@@ -1,0 +1,178 @@
+sources:
+  - source_name: AMFI India
+    source_type: official
+    base_url: https://www.amfiindia.com/
+    reliability_score: 95
+    allowed_ingestion_method: official_download
+    refresh_frequency: daily
+    categories_covered: [mutual funds, NAV, factsheets]
+    enabled: true
+
+  - source_name: NSE India
+    source_type: official
+    base_url: https://www.nseindia.com/
+    reliability_score: 95
+    allowed_ingestion_method: official_page_or_api
+    refresh_frequency: daily
+    categories_covered: [indices, ETFs, equities]
+    enabled: true
+
+  - source_name: BSE India
+    source_type: official
+    base_url: https://www.bseindia.com/
+    reliability_score: 93
+    allowed_ingestion_method: official_page_or_api
+    refresh_frequency: daily
+    categories_covered: [indices, equities]
+    enabled: true
+
+  - source_name: RBI
+    source_type: official
+    base_url: https://www.rbi.org.in/
+    reliability_score: 96
+    allowed_ingestion_method: official_page_or_rss
+    refresh_frequency: daily
+    categories_covered: [rates, macro, policy]
+    enabled: true
+
+  - source_name: SEBI
+    source_type: official
+    base_url: https://www.sebi.gov.in/
+    reliability_score: 96
+    allowed_ingestion_method: official_page_or_rss
+    refresh_frequency: daily
+    categories_covered: [regulation, risk warnings]
+    enabled: true
+
+  - source_name: Yahoo Finance
+    source_type: api
+    base_url: https://finance.yahoo.com/
+    reliability_score: 80
+    allowed_ingestion_method: public_chart_endpoint
+    refresh_frequency: daily
+    categories_covered: [market data, ETFs, equities]
+    enabled: true
+
+  - source_name: CoinGecko
+    source_type: api
+    base_url: https://www.coingecko.com/
+    reliability_score: 82
+    allowed_ingestion_method: public_api
+    refresh_frequency: daily
+    categories_covered: [crypto]
+    enabled: true
+
+  - source_name: Alpha Vantage
+    source_type: api
+    base_url: https://www.alphavantage.co/
+    reliability_score: 82
+    allowed_ingestion_method: api_key
+    refresh_frequency: daily
+    categories_covered: [market data]
+    enabled_by_env: ALPHA_VANTAGE_API_KEY
+
+  - source_name: Twelve Data
+    source_type: api
+    base_url: https://twelvedata.com/
+    reliability_score: 82
+    allowed_ingestion_method: api_key
+    refresh_frequency: daily
+    categories_covered: [market data]
+    enabled_by_env: TWELVE_DATA_API_KEY
+
+  - source_name: News API
+    source_type: api
+    base_url: https://newsapi.org/
+    reliability_score: 72
+    allowed_ingestion_method: api_key
+    refresh_frequency: hourly
+    categories_covered: [news]
+    enabled_by_env: NEWS_API_KEY
+
+  - source_name: LiveMint Markets
+    source_type: rss
+    base_url: https://www.livemint.com/market
+    feed_url: https://www.livemint.com/rss/markets
+    reliability_score: 76
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [market news, macro]
+    enabled: true
+
+  - source_name: Economic Times Markets
+    source_type: rss
+    base_url: https://economictimes.indiatimes.com/markets
+    feed_url: https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms
+    reliability_score: 74
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [market news, stocks]
+    enabled: true
+
+  - source_name: Times of India Business
+    source_type: rss
+    base_url: https://timesofindia.indiatimes.com/business
+    feed_url: https://timesofindia.indiatimes.com/rssfeeds/1898055.cms
+    reliability_score: 70
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [business news, macro]
+    enabled: true
+
+  - source_name: Investing.com India
+    source_type: rss
+    base_url: https://in.investing.com/news/
+    feed_url: https://in.investing.com/rss/news_25.rss
+    reliability_score: 70
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [market news, macro]
+    enabled: true
+
+  - source_name: Hindu BusinessLine Markets
+    source_type: rss
+    base_url: https://www.thehindubusinessline.com/markets/
+    feed_url: https://www.thehindubusinessline.com/markets/?service=rss
+    reliability_score: 80
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [market news, stocks, macro]
+    enabled: true
+
+  - source_name: RBI Press Releases
+    source_type: rss
+    base_url: https://www.rbi.org.in/
+    feed_url: https://rbi.org.in/pressreleases_rss.xml
+    reliability_score: 96
+    allowed_ingestion_method: official_rss
+    refresh_frequency: daily
+    categories_covered: [rates, macro, policy]
+    enabled: true
+
+  - source_name: SEBI Updates
+    source_type: rss
+    base_url: https://www.sebi.gov.in/
+    feed_url: https://www.sebi.gov.in/sebirss.xml
+    reliability_score: 96
+    allowed_ingestion_method: official_rss
+    refresh_frequency: daily
+    categories_covered: [regulation, risk warnings]
+    enabled: true
+
+  - source_name: Zerodha Varsity
+    source_type: article
+    base_url: https://zerodha.com/varsity/
+    reliability_score: 88
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: monthly
+    categories_covered: [education, risk, investing basics]
+    enabled: true
+
+  - source_name: Value Research
+    source_type: article
+    base_url: https://www.valueresearchonline.com/
+    reliability_score: 84
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: weekly
+    categories_covered: [mutual funds, fund research]
+    enabled: true

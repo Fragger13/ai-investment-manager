@@ -1,0 +1,192 @@
+# AI Investment Manager
+
+Working MVP for beginner-friendly personal investment planning for Indian retail investors.
+
+The app now uses backend APIs for onboarding, document upload, dashboard intelligence, recommendations, market/research source attribution, and AI chat. It does not fill user-facing flows with random sample data.
+
+## Run Locally
+
+Backend:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000
+```
+
+Frontend:
+
+```bash
+npm install --prefix frontend
+npm run dev --prefix frontend
+```
+
+Open:
+
+- Frontend: http://localhost:3000
+- If port 3000 is busy, Next.js may use http://localhost:3001. The backend allows both ports in local development.
+- Backend health: http://127.0.0.1:8000/health
+- API docs: http://127.0.0.1:8000/docs
+
+The frontend defaults to `http://127.0.0.1:8000/api/v1`. Override with:
+
+```bash
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api/v1 npm run dev --prefix frontend
+```
+
+### Local Dev Login
+
+Seed the local-only development user after installing backend dependencies:
+
+```bash
+cd backend
+.venv/bin/python scripts/seed_dev_user.py
+```
+
+Credentials:
+
+- Email: `tanishq13@gmail.com`
+- Password: `Test@12345`
+
+The seed script only runs when `ENVIRONMENT` is `development`, `dev`, `local`, or `test`, and only against the local SQLite database. It is not run automatically in production.
+
+Auth failure messages distinguish:
+
+- user not found
+- wrong password
+- backend unavailable
+- server error
+- unsupported local password hash requiring reset
+
+## MVP Features
+
+- Functional auth with FastAPI, JWT, and SQLite persistence.
+- Blank onboarding fields with helpful placeholders.
+- DOB-based age calculation.
+- Auto-calculated monthly inflow from salary, bonus, side income, and other income.
+- Document-first or manual onboarding.
+- Real file upload endpoint with PDF, CSV, and XLSX validation and parsing.
+- Reviewable extracted fields with confidence and “Needs your review” status.
+- Dynamic additional investments.
+- Short-term and long-term risk comfort capture.
+- Travel, retirement, financial freedom, and EMI-aware goal planning.
+- Behavioral profile capture and saved use in alerts and recommendations.
+- Rule-backed active agents for health, investing, market/research, behavior, documents, opportunities, goals, and chat.
+- Source-attributed recommendations and market insights.
+- Investment risk disclaimers in dashboard and recommendations.
+
+## Document Upload Support
+
+Supported now:
+
+- PDF text extraction using a lightweight built-in parser for digital PDFs.
+- CSV parsing using Python standard library.
+- XLSX parsing using Python standard library ZIP/XML reading.
+
+Image OCR:
+
+- The upload flow rejects image OCR for now and tells users that OCR support is coming soon.
+- The service interface is ready to connect OCR later.
+
+## Phase 2 Research Ingestion
+
+The research layer now attempts real, source-backed ingestion when `POST /api/v1/research/refresh` runs:
+
+- RSS/public feed ingestion from validated finance sources configured in `backend/app/config/research_sources.yaml`: LiveMint, Economic Times, Times of India Business, Investing.com India, Hindu BusinessLine, RBI, and SEBI.
+- API-style structured market ingestion from Yahoo Finance chart endpoints for Indian indices and ETFs.
+- AMFI NAV text ingestion for selected mutual fund research records.
+- CoinGecko simple price ingestion for Bitcoin and Ethereum crypto research.
+- Deterministic rule-based signal extraction for sentiment, asset classes, sectors, instruments, macro themes, risk warnings, opportunities, confidence, relevance, and source credibility.
+- Database persistence for research sources, research articles, market signals, asset research, and source refresh logs.
+- Duplicate protection for repeated article URLs and repeated market signals.
+- Market page refresh workflow with status, latest timestamps, source URLs, data mode labels, and credibility scores.
+
+The system does not scrape paywalled/blocked pages, does not use browser automation for ingestion, and does not present fallback or cached data as live.
+
+Phase 2A reliability upgrades:
+
+- Shared resilient HTTP client with urllib first, curl fallback, retries, timeouts, content validation, and file-backed response cache.
+- Explicit data modes: `live`, `cached`, `delayed`, `limited`, and `fallback`.
+- Dead or blocked feeds are excluded from the YAML source registry instead of being treated as usable sources.
+- RSS endpoints are required to return parseable RSS/Atom XML before articles are stored.
+- AMFI, Yahoo Finance, and CoinGecko connectors use the same retry/cache path.
+
+Live source endpoints used by the Phase 2 connectors include:
+
+- AMFI NAV: `https://portal.amfiindia.com/spages/NAVOpen.txt`
+- Yahoo Finance chart API: `https://query1.finance.yahoo.com/v8/finance/chart/...`
+- CoinGecko simple price API: `https://api.coingecko.com/api/v3/simple/price`
+- LiveMint Markets RSS: `https://www.livemint.com/rss/markets`
+- Economic Times Markets RSS: `https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms`
+- Times of India Business RSS: `https://timesofindia.indiatimes.com/rssfeeds/1898055.cms`
+- Investing.com India RSS: `https://in.investing.com/rss/news_25.rss`
+- Hindu BusinessLine Markets RSS: `https://www.thehindubusinessline.com/markets/?service=rss`
+- RBI Press Releases RSS: `https://rbi.org.in/pressreleases_rss.xml`
+- SEBI RSS: `https://www.sebi.gov.in/sebirss.xml`
+
+If any source is unavailable, blocked, rate-limited, or the local environment has no internet access, the refresh log marks that source as `limited` or `fallback` and keeps the UI explicit about data quality.
+
+## Optional Market API Keys
+
+The app works without API keys, but optional keys can improve future source coverage. Missing keys should not break local development.
+
+```bash
+ALPHA_VANTAGE_API_KEY=
+TWELVE_DATA_API_KEY=
+NEWS_API_KEY=
+COINGECKO_API_KEY=
+OPENAI_API_KEY=
+```
+
+## Advanced Research Intelligence
+
+Architecture documentation:
+
+- `docs/ADVANCED_RESEARCH_ARCHITECTURE.md`
+
+Phase 1 includes:
+
+- Research source registry.
+- Research database models for sources, articles, signals, assets, recommendation sources, and refresh logs.
+- RSS/API connector structure without uncontrolled scraping.
+- Deterministic signal extraction and fallback-labelled market signals.
+- Advanced recommendation schema with exact instrument names, source links, suitability, confidence, action plan, risks, and data mode.
+- Recommendations UI filters, sorting, source counts, evidence panels, refresh button, and fallback/live labels.
+- Market page showing research signals and source registry entries.
+
+Phase 2 includes:
+
+- Real RSS/API ingestion structure for safe public sources.
+- AMFI, Yahoo Finance endpoint, and CoinGecko connectors with fallback labeling.
+- Source credibility scoring and refresh logs.
+- Stored market signals and asset research from live or clearly labelled limited/fallback sources.
+- Market Intelligence UI refresh button, status panel, source links, sentiment tags, timestamps, and source credibility scores.
+
+Research APIs:
+
+```text
+POST /api/v1/research/refresh
+GET  /api/v1/research/sources
+GET  /api/v1/research/signals
+GET  /api/v1/research/assets
+GET  /api/v1/research/status
+POST /api/v1/recommendations/generate-advanced
+GET  /api/v1/recommendations/latest
+GET  /api/v1/recommendations/{id}/sources
+```
+
+## Verification
+
+Useful checks:
+
+```bash
+backend/.venv/bin/python -m compileall backend/app
+npm run lint --prefix frontend
+npm run build
+```
+
+## Safety
+
+The app provides educational decision support, not guaranteed financial advice. Investments involve market risk. Users should verify source links and suitability before investing.
