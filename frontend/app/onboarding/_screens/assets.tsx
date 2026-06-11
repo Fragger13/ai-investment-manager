@@ -537,7 +537,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
             {draftList.map((row, index) => (
               <div key={index} className="grid gap-2 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                 <div className="space-y-1">
-                  <Label className="text-xs">Type</Label>
+                  <Label className="text-[13px]">Type</Label>
                   <Select value={row.type || ""} onValueChange={(v) => setDraftList(draftList.map((r, i) => i === index ? { ...r, type: v } : r))}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -546,14 +546,14 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Value today</Label>
+                  <Label className="text-[13px]">Value today</Label>
                   <div className="relative">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                     <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.value || 0) ? formatIndianCurrencyInput(Number(row.value)) : ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, value: parseIndianCurrencyInput(e.target.value) } : r))} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Notes</Label>
+                  <Label className="text-[13px]">Notes</Label>
                   <Input placeholder="Optional" value={row.notes || ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} />
                 </div>
                 <div className="flex items-end">
@@ -630,7 +630,7 @@ function HoldingsBucketDialog({
                 <div key={h.id} className="flex items-start justify-between gap-3 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-[#0F172A] truncate">{h.name}</p>
-                    <p className="mt-0.5 text-[11px] text-[#4B5563]">
+                    <p className="mt-0.5 text-[12px] text-[#4B5563]">
                       {formatINR(h.currentValue)}
                       {h.units ? ` · ${h.units} units` : ""}
                       {h.symbol ? ` · ${h.symbol}` : ""}
@@ -802,7 +802,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
               <div key={row.id} className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
                 <div className="grid gap-2 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                   <div className="space-y-1">
-                    <Label className="text-xs">Type</Label>
+                    <Label className="text-[13px]">Type</Label>
                     <Select value={row.assetClass || ""} onValueChange={(v) => updateRow(index, { assetClass: v as HoldingAssetClass })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
@@ -811,14 +811,14 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Value today</Label>
+                    <Label className="text-[13px]">Value today</Label>
                     <div className="relative">
                       <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                       <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.currentValue || 0) ? formatIndianCurrencyInput(Number(row.currentValue)) : ""} onChange={(e) => updateRow(index, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">{nameLabel}</Label>
+                    <Label className="text-[13px]">{nameLabel}</Label>
                     <Input placeholder={namePlaceholder} value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} />
                   </div>
                   <div className="flex items-end">
@@ -828,7 +828,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                 {showExtras ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label className="text-xs text-[#6B7280]">Value at cost (optional)</Label>
+                      <Label className="text-[13px] text-[#6B7280]">Value at cost (optional)</Label>
                       <div className="relative">
                         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                         <Input className="pl-7" inputMode="numeric" placeholder="For P&L" value={Number(row.valueAtCost || 0) ? formatIndianCurrencyInput(Number(row.valueAtCost)) : ""} onChange={(e) => updateRow(index, { valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
@@ -836,13 +836,13 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </div>
                     {unitLbl ? (
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#6B7280]">{unitLbl} (optional)</Label>
+                        <Label className="text-[13px] text-[#6B7280]">{unitLbl} (optional)</Label>
                         <Input type="number" inputMode="decimal" placeholder="e.g., 25" value={Number(row.units || 0) === 0 ? "" : Number(row.units)} onChange={(e) => updateRow(index, { units: Number(e.target.value || 0) })} />
                       </div>
                     ) : null}
                     {isCrypto ? (
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#6B7280]">Symbol (optional)</Label>
+                        <Label className="text-[13px] text-[#6B7280]">Symbol (optional)</Label>
                         <Input placeholder="BTC, ETH" value={row.symbol || ""} onChange={(e) => updateRow(index, { symbol: e.target.value.toUpperCase() })} />
                       </div>
                     ) : null}
@@ -920,7 +920,7 @@ function HoldingEditorDialog({
                 onChange={(e) => onChange(symbolField === "schemeCode" ? { ...holding, schemeCode: e.target.value } : { ...holding, symbol: e.target.value.toUpperCase() })}
                 placeholder={symbolPlaceholder}
               />
-              <p className="text-[11px] text-[#4B5563]">Lets us refresh prices live later.</p>
+              <p className="text-[12px] text-[#4B5563]">Helps us refresh prices live later.</p>
             </div>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">

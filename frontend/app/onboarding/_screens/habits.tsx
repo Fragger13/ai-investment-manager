@@ -3,7 +3,7 @@
 import { OptionPill } from "../_components/choice-card";
 import { fieldError } from "../_lib/field-helpers";
 import { ScreenWrap } from "./about";
-import { useScrollToFirstError } from "./risk";
+import { AnsweredBadge, scrollToNextUnanswered, useScrollToFirstError } from "./risk";
 import { ScreenContext } from "../_flow/types";
 import { OnboardingProfile } from "@/types";
 
@@ -80,12 +80,18 @@ export function HabitsScreen(ctx: ScreenContext) {
     .map((q) => q.field)
     .filter((field) => Boolean(fieldError(errors as Record<string, unknown>, field)));
   useScrollToFirstError(erroredFields);
+  const answered = HABIT_QUESTIONS.filter((q) => Boolean(ctx.values[q.field])).length;
+  const selectAnswer = (field: HabitField, value: string) => {
+    ctx.form.setValue(field, value, { shouldValidate: true });
+    scrollToNextUnanswered(HABIT_QUESTIONS.map((q) => q.field), field, (f) => f === field ? value : String(ctx.values[f as HabitField] || ""));
+  };
   return (
     <ScreenWrap
       papa="Let's find out if you're Warren Buffett or 'Add to Cart' Buffett."
       headline="Your money habits"
       sub="Pick the option closest to how you usually act."
       mood="laugh"
+      badge={<AnsweredBadge answered={answered} total={HABIT_QUESTIONS.length} />}
     >
       <div className="grid min-h-0 flex-1 gap-x-10 gap-y-5 lg:grid-cols-2">
         <div className="flex flex-col gap-12">
@@ -97,7 +103,7 @@ export function HabitsScreen(ctx: ScreenContext) {
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
               error={erroredFields.includes(q.field)}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
         </div>
@@ -110,7 +116,7 @@ export function HabitsScreen(ctx: ScreenContext) {
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
               error={erroredFields.includes(q.field)}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
         </div>

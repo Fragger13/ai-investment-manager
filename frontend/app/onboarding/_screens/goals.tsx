@@ -107,6 +107,7 @@ export function GoalsScreen({ form, values }: ScreenContext) {
                 emoji={opt.emoji}
                 filled={filled}
                 summary={summary}
+                popular={opt.value === "Emergency fund" || opt.value === "Retirement"}
                 onClick={() => openForType(opt.value)}
                 onRemove={filled ? () => {
                   const idx = goals.findIndex((g) => g?.type === opt.value);
@@ -117,7 +118,7 @@ export function GoalsScreen({ form, values }: ScreenContext) {
           })}
         </div>
 
-        <p className="text-xs text-[#4B5563]">
+        <p className="text-[13px] text-[#4B5563]">
           {goals.length === 0
             ? "Pick at least one goal to continue. Each opens its own little planner."
             : `${goals.length} goal${goals.length > 1 ? "s" : ""} planned. Tap a tile to edit, X to remove.`}
@@ -144,6 +145,7 @@ function GoalChip({
   emoji,
   filled,
   summary,
+  popular = false,
   onClick,
   onRemove
 }: {
@@ -151,6 +153,7 @@ function GoalChip({
   emoji: string;
   filled: boolean;
   summary?: string;
+  popular?: boolean;
   onClick: () => void;
   onRemove?: () => void;
 }) {
@@ -168,6 +171,9 @@ function GoalChip({
         <span className="text-[36px] leading-none" aria-hidden>{emoji}</span>
         <span className="text-base font-semibold leading-tight text-[#0F172A]">{label}</span>
         {filled && summary ? <span className="text-xs font-semibold text-[#138A3C]">{summary}</span> : null}
+        {popular && !filled ? (
+          <span className="rounded-full bg-[#E9F4EC] px-2 py-0.5 text-[12px] font-semibold text-[#138A3C]">Popular</span>
+        ) : null}
         {filled ? (
           <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#138A3C] text-white">
             <Check className="h-3 w-3" />

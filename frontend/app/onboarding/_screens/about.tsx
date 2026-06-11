@@ -58,18 +58,23 @@ export function ScreenWrap({
   headline,
   sub,
   mood,
+  badge,
   children
 }: {
   papa: string;
   headline: string;
   sub?: string;
   mood?: PapaMood;
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-1 flex-col">
       <div>
-        <h2 className="text-[22px] font-semibold leading-tight text-[#0F172A] sm:text-[28px]">{headline}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-[22px] font-semibold leading-tight text-[#0F172A] sm:text-[28px]">{headline}</h2>
+          {badge}
+        </div>
         {sub ? <p className="mt-1 text-[15px] leading-6 text-[#4B5563]">{sub}</p> : null}
       </div>
       <div className="mt-4 mb-[1cm]">

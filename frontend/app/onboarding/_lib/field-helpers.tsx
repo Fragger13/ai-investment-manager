@@ -155,7 +155,7 @@ export function ReadOnly({ label, value, helper }: { label?: string; value: stri
     <div className="space-y-2">
       {label ? <Label>{label}</Label> : null}
       <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">{value}</div>
-      {helper ? <p className="text-xs leading-5 text-muted-foreground">{helper}</p> : null}
+      {helper ? <p className="text-[13px] leading-5 text-muted-foreground">{helper}</p> : null}
     </div>
   );
 }

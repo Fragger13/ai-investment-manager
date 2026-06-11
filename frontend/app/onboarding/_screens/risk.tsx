@@ -72,12 +72,18 @@ export function RiskScreen(ctx: ScreenContext) {
     .map((q) => q.field)
     .filter((field) => Boolean(fieldError(errors as Record<string, unknown>, field)));
   useScrollToFirstError(erroredFields);
+  const answered = RISK_QUESTIONS.filter((q) => Boolean(ctx.values[q.field])).length;
+  const selectAnswer = (field: ChoiceField, value: string) => {
+    ctx.form.setValue(field, value, { shouldValidate: true });
+    scrollToNextUnanswered(RISK_QUESTIONS.map((q) => q.field), field, (f) => f === field ? value : String(ctx.values[f as ChoiceField] || ""));
+  };
   return (
     <ScreenWrap
-      papa="This isn't an exam. Nobody gets extra marks for bravery."
+      papa="More than halfway, beta. And remember — this isn't an exam. Nobody gets extra marks for bravery."
       headline="Your risk profile"
       sub="Pick what fits — we'll size every recommendation to match."
       mood="gentle"
+      badge={<AnsweredBadge answered={answered} total={RISK_QUESTIONS.length} />}
     >
       <div className="grid min-h-0 flex-1 gap-x-10 gap-y-5 lg:grid-cols-2">
         <div className="flex flex-col gap-12">
@@ -89,7 +95,7 @@ export function RiskScreen(ctx: ScreenContext) {
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
               error={erroredFields.includes(q.field)}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
         </div>
@@ -102,7 +108,7 @@ export function RiskScreen(ctx: ScreenContext) {
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
               error={erroredFields.includes(q.field)}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
           <RetirementBlock years={years} />
@@ -110,6 +116,44 @@ export function RiskScreen(ctx: ScreenContext) {
       </div>
     </ScreenWrap>
   );
+}
+
+// Live progress chip next to the headline: fills green once every pill
+// question on the screen is answered.
+export function AnsweredBadge({ answered, total }: { answered: number; total: number }) {
+  const done = answered >= total;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold transition ${
+        done
+          ? "border-[#138A3C] bg-[#138A3C] text-white"
+          : "border-[#E5E7EB] bg-white text-[#4B5563]"
+      }`}
+    >
+      {done ? "✓ All answered" : `${answered}/${total} answered`}
+    </span>
+  );
+}
+
+// After a pill is tapped, glide to the next unanswered question so the screen
+// reads tap → next → tap. Skipped when the next question is already fully
+// visible (desktop), so the page never jiggles.
+export function scrollToNextUnanswered(
+  fields: string[],
+  justAnswered: string,
+  valueOf: (field: string) => string
+) {
+  window.setTimeout(() => {
+    const idx = fields.indexOf(justAnswered);
+    const ordered = [...fields.slice(idx + 1), ...fields.slice(0, idx)];
+    const next = ordered.find((field) => !valueOf(field));
+    if (!next) return;
+    const el = document.getElementById(`question-${next}`);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const fullyVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    if (!fullyVisible) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 150);
 }
 
 // Pill questions are not real inputs, so react-hook-form's shouldFocus cannot
