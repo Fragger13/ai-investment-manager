@@ -120,7 +120,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E9F4EC] text-[#138A3C]"><Pencil className="h-5 w-5" /></span>
             <p className="text-[17px] font-semibold text-[#0F172A]">Add manually</p>
-            <p className="text-[14px] leading-snug text-[#4B5563]">That&apos;s okay. Just enter what you remember. We can always update the details later.</p>
+            <p className="text-[14px] leading-snug text-[#4B5563]">Just enter what you remember. We can always update the details later.</p>
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-800">⚠ No live P&amp;L — refresh values monthly to stay accurate</p>
           </button>
         </div>

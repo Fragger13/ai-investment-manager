@@ -113,7 +113,7 @@ export function OnboardingShell({
           </div>
         </section>
 
-        <footer className="mt-4 mb-[2cm] flex items-center justify-between">
+        <footer className="mt-4 mb-10 flex items-center justify-between sm:mb-14">
           <Button
             type="button"
             variant="outline"

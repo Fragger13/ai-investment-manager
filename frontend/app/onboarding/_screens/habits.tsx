@@ -1,7 +1,9 @@
 "use client";
 
 import { OptionPill } from "../_components/choice-card";
+import { fieldError } from "../_lib/field-helpers";
 import { ScreenWrap } from "./about";
+import { useScrollToFirstError } from "./risk";
 import { ScreenContext } from "../_flow/types";
 import { OnboardingProfile } from "@/types";
 
@@ -73,6 +75,11 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
 ];
 
 export function HabitsScreen(ctx: ScreenContext) {
+  const { errors } = ctx.form.formState;
+  const erroredFields = HABIT_QUESTIONS
+    .map((q) => q.field)
+    .filter((field) => Boolean(fieldError(errors as Record<string, unknown>, field)));
+  useScrollToFirstError(erroredFields);
   return (
     <ScreenWrap
       papa="Let's find out if you're Warren Buffett or 'Add to Cart' Buffett."
@@ -81,24 +88,28 @@ export function HabitsScreen(ctx: ScreenContext) {
       mood="laugh"
     >
       <div className="grid min-h-0 flex-1 gap-x-10 gap-y-5 lg:grid-cols-2">
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {HABIT_QUESTIONS.slice(0, 3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
+              error={erroredFields.includes(q.field)}
               onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
             />
           ))}
         </div>
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {HABIT_QUESTIONS.slice(3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
+              error={erroredFields.includes(q.field)}
               onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
             />
           ))}
@@ -109,19 +120,25 @@ export function HabitsScreen(ctx: ScreenContext) {
 }
 
 function QuestionRow({
+  field,
   question,
   options,
   value,
+  error = false,
   onSelect
 }: {
+  field: string;
   question: string;
   options: Option[];
   value?: string;
+  error?: boolean;
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2.5">
-      <p className="text-base font-medium text-[#0F172A]">{question}<span className="ml-1 text-red-500" aria-hidden>*</span></p>
+    <div id={`question-${field}`} className={`space-y-2.5 rounded-xl transition ${error ? "-m-2 bg-red-50/60 p-2 ring-1 ring-red-300" : ""}`}>
+      <p className={`text-base font-medium ${error ? "text-red-600" : "text-[#0F172A]"}`}>
+        {question}<span className="ml-1 text-red-500" aria-hidden>*</span>
+      </p>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
           <OptionPill
@@ -133,6 +150,7 @@ function QuestionRow({
           />
         ))}
       </div>
+      {error ? <p className="text-[13px] font-medium text-red-600">Pick one to continue</p> : null}
     </div>
   );
 }

@@ -53,6 +53,20 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [stepError, setStepError] = useState("");
   const initializedFromQuery = useRef(false);
+  const stepErrorRef = useRef<HTMLParagraphElement | null>(null);
+
+  // Start each screen at the top — on mobile the user is usually scrolled to
+  // the bottom (where Continue lives) when the next screen mounts.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [screenIndex]);
+
+  // Surface validation errors even when the card is taller than the viewport.
+  useEffect(() => {
+    if (stepError) {
+      stepErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [stepError]);
 
   const form = useForm<OnboardingProfile>({
     resolver: zodResolver(onboardingSchema),
@@ -321,6 +335,27 @@ export default function OnboardingPage() {
     }
   }
 
+  // Enter advances the flow, so keyboard users never have to reach for the
+  // Continue button. Skipped inside dialogs/popovers and on focused buttons
+  // (where Enter already has its own meaning).
+  const goNextRef = useRef<() => Promise<void>>(async () => {});
+  goNextRef.current = goNext;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A" || tag === "SELECT") return;
+        if (target.closest('[role="dialog"],[role="listbox"],[role="menu"],[role="combobox"]')) return;
+      }
+      event.preventDefault();
+      void goNextRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   if (!current) return null;
 
   return (
@@ -345,7 +380,7 @@ export default function OnboardingPage() {
             return <ScreenRenderer form={form} values={values} next={goNext} back={goBack} />;
           })()}
         </ScreenFrame>
-        {stepError ? <p className="mt-5 text-sm font-medium text-negative-foreground">{stepError}</p> : null}
+        {stepError ? <p ref={stepErrorRef} className="mt-5 text-sm font-medium text-negative-foreground">{stepError}</p> : null}
       </OnboardingShell>
     </FormProvider>
   );

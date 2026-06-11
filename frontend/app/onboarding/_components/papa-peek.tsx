@@ -35,7 +35,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
             transition={{ type: "spring", stiffness: 200, damping: 24 }}
             className="pointer-events-none fixed right-0 top-1/2 z-50 -translate-y-1/2"
           >
-            <div className="pointer-events-none relative h-[260px] w-[260px] sm:h-[300px] sm:w-[300px]">
+            <div className="pointer-events-none relative h-[200px] w-[200px] sm:h-[300px] sm:w-[300px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageSrc}
@@ -43,8 +43,8 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
                 aria-hidden
                 className="absolute right-0 top-0 w-full object-contain object-top drop-shadow-2xl"
               />
-              <div className="pointer-events-auto absolute -top-24 right-[120px] w-[min(360px,calc(100vw-2.5rem))] sm:right-[140px] sm:w-[400px]">
-                <div className="relative rounded-2xl border border-[#E5E7EB] bg-white px-5 py-3 shadow-2xl sm:px-6 sm:py-4">
+              <div className="pointer-events-auto absolute -top-20 right-[88px] w-[min(260px,calc(100vw-7.5rem))] sm:-top-24 sm:right-[140px] sm:w-[400px]">
+                <div className="relative rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
                   <button
                     type="button"
                     onClick={onClose}

@@ -1,11 +1,13 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { PapaAvatar } from "../_components/papa-bubble";
 import { SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
+import { useAuthStore } from "@/store/auth-store";
 import { ScreenContext } from "../_flow/types";
 
 export function WelcomeScreen(_ctx: ScreenContext) {
+  const user = useAuthStore((state) => state.user);
+  const firstName = (user?.name || "").trim().split(/\s+/)[0] || "";
   return (
     <div className="flex flex-col items-center text-center">
       <PapaAvatar
@@ -21,7 +23,7 @@ export function WelcomeScreen(_ctx: ScreenContext) {
         Hi Bacche!
       </h1>
       <p className="mt-3 max-w-xl text-base leading-7 text-[#4B5563]">
-        Five minutes. You have spent longer deciding what to watch on Netflix.
+        Five minutes{firstName ? `, ${firstName}` : ""}. You have spent longer deciding what to watch on Netflix.
       </p>
       <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-3">
         <WelcomePill icon="⏱️" label="5 minutes" />
@@ -29,7 +31,7 @@ export function WelcomeScreen(_ctx: ScreenContext) {
         <WelcomePill icon="☕" label="Pause anytime" />
       </div>
       <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#E9F4EC] px-4 py-1.5 text-xs font-semibold text-[#138A3C]">
-        <Sparkles className="h-3 w-3" /> Tap Begin to start
+        🔒 Private — only Papa sees this
       </div>
     </div>
   );

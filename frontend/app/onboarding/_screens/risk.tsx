@@ -1,6 +1,7 @@
 "use client";
 
-import { NumberField } from "../_lib/field-helpers";
+import { useEffect, useRef } from "react";
+import { NumberField, fieldError } from "../_lib/field-helpers";
 import { OptionPill } from "../_components/choice-card";
 import { ScreenWrap } from "./about";
 import { ScreenContext } from "../_flow/types";
@@ -66,6 +67,11 @@ const RISK_QUESTIONS: { field: ChoiceField; question: string; options: Option[] 
 
 export function RiskScreen(ctx: ScreenContext) {
   const years = Math.max(60 - Number(ctx.values.age || 0), 0);
+  const { errors } = ctx.form.formState;
+  const erroredFields = RISK_QUESTIONS
+    .map((q) => q.field)
+    .filter((field) => Boolean(fieldError(errors as Record<string, unknown>, field)));
+  useScrollToFirstError(erroredFields);
   return (
     <ScreenWrap
       papa="This isn't an exam. Nobody gets extra marks for bravery."
@@ -74,24 +80,28 @@ export function RiskScreen(ctx: ScreenContext) {
       mood="gentle"
     >
       <div className="grid min-h-0 flex-1 gap-x-10 gap-y-5 lg:grid-cols-2">
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {RISK_QUESTIONS.slice(0, 3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
+              error={erroredFields.includes(q.field)}
               onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
             />
           ))}
         </div>
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {RISK_QUESTIONS.slice(3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
+              error={erroredFields.includes(q.field)}
               onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
             />
           ))}
@@ -100,6 +110,20 @@ export function RiskScreen(ctx: ScreenContext) {
       </div>
     </ScreenWrap>
   );
+}
+
+// Pill questions are not real inputs, so react-hook-form's shouldFocus cannot
+// reach them — scroll the first unanswered question into view ourselves when
+// a failed Continue adds new errors.
+export function useScrollToFirstError(erroredFields: string[]) {
+  const prevCount = useRef(0);
+  useEffect(() => {
+    if (erroredFields.length > prevCount.current && erroredFields.length > 0) {
+      document.getElementById(`question-${erroredFields[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    prevCount.current = erroredFields.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erroredFields.join(",")]);
 }
 
 function RetirementBlock({ years }: { years: number }) {
@@ -119,19 +143,25 @@ function RetirementBlock({ years }: { years: number }) {
 }
 
 function QuestionRow({
+  field,
   question,
   options,
   value,
+  error = false,
   onSelect
 }: {
+  field: string;
   question: string;
   options: Option[];
   value?: string;
+  error?: boolean;
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2.5">
-      <p className="text-base font-medium text-[#0F172A]">{question}<span className="ml-1 text-red-500" aria-hidden>*</span></p>
+    <div id={`question-${field}`} className={`space-y-2.5 rounded-xl transition ${error ? "-m-2 bg-red-50/60 p-2 ring-1 ring-red-300" : ""}`}>
+      <p className={`text-base font-medium ${error ? "text-red-600" : "text-[#0F172A]"}`}>
+        {question}<span className="ml-1 text-red-500" aria-hidden>*</span>
+      </p>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
           <OptionPill
@@ -143,6 +173,7 @@ function QuestionRow({
           />
         ))}
       </div>
+      {error ? <p className="text-[13px] font-medium text-red-600">Pick one to continue</p> : null}
     </div>
   );
 }
