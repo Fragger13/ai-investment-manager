@@ -73,7 +73,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
   const totalValue = (values.holdings || []).reduce((sum, h) => sum + Number(h.currentValue || 0), 0);
   const [peekOpen, setPeekOpen] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setPeekOpen(true), 1000);
+    const t = window.setTimeout(() => setPeekOpen(true), 500);
     return () => window.clearTimeout(t);
   }, []);
   const triggerUpload = () => {
@@ -131,9 +131,10 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
         onClose={() => setPeekOpen(false)}
         variant="edge"
         imageSrc="/landing/papa-peek-concerned.png"
-        autoDismissMs={7000}
+        autoDismissMs={8000}
       >
         <strong>You don&apos;t have the statement handy, do you? Thought so.</strong>
+        <br />
         <br />
         And somehow this 5-minute onboarding is about to become a 15-minute adventure.
       </PapaPeek>
@@ -207,11 +208,12 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
   return (
     <ScreenWrap
       papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
-      headline="Upload portfolio statement"
-      sub="XLSX or CSV of the XIRR from your DEMAT broker app. Add one file or many — we'll merge them into one portfolio with live P&L."
+      headline="Your portfolio"
+      sub="Upload an XIRR statement (XLSX/CSV) to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
       mood="curious"
     >
-      <div className="space-y-4">
+      <div className="space-y-6">
+        <div className="space-y-4">
         {preview ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-2xl border border-[#138A3C]/30 bg-[#E9F4EC] px-4 py-3">
@@ -285,9 +287,10 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
             {error ? <p className="text-[13px] text-negative-foreground">{error}</p> : null}
-            <p className="text-[12px] text-[#4B5563]">Already added {readHoldings(form).length} holding{readHoldings(form).length === 1 ? "" : "s"}. Tap Continue to keep going manually, or upload to add more.</p>
           </div>
         )}
+        </div>
+        <PortfolioBuckets form={form} values={values} />
       </div>
     </ScreenWrap>
   );
@@ -295,11 +298,11 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
 
 const OTHER_CLASSES: HoldingAssetClass[] = ["gold", "silver", "crypto", "etf", "realEstate", "bond", "nps", "fd", "other"];
 
-// ─────────────────────────── Overview (post-upload single section) ───────────────────────────
+// ─────────────────────────── Portfolio buckets (shown inline under upload) ───────────────────────────
 
 type BucketKey = "stocks" | "mf" | "cash" | "epf" | "others";
 
-export function AssetsOverviewScreen({ form, values }: ScreenContext) {
+export function PortfolioBuckets({ form, values }: { form: UseFormReturn<OnboardingProfile>; values: OnboardingProfile }) {
   const [openBucket, setOpenBucket] = useState<BucketKey | null>(null);
   const stocks = holdingsForClass(values, ["stock", "etf"]);
   const mfs = holdingsForClass(values, ["mutualFund"]);
@@ -322,19 +325,16 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
   const totalHoldings = stocks.length + mfs.length + others.length + (cashValue > 0 ? 1 : 0) + (epfValue > 0 ? 1 : 0);
 
   return (
-    <ScreenWrap
-      papa="Here's everything you own at a glance. Tap any bucket to add or edit."
-      headline="Your portfolio"
-      sub="Green ticks mean we already have it from your upload. Click a bucket to review or top up."
-      mood="proud"
-    >
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <div className="space-y-3">
         {totalHoldings > 0 ? (
           <div className="rounded-2xl border border-[#138A3C]/20 bg-[#E9F4EC] p-4">
             <p className="text-[15px] font-semibold text-[#0F172A]">{totalHoldings} entr{totalHoldings === 1 ? "y" : "ies"} on file · Net assets {formatINR(grandTotal)}</p>
             <p className="mt-1 text-[13px] text-[#4B5563]">Tap any bucket below to add more or edit.</p>
           </div>
-        ) : null}
+        ) : (
+          <p className="text-[13px] text-[#4B5563]">Or add any bucket by hand — tap one below.</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           {buckets.map((b) => (
             <BucketTile key={b.key} bucket={b} onClick={() => setOpenBucket(b.key)} />
@@ -386,6 +386,10 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
           fieldName="epfPpfValue"
           form={form}
           initialValue={epfValue}
+          monthlyField="epfPpfMonthly"
+          monthlyLabel="Monthly contribution"
+          monthlyHelper="Amount added every month (your share + employer's, or your PPF deposit)."
+          monthlyInitial={Number(values.epfPpfMonthly || 0)}
           onClose={() => setOpenBucket(null)}
         />
       ) : null}
@@ -396,7 +400,7 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
           onClose={() => setOpenBucket(null)}
         />
       ) : null}
-    </ScreenWrap>
+    </div>
   );
 }
 
@@ -670,6 +674,7 @@ function HoldingsBucketDialog({
 
 function ScalarBucketDialog({
   title, helper, fieldName, form, initialValue, onClose,
+  monthlyField, monthlyLabel, monthlyHelper, monthlyInitial = 0,
 }: {
   title: string;
   helper: string;
@@ -677,10 +682,16 @@ function ScalarBucketDialog({
   form: UseFormReturn<OnboardingProfile>;
   initialValue: number;
   onClose: () => void;
+  monthlyField?: "epfPpfMonthly";
+  monthlyLabel?: string;
+  monthlyHelper?: string;
+  monthlyInitial?: number;
 }) {
   const [value, setValue] = useState(initialValue);
+  const [monthly, setMonthly] = useState(monthlyInitial);
   const save = () => {
     form.setValue(fieldName, value, { shouldValidate: false, shouldDirty: true });
+    if (monthlyField) form.setValue(monthlyField, monthly, { shouldValidate: false, shouldDirty: true });
     onClose();
   };
   return (
@@ -689,12 +700,22 @@ function ScalarBucketDialog({
         <DialogTitle className="text-lg font-semibold text-[#0F172A]">{title}</DialogTitle>
         <p className="mt-1 text-[13px] text-[#4B5563]">{helper}</p>
         <div className="mt-4 space-y-1.5">
-          <Label className="text-[13px]">Amount</Label>
+          <Label className="text-[13px]">Current balance</Label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
             <Input className="pl-7" inputMode="numeric" autoFocus value={formatIndianCurrencyInput(Number(value || 0))} onChange={(e) => setValue(parseIndianCurrencyInput(e.target.value))} />
           </div>
         </div>
+        {monthlyField ? (
+          <div className="mt-4 space-y-1.5">
+            <Label className="text-[13px] text-[#6B7280]">{monthlyLabel || "Monthly contribution"} <span className="font-normal">(optional)</span></Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+              <Input className="pl-7" inputMode="numeric" placeholder="e.g., 12,000" value={Number(monthly || 0) === 0 ? "" : formatIndianCurrencyInput(Number(monthly))} onChange={(e) => setMonthly(parseIndianCurrencyInput(e.target.value))} />
+            </div>
+            {monthlyHelper ? <p className="text-[12px] text-[#4B5563]">{monthlyHelper}</p> : null}
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="button" className="bg-[#138A3C] text-white hover:bg-[#107132]" onClick={save}>Save</Button>

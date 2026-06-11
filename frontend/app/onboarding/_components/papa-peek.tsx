@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
+import { SCRIPT_GREEN } from "@/lib/fonts";
 import { PapaAvatar, PapaMood } from "./papa-bubble";
 
 type PapaPeekProps = {
@@ -13,10 +13,14 @@ type PapaPeekProps = {
   autoDismissMs?: number;
   variant?: "toast" | "edge";
   imageSrc?: string;
+  // Vertical position of the speech bubble relative to the peeking image. Each
+  // papa pose has the head at a slightly different height, so the bubble's tail
+  // needs a per-image offset to land just above the head.
+  bubbleTopClass?: string;
   children: ReactNode;
 };
 
-export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant = "toast", imageSrc = "/landing/papa-peek.png", children }: PapaPeekProps) {
+export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant = "toast", imageSrc = "/landing/papa-peek.png", bubbleTopClass = "-top-28 sm:-top-36", children }: PapaPeekProps) {
   useEffect(() => {
     if (!open || !autoDismissMs) return;
     const t = window.setTimeout(onClose, autoDismissMs);
@@ -43,7 +47,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
                 aria-hidden
                 className="absolute right-0 top-0 w-full object-contain object-top drop-shadow-2xl"
               />
-              <div className="pointer-events-auto absolute -top-20 right-[88px] w-[min(260px,calc(100vw-7.5rem))] sm:-top-24 sm:right-[140px] sm:w-[400px]">
+              <div className={`pointer-events-auto absolute right-[88px] w-[min(260px,calc(100vw-7.5rem))] sm:right-[140px] sm:w-[400px] ${bubbleTopClass}`}>
                 <div className="relative rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
                   <button
                     type="button"
@@ -53,7 +57,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
                   >
                     <X className="h-4 w-4" />
                   </button>
-                  <p className="text-[19px] leading-snug sm:text-[23px]" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
+                  <p className="text-[15px] font-medium leading-snug sm:text-[16px]" style={{ color: SCRIPT_GREEN }}>
                     {children}
                   </p>
                   <svg
@@ -87,7 +91,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
           <div className="relative flex items-start gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-2xl">
             <PapaAvatar avatarClass="h-14 w-14" mood={mood} />
             <div className="flex-1 pr-5">
-              <p className="text-[15px] leading-snug" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
+              <p className="text-[14px] font-medium leading-snug" style={{ color: SCRIPT_GREEN }}>
                 {children}
               </p>
             </div>

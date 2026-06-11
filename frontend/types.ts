@@ -107,6 +107,7 @@ export type OnboardingProfile = {
   cryptoValue: number;
   goldValue: number;
   epfPpfValue: number;
+  epfPpfMonthly: number;
   realEstateValue: number;
   cashBalance: number;
   additionalInvestments: Investment[];

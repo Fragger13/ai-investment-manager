@@ -132,6 +132,7 @@ class OnboardingProfile(BaseModel):
     cryptoValue: int = 0
     goldValue: int = 0
     epfPpfValue: int = 0
+    epfPpfMonthly: int = 0
     realEstateValue: int = 0
     cashBalance: int = 0
     additionalInvestments: list[AddedInvestment] = Field(default_factory=list)

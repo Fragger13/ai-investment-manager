@@ -66,9 +66,9 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
     options: [
       { value: "Nothing right now", title: "Nothing right now", emoji: "🌈" },
       { value: "Irregular income", title: "Irregular income", emoji: "📉" },
+      { value: "Fear of losses", title: "Fear of losses", emoji: "😨" },
       { value: "Unexpected expenses", title: "Surprise expenses", emoji: "🛠️" },
       { value: "I forget or delay", title: "I forget or delay", emoji: "🕒" },
-      { value: "Fear of losses", title: "Fear of losses", emoji: "😨" },
       { value: "Too many choices", title: "Too many choices", emoji: "🤯" }
     ]
   }

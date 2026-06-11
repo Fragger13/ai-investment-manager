@@ -177,7 +177,7 @@ export function LoansScreen({ form, values }: ScreenContext) {
         onCommit={commit}
       />
 
-      <PapaPeek open={peekOpen} onClose={() => setPeekOpen(false)} variant="edge">
+      <PapaPeek open={peekOpen} onClose={() => setPeekOpen(false)} variant="edge" bubbleTopClass="-top-16 sm:-top-24">
         Not sure where to look, beta? Check <a href="https://www.cibil.com/" target="_blank" rel="noreferrer noopener" className="underline">CIBIL</a> for every loan on your PAN, and your credit card statements for any card EMIs.
       </PapaPeek>
     </ScreenWrap>

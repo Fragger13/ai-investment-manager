@@ -17,7 +17,7 @@ type Option = { value: string; title: string; emoji: string };
 const RISK_QUESTIONS: { field: ChoiceField; question: string; options: Option[] }[] = [
   {
     field: "shortTermLossTolerance",
-    question: "Short term — how much of a dip would still feel okay?",
+    question: "If your short-term savings dipped a bit, how much fall could you shrug off?",
     options: [
       { value: "0-5%", title: "Up to 5%", emoji: "😌" },
       { value: "5-10%", title: "Up to 10%", emoji: "😐" },
@@ -27,7 +27,7 @@ const RISK_QUESTIONS: { field: ChoiceField; question: string; options: Option[] 
   },
   {
     field: "shortTermHorizon",
-    question: "For short-term money, how long can it stay parked?",
+    question: "When investing for the short term, how long can you stay invested before needing the money?",
     options: [
       { value: "Less than 3 months", title: "Under 3 months", emoji: "⚡" },
       { value: "3-6 months", title: "3 to 6 months", emoji: "🌱" },
@@ -37,7 +37,7 @@ const RISK_QUESTIONS: { field: ChoiceField; question: string; options: Option[] 
   },
   {
     field: "drawdownTolerance",
-    question: "For long-term money, how much temporary drop can you stomach?",
+    question: "Your long-term investments drop temporarily. How big a dip can you sit through calmly?",
     options: [
       { value: "0-10%", title: "Up to 10%", emoji: "🛡️" },
       { value: "10-25%", title: "10 to 25%", emoji: "🧘" },

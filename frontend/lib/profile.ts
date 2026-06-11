@@ -26,6 +26,7 @@ export const blankProfile: OnboardingProfile = {
   cryptoValue: 0,
   goldValue: 0,
   epfPpfValue: 0,
+  epfPpfMonthly: 0,
   realEstateValue: 0,
   cashBalance: 0,
   additionalInvestments: [],

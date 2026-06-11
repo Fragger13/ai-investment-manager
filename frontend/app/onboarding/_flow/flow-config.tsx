@@ -7,7 +7,6 @@ import { SpendingScreen, LoansScreen } from "../_screens/expenses";
 import {
   AssetsIntroScreen,
   AssetsUploadScreen,
-  AssetsOverviewScreen,
   AssetsManualScreen,
 } from "../_screens/assets";
 import { RiskScreen } from "../_screens/risk";
@@ -69,7 +68,7 @@ export function buildScreens(
   });
 
   // Assets flow: Intro picks "upload" or "manual" intent.
-  //   • Upload path → Upload screen → Overview (bucket tiles + popups)
+  //   • Upload path → single Upload screen (upload box + portfolio buckets inline)
   //   • Manual path → single Manual screen (lumpsum entry)
   const assetsIntent = (): "upload" | "manual" | null => {
     if (typeof window === "undefined") return null;
@@ -87,13 +86,6 @@ export function buildScreens(
     id: "assets-upload",
     sectionId: "assets",
     render: AssetsUploadScreen,
-    shouldSkip: () => assetsIntent() === "manual",
-  });
-
-  screens.push({
-    id: "assets-overview",
-    sectionId: "assets",
-    render: AssetsOverviewScreen,
     shouldSkip: () => assetsIntent() === "manual",
   });
 

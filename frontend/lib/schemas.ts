@@ -90,6 +90,7 @@ export const onboardingSchema = z.object({
   cryptoValue: numeric,
   goldValue: numeric,
   epfPpfValue: numeric,
+  epfPpfMonthly: numeric,
   realEstateValue: numeric,
   cashBalance: numeric,
   additionalInvestments: z.array(z.object({ type: z.string(), value: numeric, notes: z.string().optional() })),
