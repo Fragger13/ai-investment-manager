@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Landing hero placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E9F4EC" />
+      <stop offset="100%" stop-color="#CFE8D6" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" rx="32" fill="url(#bg)" />
+  <g fill="#138A3C" opacity="0.55" font-family="ui-sans-serif, system-ui" text-anchor="middle">
+    <text x="400" y="285" font-size="28" font-weight="700">Drop your hero image at</text>
+    <text x="400" y="325" font-size="22" font-weight="500">/public/landing/hero.png</text>
+  </g>
+</svg>

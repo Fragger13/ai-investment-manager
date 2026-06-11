@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mutual fund">
+  <rect width="64" height="64" rx="18" fill="#F3E8FF"/>
+  <circle cx="24" cy="24" r="9" fill="#7C3AED"/>
+  <circle cx="41" cy="29" r="9" fill="#A855F7"/>
+  <circle cx="31" cy="43" r="9" fill="#C084FC"/>
+  <path d="M24 33c4 6 10 7 17 5" fill="none" stroke="#581C87" stroke-width="3" stroke-linecap="round"/>
+</svg>

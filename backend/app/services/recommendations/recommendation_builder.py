@@ -11,9 +11,9 @@ from app.services.recommendations.asset_screening_service import ResearchAsset, 
 from app.services.recommendations.suitability_scoring_service import ProfileContext
 
 
-def build_recommendation(profile: OnboardingProfile, context: ProfileContext, asset: ResearchAsset, signals: list[dict], priority: int) -> dict | None:
+def build_recommendation(profile: OnboardingProfile, context: ProfileContext, asset: ResearchAsset, signals: list[dict], priority: int, fit_override: dict | None = None) -> dict | None:
     supporting, conflicting = signals_for_asset(asset, signals)
-    fit = analyze_asset_fit_with_context(context, asset, supporting, conflicting)
+    fit = fit_override or analyze_asset_fit_with_context(context, asset, supporting, conflicting)
     if fit["suggestedAllocationPercentage"] <= 0 or fit["suggestedMonthlyAmount"] <= 0:
         return None
     if fit["suitabilityScore"] < 45:
@@ -57,30 +57,110 @@ def _stable_id(name: str) -> str:
 
 
 def _title(asset: ResearchAsset) -> str:
-    verb = "Build emergency money with" if asset.asset_key == "debt" else "Start a SIP in" if asset.asset_key == "equity" else "Use a small allocation to" if asset.asset_key == "gold" else "Only consider a capped satellite allocation to"
+    verb = "Build emergency savings with" if asset.asset_key == "debt" else "Start regular investing in" if asset.asset_key == "equity" else "Use a small part of your plan for" if asset.asset_key == "gold" else "Consider a small short-term amount in" if asset.asset_key == "tactical" else "Only consider a small amount in"
     return f"{verb} {asset.instrument_name}"
 
 
 def _user_reasoning(profile: OnboardingProfile, context: ProfileContext, asset: ResearchAsset, fit: dict) -> str:
+    """Profile-aware reasoning that references actual numbers and goals."""
+    age = context.age
+    name_goal = _top_goal_name(profile)
+    surplus_str = f"₹{context.surplus:,}/month"
+
+    if "asset intelligence" in asset.category.lower():
+        action = "keep-an-eye-on" if "watchlist" in asset.category.lower() else "small short-term"
+        return (
+            f"{asset.instrument_name} surfaced from the research review as a {action} idea with a "
+            f"{asset.confidence_score}% confidence level. It fits only as a small slice outside your core plan, "
+            f"because your surplus is {surplus_str} and your core goals come first."
+        )
+
     if asset.asset_key == "debt":
+        parts = []
         if context.emergency_gap > 0:
-            return f"You still have an emergency fund gap of about ₹{context.emergency_gap:,}. This is why a lower-volatility option gets priority before taking more market risk."
-        return "Your emergency fund looks closer to target, so this can stay as a smaller stability allocation rather than the main investment."
+            parts.append(
+                f"You still need about ₹{context.emergency_gap:,} more in emergency savings, "
+                f"which is why a steadier option comes before more market risk."
+            )
+        elif context.age_band in {"pre_retire", "senior"}:
+            parts.append(
+                f"At {age}, capital preservation matters more than chasing returns — debt is your stability layer."
+            )
+        elif context.has_short_term_goals:
+            parts.append(
+                f"You have near-term goals (within 3 years) — debt funds protect that money from equity swings."
+            )
+        else:
+            parts.append("Your emergency cover is close to the suggested level, so debt becomes a smaller stability layer rather than the main investment.")
+        if context.irregular_income:
+            parts.append("Your income is irregular, so a debt buffer also smooths month-to-month volatility.")
+        return " ".join(parts)
+
     if asset.asset_key == "equity":
         horizon = profile.investmentHorizon or "long-term"
-        return f"This fits a {horizon} goal better than short-term needs. A SIP helps you invest steadily without trying to guess the perfect market entry date."
+        parts = []
+        if context.age_band == "young":
+            parts.append(f"At {age}, you have the longest possible runway for compounding — equity rewards patience.")
+        elif context.age_band == "mid":
+            parts.append(f"At {age}, equity is still your main growth engine — you have time to ride out market cycles.")
+        elif context.age_band == "pre_retire":
+            parts.append(f"At {age}, equity stays in the mix but with a smaller share — risk capacity is lower than it was at 30.")
+        else:
+            parts.append(f"At {age}, equity should be a small minority of your investments — capital preservation comes first.")
+        if name_goal:
+            parts.append(f"This investment is sized to support your goal: {name_goal}.")
+        else:
+            parts.append("Add a long-term goal so we can size this against a real target.")
+        if context.portfolio_equity_share > 0.65:
+            parts.append("Your portfolio is already heavy on equity, so the suggested amount is on the lower side.")
+        elif context.portfolio_equity_share < 0.15 and context.age_band in {"young", "mid"}:
+            parts.append("You are currently under-allocated to equity for your age, so this is a meaningful tilt.")
+        if context.panic_risk:
+            parts.append("Because your behaviour profile shows panic-sell risk, the SIP is sized small enough to ride out swings without forcing you to react.")
+        return " ".join(parts)
+
     if asset.asset_key == "gold":
-        return "This is mainly for diversification. It can help reduce dependence on only equity or debt, but it should stay a small part of the portfolio."
+        parts = ["Gold helps spread your money beyond shares and debt funds, especially when markets are volatile."]
+        if context.portfolio_gold_share > 0.12:
+            parts.append(f"Your existing gold share is already ~{round(context.portfolio_gold_share * 100)}% — that's enough; this should be capped at 10-12% of investments total.")
+        if context.age_band in {"pre_retire", "senior"}:
+            parts.append("A small gold tilt is reasonable as you approach retirement for added stability.")
+        return " ".join(parts)
+
+    if asset.asset_key == "tactical":
+        parts = ["This is a short-term tactical idea — keep it small, review it monthly, and never use money tied to important goals."]
+        if context.disciplined and context.income_tier in {"high", "ultra"}:
+            parts.append("Your discipline and income tier make a small tactical slice acceptable.")
+        elif not context.disciplined:
+            parts.append("Because your investing discipline is still developing, the suggested amount is on the lower side.")
+        return " ".join(parts)
+
+    if asset.asset_key == "crypto":
+        parts = [
+            "Crypto fits only if you already have emergency money, core SIPs running, and are comfortable with sharp drops.",
+        ]
+        if context.portfolio_crypto_share > 0.05:
+            parts.append(f"Your existing crypto share is ~{round(context.portfolio_crypto_share * 100)}% — already at the cap; no further allocation suggested.")
+        if context.age_band in {"pre_retire", "senior"}:
+            parts.append("At your age, crypto should be a very small or zero allocation.")
+        if context.emergency_gap > 0:
+            parts.append(f"Fix the ₹{context.emergency_gap:,} emergency gap first before adding crypto exposure.")
+        return " ".join(parts)
+
     return "This only fits if you are comfortable with large temporary losses and already have emergency money and core investments in place."
 
 
 def _market_reasoning(asset: ResearchAsset, supporting: list[dict], conflicting: list[dict]) -> str:
+    if "asset intelligence" in asset.category.lower():
+        signal_text = supporting[0]["summary"] if supporting else "matching market signals are limited"
+        conflict_text = f" Main conflict: {conflicting[0]['summary']}" if conflicting else ""
+        return f"Investment idea summary: {asset.summary} Related market update: {signal_text}.{conflict_text}"
     if supporting:
         best = supporting[0]
-        return f"Research support: {best['summary']} Source credibility: {best['credibilityScore']}%. Asset data: {asset.summary}"
+        return f"Supporting information: {best['summary']} Source quality: {best['credibilityScore']}%. Investment details: {asset.summary}"
     if conflicting:
-        return f"Market evidence is mixed. Main caution: {conflicting[0]['summary']} Asset data: {asset.summary}"
-    return f"Asset research is available, but there are not enough matching market signals yet. Asset data: {asset.summary}"
+        return f"Market information is mixed. Main caution: {conflicting[0]['summary']} Investment details: {asset.summary}"
+    return f"Investment details are available, but there are not enough matching market updates yet. Investment details: {asset.summary}"
 
 
 def _risk_explanation(asset: ResearchAsset, context: ProfileContext) -> str:
@@ -95,12 +175,16 @@ def _risk_explanation(asset: ResearchAsset, context: ProfileContext) -> str:
 
 
 def _what_can_go_wrong(asset: ResearchAsset) -> str:
+    if "asset intelligence" in asset.category.lower():
+        return "This idea can weaken if its price trend reverses, investment quality falls, buying and selling becomes harder, or markets become more cautious."
     if asset.asset_key == "equity":
         return "A market correction can reduce value soon after you start. If you stop SIPs or sell during a fall, long-term compounding can be hurt."
     if asset.asset_key == "debt":
         return "Returns may be modest, and rare credit or liquidity events can affect debt funds. Check the latest portfolio before investing."
     if asset.asset_key == "gold":
         return "Gold may stay flat while equity or debt performs better. SGBs also have liquidity and tenure constraints."
+    if asset.asset_key == "tactical":
+        return "A sector trend can reverse quickly. A short-term idea can perform poorly even when your long-term investments are doing fine."
     return "The price can fall sharply, regulation can change, and the asset can become unsuitable if your risk comfort changes."
 
 
@@ -160,7 +244,17 @@ def _shorten(value: str, limit: int) -> str:
     return value[: limit - 1].rstrip() + "..."
 
 
+def _top_goal_name(profile: OnboardingProfile) -> str:
+    goals = sorted(profile.goals or [], key=lambda g: (g.priority or 9, -(g.targetAmount or 0)))
+    if not goals:
+        return ""
+    top = goals[0]
+    return top.customName or top.type or ""
+
+
 def _combined_mode(asset: ResearchAsset, supporting: list[dict]) -> str:
+    if asset.data_mode in {"limited", "fallback"}:
+        return asset.data_mode
     modes = [asset.data_mode, *[signal.get("dataMode", "fallback") for signal in supporting]]
     if "live" in modes:
         return "live"

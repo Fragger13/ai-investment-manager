@@ -7,7 +7,7 @@ from app.schemas.financial import OnboardingProfile
 
 
 DISCLAIMER = (
-    "This is educational decision support, not guaranteed financial advice. "
+    "This is educational decision support, not a promise of financial results. "
     "Investments involve market risk. Please verify sources and suitability before investing."
 )
 
@@ -32,7 +32,17 @@ def calculate_age(date_of_birth: str, fallback: int = 0) -> int:
 
 
 def monthly_income(profile: OnboardingProfile) -> int:
-    return int(profile.monthlySalary + profile.bonusIncome + profile.sideIncome + profile.otherIncome)
+    return int(profile.monthlySalary + profile.otherIncome)
+
+
+def total_emi_payments(profile: OnboardingProfile) -> int:
+    if profile.emiLoans:
+        return int(sum(item.monthlyEmiAmount for item in profile.emiLoans))
+    return int(profile.emi)
+
+
+def recurring_liabilities(profile: OnboardingProfile) -> int:
+    return int(profile.rent + profile.subscriptions + total_emi_payments(profile))
 
 
 def net_worth(profile: OnboardingProfile) -> int:
@@ -66,14 +76,57 @@ def corpus_for_income(yearly_income: int, withdrawal_rate: float) -> int:
     return round(yearly_income / rate)
 
 
+def months_until(date_value: str, fallback: int = 60) -> int:
+    if not date_value:
+        return fallback
+    try:
+        target = datetime.strptime(date_value, "%Y-%m-%d").date()
+    except ValueError:
+        return fallback
+    today = datetime.now(UTC).date()
+    return max((target.year - today.year) * 12 + target.month - today.month, 1)
+
+
+def goal_display_name(goal) -> str:
+    return goal.customName.strip() if goal.type == "Other" and goal.customName.strip() else goal.type or "Goal"
+
+
+def calculated_goal_target(goal) -> int:
+    if goal.type in {"Retirement", "Financial freedom"}:
+        if goal.retirementInputType == "monthly":
+            return corpus_for_income(goal.desiredMonthlyIncome * 12, goal.withdrawalRate)
+        if goal.retirementInputType == "yearly":
+            return corpus_for_income(goal.desiredYearlyIncome, goal.withdrawalRate)
+    return int(goal.targetAmount)
+
+
+def dynamic_goal_explanation(goal) -> str:
+    explanations = {
+        "Emergency fund": "Emergency money protects you from job loss, medical costs, or sudden expenses.",
+        "Retirement": "Retirement planning estimates how much you need after active income slows down or stops.",
+        "Financial freedom": "Financial freedom means building enough savings and investments to support the income you want.",
+        "House purchase": "This compares saving first with a monthly loan payment so a home goal does not weaken your monthly budget.",
+        "Car purchase": "This checks whether the car goal or EMI fits without crowding out higher-priority goals.",
+        "Child education": "Education goals need early planning because costs can rise over time.",
+        "Higher education": "This goal helps separate education savings from day-to-day spending.",
+        "Marriage": "This helps plan a large family expense without using emergency savings.",
+        "Travel": "This helps you save for a planned trip without affecting higher-priority goals.",
+        "Debt repayment": "Repaying debt can free up money each month and reduce interest costs.",
+        "Business/startup": "Startup capital should be planned separately because timing and risk can vary.",
+        "Wealth creation": "Wealth creation is a long-term goal for growing net worth after basics are covered.",
+    }
+    return explanations.get(goal.type, "This goal is included in your priority order and monthly planning.")
+
+
 def health_agent(profile: OnboardingProfile) -> dict:
     income = monthly_income(profile)
     worth = net_worth(profile)
-    surplus = max(income - profile.monthlyExpenses - profile.emi, 0)
+    emi_total = total_emi_payments(profile)
+    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
     savings_rate = (surplus / income * 100) if income else 0
     expense_burden = (profile.monthlyExpenses / income * 100) if income else 0
-    debt_burden = ((profile.emi + profile.creditCardDebt / 12) / income * 100) if income else 0
-    months_of_buffer = profile.cashBalance / max(profile.monthlyExpenses + profile.emi, 1)
+    debt_burden = (emi_total / income * 100) if income else 0
+    months_of_buffer = profile.cashBalance / max(profile.monthlyExpenses + emi_total, 1)
     score = 50 + min(savings_rate, 40) * 0.65 + min(months_of_buffer, 12) * 1.4 - min(debt_burden, 45) * 0.45
     if profile.investsMonthly.lower() in {"yes", "always"}:
         score += 4
@@ -99,9 +152,6 @@ def health_agent(profile: OnboardingProfile) -> dict:
     else:
         weaknesses.append("Debt payments are taking a large share of income.")
         actions.append("Avoid adding new EMIs until savings rate improves.")
-    if profile.creditCardDebt > 0:
-        actions.append("Clear credit card dues before adding high-risk investments.")
-
     return {
         "score": score,
         "explanation": "Your Financial Health Score is a simple score based on income, expenses, savings, debt, emergency money, goals, and behavior.",
@@ -119,22 +169,24 @@ def health_agent(profile: OnboardingProfile) -> dict:
 
 def behavior_agent(profile: OnboardingProfile) -> dict:
     impulse = "High" if profile.emotionalSpendingTendency in {"High", "Often"} else "Moderate" if profile.emotionalSpendingTendency else "Needs review"
-    panic = "High" if profile.riskReaction == "Panic sell" or profile.panicSellRisk == "Yes" else "Low"
-    discipline = "Strong" if profile.spendingDiscipline == "Strong" and profile.investsMonthly in {"Yes", "Always"} else "Improving"
+    panic = "High" if profile.riskReaction in {"Panic sell", "I may sell"} or profile.panicSellRisk in {"Yes", "Often"} else "Low"
+    discipline = "Strong" if profile.spendingDiscipline in {"Strong", "High"} and profile.investsMonthly in {"Yes", "Always", "Often"} else "Improving"
     nudges = []
     if impulse == "High":
         nudges.append("Use a 24-hour pause before large discretionary purchases.")
     if panic == "High":
         nudges.append("Use smaller SIPs and avoid checking long-term investments daily.")
-    if profile.tracksExpenses != "Yes":
+    if profile.tracksExpenses not in {"Yes", "Often"}:
         nudges.append("Track expenses weekly so recommendations stay accurate.")
+    if profile.investingBlocker in {"Fear of losses", "Too many choices"}:
+        nudges.append("Use simple, smaller monthly investments first so the habit feels manageable.")
     if not nudges:
         nudges.append("Keep investing consistently and review the plan monthly.")
     return {
         "spendingDiscipline": discipline,
         "impulseSpendingRisk": impulse,
         "panicSellingRisk": panic,
-        "investmentDiscipline": "Consistent" if profile.investsMonthly in {"Yes", "Always"} else "Needs routine",
+        "investmentDiscipline": "Consistent" if profile.investsMonthly in {"Yes", "Always", "Often"} else "Needs routine",
         "suggestedNudges": nudges,
     }
 
@@ -182,8 +234,8 @@ def research_agent(profile: OnboardingProfile) -> list[dict]:
         },
         {
             "title": "Short-term opportunities need strict limits",
-            "detail": "Tactical ideas can move quickly, so the MVP caps them to a small part of surplus unless short-term risk comfort is high.",
-            "whyItMatters": "A cap protects your core goals if a short-term call goes wrong.",
+            "detail": "Short-term ideas can move quickly, so the app keeps them to a small part of your monthly savings unless your comfort with risk is high.",
+            "whyItMatters": "A limit helps protect your main goals if a short-term idea goes wrong.",
             "confidence": 70,
             "tone": "Warning",
             "sources": sources[:1],
@@ -193,8 +245,9 @@ def research_agent(profile: OnboardingProfile) -> list[dict]:
 
 def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     income = monthly_income(profile)
-    surplus = max(income - profile.monthlyExpenses - profile.emi, 0)
-    emergency_needed = max(profile.emergencyFundTarget or profile.monthlyExpenses * 6, profile.monthlyExpenses * 6)
+    surplus = max(income - profile.monthlyExpenses - total_emi_payments(profile), 0)
+    emergency_goal = next((goal for goal in profile.goals if goal.type == "Emergency fund"), None)
+    emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or profile.monthlyExpenses * 6, profile.monthlyExpenses * 6)
     emergency_gap = max(emergency_needed - profile.cashBalance, 0)
     high_long_term_risk = profile.volatilityComfort == "High" or profile.investmentHorizon in {"7-10 years", "10+ years"}
     short_term_ok = profile.shortTermVolatilityComfort == "High" and profile.shortTermLossTolerance in {"10-15%", "15%+"}
@@ -248,14 +301,14 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Use this money for emergencies or short-term planned expenses.",
             "confidenceScore": 90 if emergency_gap else 78,
             "riskLevel": "Low",
-            "reasoning": "You need money that is easier to access and less volatile before taking more investment risk.",
+            "reasoning": "You need money that is easier to access and moves less before taking more investment risk.",
             "whatCanGoWrong": "Returns can be modest and may change with interest rates. Credit risk depends on the fund.",
             "suitableFor": "Emergency fund, near-term goals, or users uncomfortable with market swings.",
             "timeHorizon": "0-3 years",
             "reviewCondition": "Review once cash plus liquid funds cover 6 months of expenses.",
             "sourceLinks": source_links[1:],
             "scenarioProjection": {
-                "best": "Provides stable liquidity while equity markets fluctuate.",
+                "best": "Keeps money more stable and accessible while stock markets move up and down.",
                 "base": "Helps complete emergency fund without taking high risk.",
                 "worst": "May not beat inflation after tax in every period.",
             },
@@ -266,15 +319,15 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "suggestedAllocation": gold_percent,
             "suggestedMonthlyAmount": amount(gold_percent),
             "strategyType": "Diversification",
-            "entryTiming": "Add gradually after emergency allocation is active.",
+            "entryTiming": "Add gradually after your emergency savings are on track.",
             "exitTiming": "Review if gold crosses 15% of total net worth.",
             "confidenceScore": 72,
             "riskLevel": "Medium",
-            "reasoning": "A small gold allocation can reduce dependence on only stocks and mutual funds.",
+            "reasoning": "A small gold investment can reduce dependence on only shares and mutual funds.",
             "whatCanGoWrong": "Gold can remain flat for long periods and does not create business earnings.",
             "suitableFor": "Users who want some protection from currency and market stress.",
             "timeHorizon": "3+ years",
-            "reviewCondition": "Review yearly during portfolio rebalancing.",
+            "reviewCondition": "Review yearly when you check your overall investment mix.",
             "sourceLinks": source_links[2:],
             "scenarioProjection": {
                 "best": "Can help when equity markets or currency sentiment is weak.",
@@ -287,7 +340,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
         recommendations.append(
             {
                 "id": "rec-tactical-capped",
-                "assetClass": "Capped tactical opportunity bucket",
+                "assetClass": "Small short-term opportunity fund",
                 "suggestedAllocation": tactical_percent,
                 "suggestedMonthlyAmount": amount(tactical_percent),
                 "strategyType": "Short-term opportunity",
@@ -297,13 +350,13 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
                 "riskLevel": "High",
                 "reasoning": "Your short-term risk answers allow a small opportunity bucket, but it should not disturb core goals.",
                 "whatCanGoWrong": "Short-term calls can fail quickly. Losses should be capped before entry.",
-                "suitableFor": "Users who can tolerate short-term volatility and want limited tactical exposure.",
+                "suitableFor": "Users who can tolerate short-term ups and downs and want a small amount for short-term ideas.",
                 "timeHorizon": "1-12 months",
                 "reviewCondition": "Exit or reduce if it affects emergency fund, EMI comfort, or goal SIPs.",
                 "sourceLinks": source_links[:1],
                 "scenarioProjection": {
                     "best": "May add extra upside in strong short-term trends.",
-                    "base": "Mixed results; small allocation limits damage.",
+                    "base": "Results can be mixed, so keeping the amount small limits the impact of a loss.",
                     "worst": "Can lose money quickly if momentum reverses.",
                 },
             }
@@ -312,8 +365,41 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
 
 
 def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dict]:
+    if profile.goals:
+        income = monthly_income(profile)
+        planned_goals = []
+        for index, goal in enumerate(sorted(profile.goals, key=lambda item: (item.priority or 999, goal_display_name(item)))):
+            target = calculated_goal_target(goal)
+            current = int(goal.currentAmount or goal.downPayment or 0)
+            loan_amount = max(target - int(goal.downPayment or 0), 0)
+            estimated_goal_emi = emi_amount(loan_amount, goal.interestRate, goal.tenureYears) if goal.paymentStyle == "emi" else 0
+            months = months_until(goal.targetDate, 6 if goal.type == "Emergency fund" else 60)
+            required = estimated_goal_emi if goal.paymentStyle == "emi" else int(goal.monthlyContribution or ceil(max(target - current, 0) / max(months, 1)))
+            warning = ""
+            if estimated_goal_emi and income and ((total_emi_payments(profile) + estimated_goal_emi) / income) > 0.35:
+                warning = "This EMI may take too much of your monthly income and reduce your ability to save for other goals."
+            feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 75
+            slug = goal_display_name(goal).lower().replace("/", "-").replace(" ", "-")
+            planned_goals.append(
+                {
+                    "id": f"goal-{goal.priority or index + 1}-{slug}",
+                    "name": goal_display_name(goal),
+                    "priority": goal.priority or index + 1,
+                    "targetAmount": target,
+                    "currentProgress": current,
+                    "requiredMonthlyInvestment": required,
+                    "feasibilityScore": feasibility,
+                    "timelineProjection": f"{goal.tenureYears} year EMI" if goal.paymentStyle == "emi" else f"{months} month saving plan",
+                    "explanation": dynamic_goal_explanation(goal),
+                    "planType": goal.paymentStyle,
+                    "estimatedEmi": estimated_goal_emi,
+                    "affordabilityWarning": warning,
+                }
+            )
+        return planned_goals
+
     age = calculate_age(profile.dateOfBirth, profile.age)
-    travel_target = (profile.internationalTrips * profile.internationalTripCost) + (profile.domesticTrips * profile.domesticTripCost)
+    travel_target = profile.travelTarget
     retirement_target = profile.retirementTarget
     if profile.retirementInputType == "monthly":
         retirement_target = corpus_for_income(profile.retirementMonthlyIncome * 12, profile.withdrawalRate)
@@ -329,7 +415,7 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
     house_emi = emi_amount(house_loan, profile.housePlan.interestRate, profile.housePlan.tenureYears) if profile.housePlan.mode == "emi" else 0
     emi_warning = ""
     income = monthly_income(profile)
-    if house_emi and income and ((profile.emi + house_emi) / income) > 0.35:
+    if house_emi and income and ((total_emi_payments(profile) + house_emi) / income) > 0.35:
         emi_warning = "This EMI may take too much of your monthly income and reduce your ability to save."
 
     retirement_years = max((profile.retirementAge or 60) - age, 1)
@@ -353,7 +439,7 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
             "requiredMonthlyInvestment": ceil(travel_target / 12) if travel_target else 0,
             "feasibilityScore": min(95, round((surplus / max(ceil(travel_target / 12), 1)) * 70)) if travel_target else 70,
             "timelineProjection": "Yearly travel budget",
-            "explanation": "Calculated from international and domestic trip count multiplied by editable average costs.",
+            "explanation": "Set a target amount and date so travel savings stay separate from higher-priority goals.",
         },
         {
             "id": "goal-house",
@@ -412,7 +498,8 @@ def build_dashboard(profile: OnboardingProfile) -> dict:
     income = monthly_income(profile)
     profile.monthlyCashInflow = income
     worth = net_worth(profile)
-    surplus = max(income - profile.monthlyExpenses - profile.emi, 0)
+    emi_total = total_emi_payments(profile)
+    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
     savings_rate = (surplus / income * 100) if income else 0
     risk_profile = "Higher growth comfort" if profile.volatilityComfort == "High" else "More stability preferred" if profile.volatilityComfort == "Low" else "Balanced growth"
     health = health_agent(profile)
@@ -436,15 +523,14 @@ def build_dashboard(profile: OnboardingProfile) -> dict:
         "projection": [{"month": f"Month {i + 1}", "value": round(worth * (1.008**i) + surplus * i)} for i in range(12)],
         "expenseCategories": [
             {"name": "Housing", "value": profile.rent},
-            {"name": "EMI", "value": profile.emi},
+            {"name": "EMI and loans", "value": emi_total},
             {"name": "Subscriptions", "value": profile.subscriptions},
-            {"name": "Other spends", "value": max(profile.monthlyExpenses - profile.rent - profile.emi - profile.subscriptions, 0)},
+            {"name": "Other spends", "value": max(profile.monthlyExpenses - profile.rent - profile.subscriptions, 0)},
         ],
         "alerts": [
             alert
             for alert in [
                 "Your emergency fund needs attention before taking more risk." if health["emergencyFundMonths"] < 6 else "",
-                "Credit card debt can be expensive. Consider clearing it before new high-risk investments." if profile.creditCardDebt else "",
                 "Your behavior answers show panic-selling risk. Smaller SIPs may help you stay invested." if behavior["panicSellingRisk"] == "High" else "",
             ]
             if alert

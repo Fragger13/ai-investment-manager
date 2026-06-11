@@ -25,7 +25,7 @@ export default function ExpensesPage() {
 
   return (
     <AppShell>
-      <PageHeader title="Spending & Savings" subtitle="Simple cashflow review: what comes in, what goes out, and what may need attention." badge="Cashflow review" />
+      <PageHeader title="Spending & Savings" subtitle="A simple view of what comes in, what goes out, and what may need attention." badge="Monthly money review" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Monthly expenses" value={inr(data.summary.monthlyExpenses)} detail="Total spending per month" icon={CreditCard} />
         <MetricCard label="Starter savings target" value={inr(savingsTarget)} detail="25% of monthly inflow" icon={Target} />
@@ -38,10 +38,10 @@ export default function ExpensesPage() {
           <CardHeader><CardTitle>Spending Warnings</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {(data.alerts.length ? data.alerts : ["No urgent spending warning was found. Keep reviewing expenses monthly."]).map((alert) => (
-              <div key={alert} className="rounded-md border border-amber-300/15 bg-amber-400/[0.08] p-4 text-sm leading-6 text-amber-100">{alert}</div>
+              <div key={alert} className="rounded-md border border-warning/25 bg-warning-soft p-4 text-sm leading-6 text-warning-foreground">{alert}</div>
             ))}
-            <div className="rounded-md border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium text-white">Why this matters</p>
+            <div className="rounded-md border border-border bg-surface-soft p-4">
+              <p className="text-sm font-medium text-foreground">Why this matters</p>
               <p className="mt-2 text-sm text-muted-foreground">Lower recurring spending gives you more room for emergency money, goals, and investments without taking extra risk.</p>
             </div>
           </CardContent>

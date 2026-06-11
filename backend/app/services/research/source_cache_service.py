@@ -11,6 +11,7 @@ from app.models.recommendation_source import RecommendationSource
 from app.models.research_article import ResearchArticle
 from app.models.research_source import ResearchSource
 from app.models.source_refresh_log import SourceRefreshLog
+from app.services.evidence.evidence_graph_service import link_recommendation_evidence
 from app.services.intelligence import now_iso
 from app.services.research.source_registry import SourceDefinition
 
@@ -163,5 +164,6 @@ def save_advanced_recommendation(db: Session, recommendation: dict) -> Recommend
                 credibility_score=source.get("credibilityScore", 50),
             )
         )
+    link_recommendation_evidence(db, record.id, recommendation)
     db.commit()
     return record

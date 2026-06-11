@@ -1,54 +1,340 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BarChart3, CircleDollarSign, RefreshCcw, Shield } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Info, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import { AppShell } from "@/components/app-shell";
-import { AllocationChart, ProjectionChart } from "@/components/charts";
-import { MetricCard } from "@/components/metric-card";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { api } from "@/lib/api";
-import { emptyDashboard } from "@/lib/profile";
-import { inr } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { InvestmentLogo } from "@/components/investment-logo";
+import { api, ApiError } from "@/lib/api";
+import { cn, inr } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
-import { DashboardData } from "@/types";
+import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { PortfolioSummary } from "@/types";
+
+const empty: PortfolioSummary = {
+  netWorth: 0,
+  baseNetWorth: 0,
+  actionContributedValue: 0,
+  monthlyIncome: 0,
+  monthlyExpenses: 0,
+  monthlyCommitments: 0,
+  investableSurplus: 0,
+  committedMonthly: 0,
+  holdings: [],
+  allocation: [],
+  projection: [],
+  recentActions: [],
+  insights: [],
+  generatedAt: "",
+};
 
 export default function PortfolioPage() {
   const profile = useAuthStore((state) => state.profile);
-  const [data, setData] = useState<DashboardData>(emptyDashboard);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const planItems = usePlanActionsStore((state) => state.planItems);
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
+  const [data, setData] = useState<PortfolioSummary>(empty);
+  const [loading, setLoading] = useState(true);
+  const [pricing, setPricing] = useState(false);
+  const [pricedAt, setPricedAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.portfolioSummary(profile);
+      setData(result);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Could not load portfolio.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshPrices() {
+    if (!profile || !(profile.holdings || []).length) return;
+    setPricing(true);
+    setError(null);
+    try {
+      const result = await api.refreshHoldingPrices(profile.holdings);
+      saveProfile({ ...profile, holdings: result.holdings }, false);
+      setPricedAt(result.refreshedAt);
+      await load();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Live price refresh failed.";
+      setError(message);
+    } finally {
+      setPricing(false);
+    }
+  }
 
   useEffect(() => {
-    if (profile) api.dashboard(profile).then(setData);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
-  const diversification = Math.min(96, data.allocation.length * 12);
+  const localCommitments = useMemo(() => actionsTaken.reduce((sum, action) => sum + (action.amount || 0), 0), [actionsTaken]);
+  const totalCommitments = Math.max(data.committedMonthly, localCommitments);
+  const startedActions = actionsTaken.length;
+  const watchlistedItems = planItems.length;
+
+  const projection = data.projection;
+  const projectedAt12 = projection[12]?.value || 0;
+  const projectedAt24 = projection[24]?.value || 0;
+  const actionContributedValue = data.actionContributedValue || 0;
+  const baseNetWorth = data.baseNetWorth ?? Math.max(0, data.netWorth - actionContributedValue);
+
+  // P&L is the sum of (currentValue - valueAtCost) across holdings that have a cost basis.
+  const { totalInvested, totalCurrent, plRupees, plPercent, plHoldingCount } = useMemo(() => {
+    let invested = 0;
+    let current = 0;
+    let count = 0;
+    for (const h of data.holdings) {
+      if (h.valueAtCost && h.valueAtCost > 0) {
+        invested += h.valueAtCost;
+        current += h.value;
+        count += 1;
+      }
+    }
+    const rupees = current - invested;
+    const percent = invested > 0 ? (rupees / invested) * 100 : 0;
+    return { totalInvested: invested, totalCurrent: current, plRupees: rupees, plPercent: percent, plHoldingCount: count };
+  }, [data.holdings]);
 
   return (
-    <AppShell>
-      <PageHeader title="Portfolio Overview" subtitle="Your investments grouped by type, with simple diversification and rebalancing suggestions." badge="Portfolio analysis" />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Net worth" value={inr(data.summary.netWorth)} detail="Current portfolio base" icon={CircleDollarSign} />
-        <MetricCard label="Diversification" value={`${diversification}%`} detail="Spread across investment types" icon={Shield} />
-        <MetricCard label="Monthly surplus" value={inr(data.summary.investableSurplus)} detail="Fresh money available" icon={BarChart3} />
-        <MetricCard label="Suggested actions" value={String(data.health.actions.length)} detail="Based on current profile" icon={RefreshCcw} />
+    <AppShell sidebarExtra={<PortfolioSidebarWidget startedActions={startedActions} committed={totalCommitments} />}>
+      <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Your Portfolio</h1>
+          <p className="mt-2 text-base text-muted-foreground">A live picture of what you own, what you&apos;ve committed to, and where you&apos;re heading.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {(profile?.holdings || []).length > 0 ? (
+            <Button variant="outline" onClick={refreshPrices} disabled={pricing || loading} title={pricedAt ? `Last refreshed ${pricedAt}` : "Pull live prices for stocks, MFs, crypto, gold/silver"}>
+              <TrendingUp className={cn("h-4 w-4", pricing && "animate-pulse")} /> {pricing ? "Pricing..." : "Refresh live prices"}
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
       </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <AllocationChart data={data.allocation} />
-        <ProjectionChart data={data.projection} />
-      </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        {data.health.actions.slice(0, 3).map((action, index) => (
-          <Card key={action}>
-            <CardHeader><CardTitle>Action {index + 1}</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm leading-6 text-muted-foreground">{action}</p>
-              <div className="mt-4 flex justify-between text-xs text-muted-foreground"><span>Priority</span><span>{90 - index * 8}%</span></div>
-              <Progress value={90 - index * 8} className="mt-2" />
-            </CardContent>
-          </Card>
-        ))}
+
+      {error ? (
+        <Card className="mb-6 border-negative/30 bg-negative-soft/40">
+          <CardContent className="p-4 text-sm text-negative-foreground">{error}</CardContent>
+        </Card>
+      ) : null}
+
+      {/* Hero — Net Worth */}
+      <Card className="mb-6 overflow-hidden">
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">Total Net Worth</p>
+          <p className="mt-2 text-5xl font-semibold tracking-tight text-foreground md:text-6xl">{inr(data.netWorth)}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+            <span className="inline-flex items-center gap-2 text-positive-foreground">
+              <ArrowUpRight className="h-4 w-4" />
+              Projected to grow to {inr(projectedAt12)} in 12 months
+            </span>
+            {plHoldingCount > 0 ? (
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", plRupees >= 0 ? "bg-positive-soft text-positive-foreground" : "bg-negative-soft text-negative-foreground")}>
+                {plRupees >= 0 ? "+" : ""}{inr(plRupees)} ({plPercent >= 0 ? "+" : ""}{plPercent.toFixed(2)}%) overall P&L
+                <span className="text-[10px] opacity-70">· cost {inr(totalInvested)}</span>
+              </span>
+            ) : null}
+            {actionContributedValue > 0 ? (
+              <Badge tone="primary">+{inr(actionContributedValue)} from actions you&apos;ve taken</Badge>
+            ) : null}
+          </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-4">
+            <Pill label="Base assets" value={inr(baseNetWorth)} icon={Wallet} tone="neutral" />
+            <Pill label="From plan actions" value={actionContributedValue ? inr(actionContributedValue) : "—"} icon={CheckCircle2} tone="positive" />
+            <Pill label="Active commitments" value={totalCommitments ? `${inr(totalCommitments)}/mo` : "—"} icon={ArrowUpRight} tone="positive" />
+            <Pill label="Available to invest" value={inr(data.investableSurplus)} icon={Sparkles} tone="info" />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">{watchlistedItems} idea{watchlistedItems === 1 ? "" : "s"} saved in your plan, ready to start.</p>
+        </CardContent>
+      </Card>
+
+      {/* Insights */}
+      {data.insights?.length ? (
+        <div className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {data.insights.slice(0, 4).map((insight, index) => <InsightTile key={index} insight={insight} />)}
+        </div>
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        {/* Holdings — single source of truth (includes action contributions) */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-semibold text-foreground">Holdings</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Your current investments — including value built up from plan actions.</p>
+              </div>
+              <Link href="/onboarding?mode=edit" className="text-xs font-semibold text-primary hover:underline">Edit profile →</Link>
+            </div>
+            {data.holdings.length ? (
+              <div className="mt-4 space-y-2">
+                {data.holdings.map((holding) => {
+                  const pct = data.netWorth > 0 ? (holding.value / data.netWorth) * 100 : 0;
+                  const isFromAction = holding.source === "action";
+                  const hasCost = (holding.valueAtCost || 0) > 0;
+                  const plr = hasCost ? holding.value - (holding.valueAtCost || 0) : 0;
+                  const plp = hasCost && holding.valueAtCost! > 0 ? (plr / holding.valueAtCost!) * 100 : 0;
+                  return (
+                    <div key={holding.id} className="rounded-xl border border-border p-3">
+                      <div className="flex items-center gap-3">
+                        <InvestmentLogo name={holding.name} category={holding.category} size="md" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="line-clamp-1 text-sm font-semibold text-foreground">{holding.name}</p>
+                            {isFromAction ? <Badge tone="primary" className="text-[10px]">From your plan</Badge> : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {holding.category}
+                            {isFromAction && holding.monthlyContribution ? ` · ${inr(holding.monthlyContribution)}/mo` : ""}
+                            {isFromAction && holding.since ? ` · since ${formatDate(holding.since)}` : ""}
+                            {hasCost ? ` · cost ${inr(holding.valueAtCost || 0)}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-foreground">{inr(holding.value)}</p>
+                          {hasCost ? (
+                            <p className={cn("text-xs font-medium", plr >= 0 ? "text-positive-foreground" : "text-negative-foreground")}>
+                              {plr >= 0 ? "+" : ""}{inr(plr)} ({plp >= 0 ? "+" : ""}{plp.toFixed(1)}%)
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">{pct.toFixed(1)}%</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
+                        <div className={cn("h-full rounded-full transition-all", isFromAction ? "bg-positive" : "bg-primary")} style={{ width: `${Math.min(100, pct)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-surface-soft p-6 text-center text-sm text-muted-foreground">
+                <p>No holdings yet.</p>
+                <p className="mt-1">Add your existing investments in your profile, or take action on a recommendation.</p>
+                <Button asChild className="mt-3" size="sm"><Link href="/asset-intelligence">Browse ideas <ArrowRight className="h-4 w-4" /></Link></Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Projection */}
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-base font-semibold text-foreground">Projected wealth</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Based on current holdings + monthly commitments from your plan.</p>
+            {projection.length ? (
+              <div className="mt-4 h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={projection.map((point, index) => ({ ...point, label: index }))}>
+                    <defs>
+                      <linearGradient id="projfill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="label" hide />
+                    <YAxis hide />
+                    <Tooltip formatter={(value: number) => inr(value)} labelFormatter={(label) => `Month ${label}`} />
+                    <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill="url(#projfill)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : null}
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-surface-soft p-3">
+                <p className="text-xs text-muted-foreground">In 12 months</p>
+                <p className="mt-0.5 font-semibold text-foreground">{inr(projectedAt12)}</p>
+              </div>
+              <div className="rounded-xl bg-surface-soft p-3">
+                <p className="text-xs text-muted-foreground">In 24 months</p>
+                <p className="mt-0.5 font-semibold text-foreground">{inr(projectedAt24)}</p>
+              </div>
+            </div>
+            {totalCommitments > 0 ? (
+              <p className="mt-4 text-xs text-muted-foreground">Includes {inr(totalCommitments)}/month from plan actions. Action-built holdings continue to grow each month.</p>
+            ) : (
+              <p className="mt-4 text-xs text-muted-foreground">Start any action in your plan to see new contributions show up here automatically.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );
+}
+
+function Pill({ label, value, icon: Icon, tone }: { label: string; value: string; icon: typeof CheckCircle2; tone: "positive" | "info" | "neutral" }) {
+  const toneClasses = {
+    positive: "bg-positive-soft text-positive-foreground",
+    info: "bg-info-soft text-info-foreground",
+    neutral: "bg-surface text-foreground",
+  };
+  return (
+    <div className="rounded-xl bg-surface-soft p-3">
+      <div className="flex items-center gap-2">
+        <span className={`flex h-6 w-6 items-center justify-center rounded-full ${toneClasses[tone]}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-1.5 text-base font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function InsightTile({ insight }: { insight: PortfolioSummary["insights"][number] }) {
+  const Icon = insight.tone === "warning" ? CircleAlert : insight.tone === "positive" ? TrendingUp : Info;
+  const tone: "warn" | "good" | "info" = insight.tone === "warning" ? "warn" : insight.tone === "positive" ? "good" : "info";
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-2.5">
+          <Badge tone={tone} className="shrink-0"><Icon className="h-3 w-3" /></Badge>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{insight.title}</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{insight.body}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PortfolioSidebarWidget({ startedActions, committed }: { startedActions: number; committed: number }) {
+  return (
+    <div className="rounded-2xl border border-positive-soft bg-positive-soft/60 p-4">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-positive-soft">
+          <TrendingUp className="h-4 w-4 text-positive-foreground" />
+        </span>
+        <p className="text-sm font-semibold text-foreground">Portfolio momentum</p>
+      </div>
+      {startedActions > 0 ? (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{startedActions} active commitment{startedActions === 1 ? "" : "s"} · {inr(committed)}/mo flowing into your plan.</p>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Take action on a plan item to see your portfolio start building here.</p>
+      )}
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }

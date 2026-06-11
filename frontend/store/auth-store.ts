@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
+import { isOnboardingComplete } from "@/lib/profile";
 import { OnboardingProfile } from "@/types";
 
 type User = {
@@ -14,9 +15,11 @@ type AuthState = {
   token: string | null;
   user: User | null;
   onboardingComplete: boolean;
+  emailVerified: boolean;
   profile: OnboardingProfile | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ emailVerified: boolean; onboardingComplete: boolean }>;
+  register: (name: string, email: string, password: string) => Promise<{ emailVerified: boolean }>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
   logout: () => void;
   saveProfile: (profile: OnboardingProfile, complete?: boolean) => void;
 };
@@ -27,25 +30,54 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       onboardingComplete: false,
+      emailVerified: false,
       profile: null,
       login: async (email, password) => {
         const response = await api.login(email, password);
-        const latest = await api.latestProfile().catch(() => ({ profile: null }));
+        const latest = await api.latestProfile(response.access_token).catch(() => ({ profile: null }));
+        const profileComplete = isOnboardingComplete(latest.profile);
         set({
           token: response.access_token,
           user: { name: response.name, email: response.email },
-          onboardingComplete: response.onboarding_complete || Boolean(latest.profile),
+          onboardingComplete: response.onboarding_complete && profileComplete,
+          emailVerified: response.email_verified ?? true,
           profile: latest.profile
         });
+        return {
+          emailVerified: response.email_verified ?? true,
+          onboardingComplete: response.onboarding_complete && profileComplete
+        };
       },
       register: async (name, email, password) => {
         const response = await api.register(name, email, password);
-        set({ token: response.access_token, user: { name: response.name, email: response.email }, onboardingComplete: response.onboarding_complete });
+        set({
+          token: response.access_token,
+          user: { name: response.name, email: response.email },
+          onboardingComplete: response.onboarding_complete,
+          emailVerified: response.email_verified ?? false
+        });
+        return { emailVerified: response.email_verified ?? false };
       },
-      logout: () => set({ token: null, user: null, onboardingComplete: false, profile: null }),
+      verifyEmail: async (email, code) => {
+        const response = await api.verifyEmail(email, code);
+        set({
+          token: response.access_token,
+          user: { name: response.name, email: response.email },
+          onboardingComplete: response.onboarding_complete,
+          emailVerified: response.email_verified ?? true
+        });
+      },
+      logout: () => {
+        try {
+          window.localStorage.removeItem("askpapa_onboarding_screen");
+          window.localStorage.removeItem("askpapa_chat_v1");
+          window.localStorage.removeItem("askpapa_chat_active_v1");
+        } catch { /* ignore */ }
+        set({ token: null, user: null, onboardingComplete: false, emailVerified: false, profile: null });
+      },
       saveProfile: (profile, complete = false) => {
         if (complete) localStorage.setItem("aim-onboarded", "true");
-        set({ profile, onboardingComplete: complete || false });
+        set({ profile, onboardingComplete: complete && isOnboardingComplete(profile) });
       }
     }),
     {
@@ -54,6 +86,7 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         user: state.user,
         onboardingComplete: state.onboardingComplete,
+        emailVerified: state.emailVerified,
         profile: state.profile
       })
     }

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Investment">
+  <rect width="64" height="64" rx="18" fill="#E2E8F0"/>
+  <path d="M32 12 50 22v20L32 52 14 42V22l18-10Z" fill="#64748B"/>
+  <path d="M22 34h20M32 24v20" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round"/>
+</svg>

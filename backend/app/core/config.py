@@ -13,6 +13,20 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
+        "http://localhost:3004",
+        "http://127.0.0.1:3004",
+        "http://localhost:3005",
+        "http://127.0.0.1:3005",
+        "http://localhost:3006",
+        "http://127.0.0.1:3006",
+        "http://localhost:3007",
+        "http://127.0.0.1:3007",
+        "http://localhost:3008",
+        "http://127.0.0.1:3008",
     ]
     redis_url: str = "redis://localhost:6379/0"
     upload_dir: str = "uploaded_documents"
@@ -22,6 +36,29 @@ class Settings(BaseSettings):
     news_api_key: str | None = None
     coingecko_api_key: str | None = None
     openai_api_key: str | None = None
+    resend_api_key: str | None = None
+    resend_from_email: str = "AskPapa <onboarding@resend.dev>"
+    resend_from_name: str = "AskPapa"
+    app_url: str = "http://localhost:3000"
+    llm_provider: str = "ollama"
+    llm_enabled: bool = True
+    llm_model: str = "llama3.1:8b"
+    ollama_base_url: str = "http://localhost:11434"
+    # llama3.1:8b — Meta's instruct model, strong general chat for M-series Macs.
+    # Falls back gracefully to qwen2.5:7b if you pull it; both fit on 16GB.
+    llm_model_reasoning: str = "llama3.1:8b"
+    llm_model_fast: str = "qwen2.5:7b"
+    llm_model_extraction: str = "qwen2.5:7b"
+    llm_model_summarize: str = "qwen2.5:7b"
+    llm_timeout_seconds: int = 25
+    llm_timeout_chat_seconds: int = 25
+    llm_timeout_enhancement_seconds: int = 10
+    llm_timeout_summarize_seconds: int = 8
+    llm_retries: int = 1
+    llm_batch_size: int = 2
+    llm_batch_recommendation_limit: int = 20
+    llm_batch_market_limit: int = 20
+    llm_batch_asset_limit: int = 40
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

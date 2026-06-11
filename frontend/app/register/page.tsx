@@ -22,8 +22,12 @@ export default function RegisterPage() {
   async function onSubmit(values: FormValues) {
     setError("");
     try {
-      await registerUser(values.name, values.email, values.password);
-      router.push("/onboarding");
+      const result = await registerUser(values.name, values.email, values.password);
+      if (!result.emailVerified) {
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+      } else {
+        router.push("/onboarding");
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 0) setError("Backend unavailable. Start the API server and try again.");
@@ -56,7 +60,7 @@ export default function RegisterPage() {
               <Label>Password</Label>
               <Input type="password" placeholder="Create a password" {...register("password", { required: true })} />
             </div>
-            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+            {error ? <p className="text-sm text-negative-foreground">{error}</p> : null}
             <Button className="w-full" type="submit">Get Started</Button>
           </form>
           <p className="mt-5 text-center text-sm text-muted-foreground">

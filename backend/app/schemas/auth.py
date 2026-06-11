@@ -19,6 +19,7 @@ class AuthResponse(BaseModel):
     name: str
     email: EmailStr
     onboarding_complete: bool = False
+    email_verified: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -27,3 +28,20 @@ class RefreshRequest(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class VerificationStatusResponse(BaseModel):
+    email: EmailStr
+    email_verified: bool
+    sent: bool = False
+    provider: str | None = None
+    detail: str | None = None

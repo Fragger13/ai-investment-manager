@@ -1,0 +1,652 @@
+sources:
+  - source_name: RBI Press Releases
+    source_type: official
+    base_url: https://www.rbi.org.in/
+    rss_url: https://rbi.org.in/pressreleases_rss.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 96
+    bias_risk_score: 5
+    refresh_frequency: daily
+    market_coverage: [macro, rates, policy, currency]
+    asset_coverage: [debt, banking, currency]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: SEBI Updates
+    source_type: official
+    base_url: https://www.sebi.gov.in/
+    rss_url: https://www.sebi.gov.in/sebirss.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 95
+    bias_risk_score: 5
+    refresh_frequency: daily
+    market_coverage: [regulation, policy, capital_markets]
+    asset_coverage: [equity, mutual_funds, debt]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: AMFI India
+    source_type: official
+    base_url: https://www.amfiindia.com/
+    rss_url:
+    api_url: https://www.amfiindia.com/spages/NAVAll.txt
+    ingestion_method: structured_file
+    allowed: true
+    requires_api_key: false
+    reliability_score: 95
+    bias_risk_score: 5
+    refresh_frequency: daily
+    market_coverage: [mutual_funds, nav]
+    asset_coverage: [mutual_funds, debt_funds, liquid_funds]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: NSE India
+    source_type: official
+    base_url: https://www.nseindia.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_or_structured_api_only
+    allowed: true
+    requires_api_key: false
+    reliability_score: 93
+    bias_risk_score: 8
+    refresh_frequency: daily
+    market_coverage: [indices, equity, derivatives]
+    asset_coverage: [stocks, etfs, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: BSE India
+    source_type: official
+    base_url: https://www.bseindia.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_or_structured_api_only
+    allowed: true
+    requires_api_key: false
+    reliability_score: 92
+    bias_risk_score: 8
+    refresh_frequency: daily
+    market_coverage: [equity, indices, filings]
+    asset_coverage: [stocks, etfs, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Yahoo Finance
+    source_type: api
+    base_url: https://finance.yahoo.com/
+    rss_url:
+    api_url:
+    ingestion_method: yfinance
+    allowed: true
+    requires_api_key: false
+    reliability_score: 82
+    bias_risk_score: 18
+    refresh_frequency: hourly
+    market_coverage: [price, indices, equity, etf]
+    asset_coverage: [stocks, etfs, indices, commodities]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: CoinGecko
+    source_type: api
+    base_url: https://www.coingecko.com/
+    rss_url:
+    api_url: https://api.coingecko.com/api/v3/
+    ingestion_method: api
+    allowed: true
+    requires_api_key: false
+    reliability_score: 82
+    bias_risk_score: 18
+    refresh_frequency: hourly
+    market_coverage: [crypto, price, market_cap]
+    asset_coverage: [crypto]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Alpha Vantage
+    source_type: api
+    base_url: https://www.alphavantage.co/
+    rss_url:
+    api_url: https://www.alphavantage.co/query
+    ingestion_method: api_key
+    allowed: true
+    requires_api_key: true
+    reliability_score: 80
+    bias_risk_score: 15
+    refresh_frequency: hourly
+    market_coverage: [price, technicals, fundamentals]
+    asset_coverage: [stocks, etfs, forex, crypto]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Twelve Data
+    source_type: api
+    base_url: https://twelvedata.com/
+    rss_url:
+    api_url: https://api.twelvedata.com/
+    ingestion_method: api_key
+    allowed: true
+    requires_api_key: true
+    reliability_score: 80
+    bias_risk_score: 15
+    refresh_frequency: hourly
+    market_coverage: [price, technicals]
+    asset_coverage: [stocks, etfs, forex, crypto]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: News API
+    source_type: api
+    base_url: https://newsapi.org/
+    rss_url:
+    api_url: https://newsapi.org/v2/
+    ingestion_method: api_key
+    allowed: true
+    requires_api_key: true
+    reliability_score: 72
+    bias_risk_score: 30
+    refresh_frequency: hourly
+    market_coverage: [news, sentiment]
+    asset_coverage: [stocks, sectors, macro, crypto]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: LiveMint Markets
+    source_type: rss
+    base_url: https://www.livemint.com/
+    rss_url: https://www.livemint.com/rss/markets
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 76
+    bias_risk_score: 24
+    refresh_frequency: hourly
+    market_coverage: [news, macro, markets, sectors]
+    asset_coverage: [stocks, mutual_funds, sectors]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Economic Times Markets
+    source_type: rss
+    base_url: https://economictimes.indiatimes.com/
+    rss_url: https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 75
+    bias_risk_score: 28
+    refresh_frequency: hourly
+    market_coverage: [news, equity, macro, sectors]
+    asset_coverage: [stocks, sectors, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Times of India Business
+    source_type: rss
+    base_url: https://timesofindia.indiatimes.com/
+    rss_url: https://timesofindia.indiatimes.com/rssfeeds/1898055.cms
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 70
+    bias_risk_score: 32
+    refresh_frequency: hourly
+    market_coverage: [business, macro, news]
+    asset_coverage: [sectors, economy]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Investing.com India
+    source_type: rss
+    base_url: https://in.investing.com/
+    rss_url: https://in.investing.com/rss/news.rss
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 72
+    bias_risk_score: 30
+    refresh_frequency: hourly
+    market_coverage: [markets, macro, commodities, forex]
+    asset_coverage: [stocks, commodities, currency, crypto]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: The Hindu BusinessLine Markets
+    source_type: rss
+    base_url: https://www.thehindubusinessline.com/
+    rss_url: https://www.thehindubusinessline.com/markets/feeder/default.rss
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 22
+    refresh_frequency: hourly
+    market_coverage: [markets, economy, policy]
+    asset_coverage: [stocks, commodities, sectors]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Value Research
+    source_type: article
+    base_url: https://www.valueresearchonline.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 20
+    refresh_frequency: daily
+    market_coverage: [mutual_funds, investing_education]
+    asset_coverage: [mutual_funds, debt_funds, equity_funds]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Zerodha Varsity
+    source_type: article
+    base_url: https://zerodha.com/varsity/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 82
+    bias_risk_score: 12
+    refresh_frequency: weekly
+    market_coverage: [education, risk, derivatives]
+    asset_coverage: [stocks, derivatives, mutual_funds]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Investopedia Markets
+    source_type: article
+    base_url: https://www.investopedia.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 18
+    refresh_frequency: weekly
+    market_coverage: [education, macro, markets]
+    asset_coverage: [stocks, bonds, etfs, crypto]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: false
+
+  # ── Indian financial news (major) ───────────────────────────────────────
+  - source_name: Moneycontrol Markets
+    source_type: rss
+    base_url: https://www.moneycontrol.com/
+    rss_url: https://www.moneycontrol.com/rss/marketreports.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 22
+    refresh_frequency: hourly
+    market_coverage: [equity, indices, sectors, news, macro]
+    asset_coverage: [stocks, mutual_funds, sectors, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Business Standard Markets
+    source_type: rss
+    base_url: https://www.business-standard.com/
+    rss_url: https://www.business-standard.com/rss/markets-106.rss
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 80
+    bias_risk_score: 18
+    refresh_frequency: hourly
+    market_coverage: [markets, macro, policy, sectors]
+    asset_coverage: [stocks, sectors, indices, commodities]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: BQ Prime
+    source_type: rss
+    base_url: https://www.bqprime.com/
+    rss_url: https://www.bqprime.com/feed
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 82
+    bias_risk_score: 14
+    refresh_frequency: hourly
+    market_coverage: [markets, business, policy, macro]
+    asset_coverage: [stocks, sectors, macro, banking]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: Outlook Money
+    source_type: rss
+    base_url: https://www.outlookindia.com/business/
+    rss_url: https://www.outlookindia.com/rss/outlookmoney.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 74
+    bias_risk_score: 26
+    refresh_frequency: daily
+    market_coverage: [personal_finance, mutual_funds, taxes]
+    asset_coverage: [mutual_funds, debt, insurance, tax]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: CNBC TV18
+    source_type: rss
+    base_url: https://www.cnbctv18.com/
+    rss_url: https://www.cnbctv18.com/rss/market.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 76
+    bias_risk_score: 24
+    refresh_frequency: hourly
+    market_coverage: [markets, sectors, macro]
+    asset_coverage: [stocks, sectors, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  # ── Independent / "underdog" research blogs (very high signal-to-noise) ──
+  - source_name: Capitalmind
+    source_type: rss
+    base_url: https://www.capitalmind.in/
+    rss_url: https://www.capitalmind.in/feed/
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 84
+    bias_risk_score: 12
+    refresh_frequency: daily
+    market_coverage: [research, macro, equity, debt, sectors, regime]
+    asset_coverage: [stocks, mutual_funds, debt_funds, sectors]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: FreeFincal
+    source_type: rss
+    base_url: https://freefincal.com/
+    rss_url: https://freefincal.com/feed/
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 82
+    bias_risk_score: 10
+    refresh_frequency: daily
+    market_coverage: [personal_finance, mutual_funds, retirement, behavioral]
+    asset_coverage: [mutual_funds, debt_funds, equity_funds, insurance]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Subramoney
+    source_type: rss
+    base_url: https://www.subramoney.com/
+    rss_url: https://www.subramoney.com/feed/
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 80
+    bias_risk_score: 14
+    refresh_frequency: daily
+    market_coverage: [personal_finance, behavioral, mutual_funds]
+    asset_coverage: [mutual_funds, debt, equity, insurance]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Stable Investor
+    source_type: rss
+    base_url: https://stableinvestor.com/
+    rss_url: https://stableinvestor.com/feed
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 12
+    refresh_frequency: weekly
+    market_coverage: [retirement, personal_finance, asset_allocation]
+    asset_coverage: [mutual_funds, debt, equity, retirement]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: JagoInvestor
+    source_type: rss
+    base_url: https://www.jagoinvestor.com/
+    rss_url: https://www.jagoinvestor.com/feed
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 76
+    bias_risk_score: 16
+    refresh_frequency: weekly
+    market_coverage: [personal_finance, mutual_funds, taxes, insurance]
+    asset_coverage: [mutual_funds, insurance, tax]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  # ── Fundamentals / analytics ────────────────────────────────────────────
+  - source_name: Screener.in
+    source_type: article
+    base_url: https://www.screener.in/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 86
+    bias_risk_score: 10
+    refresh_frequency: daily
+    market_coverage: [fundamentals, equity, ratios]
+    asset_coverage: [stocks, sectors]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Trendlyne
+    source_type: article
+    base_url: https://trendlyne.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 80
+    bias_risk_score: 14
+    refresh_frequency: daily
+    market_coverage: [technical, momentum, equity, analyst_consensus]
+    asset_coverage: [stocks, sectors, indices]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Tijori Finance
+    source_type: article
+    base_url: https://www.tijorifinance.com/
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 78
+    bias_risk_score: 16
+    refresh_frequency: weekly
+    market_coverage: [research, deep_dives, equity, sectors]
+    asset_coverage: [stocks, sectors]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  # ── Govt / macro / policy ───────────────────────────────────────────────
+  - source_name: PIB India
+    source_type: official
+    base_url: https://pib.gov.in/
+    rss_url: https://pib.gov.in/rss/lreleng.xml
+    api_url:
+    ingestion_method: rss
+    allowed: true
+    requires_api_key: false
+    reliability_score: 92
+    bias_risk_score: 18
+    refresh_frequency: daily
+    market_coverage: [policy, govt, macro, schemes]
+    asset_coverage: [macro, banking, infrastructure, schemes]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: true
+
+  - source_name: IMF India
+    source_type: official
+    base_url: https://www.imf.org/en/Countries/IND
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 92
+    bias_risk_score: 10
+    refresh_frequency: monthly
+    market_coverage: [macro, growth, fiscal, monetary]
+    asset_coverage: [macro, currency, debt]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: World Bank India
+    source_type: official
+    base_url: https://www.worldbank.org/en/country/india
+    rss_url:
+    api_url:
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 92
+    bias_risk_score: 10
+    refresh_frequency: monthly
+    market_coverage: [macro, growth, fiscal]
+    asset_coverage: [macro, infrastructure]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: Trading Economics India
+    source_type: api
+    base_url: https://tradingeconomics.com/india/
+    rss_url:
+    api_url: https://api.tradingeconomics.com/
+    ingestion_method: public_page_only_if_allowed
+    allowed: true
+    requires_api_key: false
+    reliability_score: 84
+    bias_risk_score: 12
+    refresh_frequency: daily
+    market_coverage: [macro, rates, gdp, cpi, currency]
+    asset_coverage: [macro, currency, debt, commodities]
+    country: IN
+    language: en
+    enabled: true
+    fallback_available: false
+
+  - source_name: FRED St Louis Fed
+    source_type: api
+    base_url: https://fred.stlouisfed.org/
+    rss_url:
+    api_url: https://api.stlouisfed.org/fred/
+    ingestion_method: api
+    allowed: true
+    requires_api_key: false
+    reliability_score: 95
+    bias_risk_score: 5
+    refresh_frequency: daily
+    market_coverage: [global_macro, us_rates, inflation, fx]
+    asset_coverage: [macro, currency, global_debt, commodities]
+    country: global
+    language: en
+    enabled: true
+    fallback_available: false

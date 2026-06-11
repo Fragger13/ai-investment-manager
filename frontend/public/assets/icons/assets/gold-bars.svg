@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gold bars">
+  <rect width="64" height="64" rx="18" fill="#FEF3C7"/>
+  <path d="M13 45h38l-4 8H17l-4-8Z" fill="#D97706" stroke="#92400E" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M17 34h30l-4 8H21l-4-8Z" fill="#F59E0B" stroke="#92400E" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M22 23h20l-3 8H25l-3-8Z" fill="#FBBF24" stroke="#92400E" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M24 26h15M20 37h23M16 48h31" stroke="#FFF7ED" stroke-width="2" stroke-linecap="round"/>
+</svg>

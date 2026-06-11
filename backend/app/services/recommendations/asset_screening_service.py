@@ -25,12 +25,16 @@ class ResearchAsset:
     @property
     def asset_key(self) -> str:
         text = f"{self.instrument_name} {self.asset_type} {self.category}".lower()
+        if "tactical" in text or "sector rotation" in text:
+            return "tactical"
         if "liquid" in text or "debt" in text:
             return "debt"
         if "crypto" in text or self.instrument_name.lower() in {"bitcoin", "ethereum"}:
             return "crypto"
         if "gold" in text:
             return "gold"
+        if "stock" in text or "share" in text or "equity" in text:
+            return "equity"
         if "etf" in text:
             return "equity"
         if "index" in text or "mutual fund" in text:
@@ -45,12 +49,73 @@ def _loads(value: str) -> list:
         return []
 
 
+# Brand-name prefixes commonly produced by legacy hardcoded code paths.
+# We only block these when the underlying data source is INTERNAL FALLBACK
+# (i.e. synthetic records). If the same name shows up via genuine research
+# (live RSS, AMFI API, news article, etc.), it's allowed through because
+# that's real research-backed evidence — exactly the kind of recommendation
+# the engine should be able to surface.
+_LEGACY_BRAND_PREFIXES = (
+    "Nippon India ETF",
+    "SBI ",
+    "ICICI Prudential",
+    "UTI Nifty",
+    "UTI Mid",
+    "UTI Small",
+    "HDFC Index",
+    "HDFC Mid",
+    "HDFC Small",
+    "Motilal Oswal Nifty",
+    "Parag Parikh",
+    "Edelweiss US",
+    "Bharat Bond",
+    "Sovereign Gold Bond",
+    "Mirae Asset",
+    "Kotak ",
+    "Axis Bluechip",
+    "DSP Nifty",
+)
+
+
+def _has_brand_prefix(name: str) -> bool:
+    if not name:
+        return False
+    return any(name.startswith(prefix) for prefix in _LEGACY_BRAND_PREFIXES)
+
+
+def _is_synthetic_fallback(data_mode: str, evidence: list[dict]) -> bool:
+    """Return True only for records whose data lineage is internal/fallback.
+
+    Genuine research (live/cached/delayed data, real external source URLs)
+    is NOT considered synthetic, even when the asset name matches a brand
+    pattern — that's a real signal worth surfacing.
+    """
+    if (data_mode or "").lower() == "fallback":
+        return True
+    for item in evidence or []:
+        url = str(item.get("sourceUrl") or "").lower()
+        if url.startswith("internal://") or url.startswith("internal:") or not url:
+            # Empty URL OR explicit internal:// prefix → synthetic origin.
+            # But require at least one such marker to flip the verdict, so a
+            # single rich evidence item is enough to "rescue" the record.
+            continue
+        # Found a real external source URL → not synthetic.
+        return False
+    # No external source URL anywhere in evidence → treat as synthetic.
+    return bool(evidence) or (data_mode or "").lower() in {"", "fallback"}
+
+
 def latest_research_assets(db: Session, limit: int = 60) -> list[ResearchAsset]:
-    rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).limit(limit).all()
+    rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).limit(limit * 2).all()
     assets: list[ResearchAsset] = []
     seen = set()
     for row in rows:
         if row.instrument_name in seen:
+            continue
+        evidence = _loads(row.evidence_json)
+        # Only skip brand-named records when their lineage is synthetic.
+        # Real research that names a specific product is allowed through.
+        if _has_brand_prefix(row.instrument_name) and _is_synthetic_fallback(row.data_mode, evidence):
             continue
         seen.add(row.instrument_name)
         assets.append(
@@ -61,12 +126,14 @@ def latest_research_assets(db: Session, limit: int = 60) -> list[ResearchAsset]:
                 summary=row.summary,
                 suitability_notes=row.suitability_notes,
                 risk_notes=row.risk_notes,
-                evidence=_loads(row.evidence_json),
+                evidence=evidence,
                 data_mode=row.data_mode,
                 confidence_score=row.confidence_score,
                 retrieved_at=row.retrieved_at,
             )
         )
+        if len(assets) >= limit:
+            break
     live_assets = [asset for asset in assets if asset.data_mode in {"live", "cached", "delayed"}]
     return live_assets or assets
 
@@ -134,47 +201,20 @@ def signals_for_asset(asset: ResearchAsset, signals: list[dict]) -> tuple[list[d
 
 
 def screen_assets_for_recommendations(db: Session) -> tuple[list[ResearchAsset], list[dict]]:
+    """Return assets sourced from the live research pipeline only.
+
+    We deliberately do NOT synthesize specific instrument names from a
+    hardcoded template list — that would surface the same "Nippon India
+    ETF X" / "ICICI Prudential Y" on every profile regardless of what
+    research actually supports. Recommendations must be backed by real
+    research records ingested into `AssetResearch`. If the pipeline is
+    empty, recommendations are empty until the user (or a worker) refreshes
+    research data.
+    """
     assets = latest_research_assets(db)
     signals = latest_market_signals(db)
-    assets.extend(_signal_derived_assets(signals, {asset.instrument_name for asset in assets}))
     priority_order = {"debt": 0, "equity": 1, "gold": 2, "crypto": 3, "other": 4}
-    return sorted(assets, key=lambda asset: (priority_order.get(asset.asset_key, 9), -asset.confidence_score)), signals
-
-
-def _signal_derived_assets(signals: list[dict], existing_names: set[str]) -> list[ResearchAsset]:
-    derived = []
-    for signal in signals:
-        instruments = set(signal.get("instruments", []))
-        if "Gold ETF proxy" in instruments and "Nippon India ETF Gold BeES" not in existing_names:
-            derived.append(
-                ResearchAsset(
-                    instrument_name="Nippon India ETF Gold BeES",
-                    asset_type="Gold ETF",
-                    category="Gold ETF",
-                    summary=signal["summary"].replace("Gold ETF proxy", "Nippon India ETF Gold BeES"),
-                    suitability_notes="Useful as a small gold allocation when diversification matters and liquidity is preferred over SGB lock-in.",
-                    risk_notes="Gold ETF prices can move differently from equity and can underperform for long periods. Check tracking error and expense ratio.",
-                    evidence=[{"sourceName": signal["sourceName"], "sourceUrl": signal["sourceUrl"], "dataMode": signal["dataMode"]}],
-                    data_mode=signal["dataMode"],
-                    confidence_score=signal["confidenceScore"],
-                    retrieved_at=signal["retrievedAt"],
-                )
-            )
-            existing_names.add("Nippon India ETF Gold BeES")
-        if "Nippon India ETF Nifty 50 BeES" in instruments and "Nippon India ETF Nifty 50 BeES" not in existing_names:
-            derived.append(
-                ResearchAsset(
-                    instrument_name="Nippon India ETF Nifty 50 BeES",
-                    asset_type="ETF",
-                    category="Nifty 50 ETF",
-                    summary=signal["summary"],
-                    suitability_notes="Useful for users comfortable buying ETFs through a brokerage account.",
-                    risk_notes="ETF price can differ from NAV. Check liquidity, tracking error, and brokerage costs.",
-                    evidence=[{"sourceName": signal["sourceName"], "sourceUrl": signal["sourceUrl"], "dataMode": signal["dataMode"]}],
-                    data_mode=signal["dataMode"],
-                    confidence_score=signal["confidenceScore"],
-                    retrieved_at=signal["retrievedAt"],
-                )
-            )
-            existing_names.add("Nippon India ETF Nifty 50 BeES")
-    return derived
+    return (
+        sorted(assets, key=lambda asset: (priority_order.get(asset.asset_key, 9), -asset.confidence_score)),
+        signals,
+    )

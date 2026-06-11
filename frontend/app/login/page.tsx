@@ -22,8 +22,14 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setError("");
     try {
-      await login(values.email, values.password);
-      router.push("/onboarding");
+      const result = await login(values.email, values.password);
+      if (!result.emailVerified) {
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+      } else if (result.onboardingComplete) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 0) setError("Backend unavailable. Start the API server and try again.");
@@ -54,7 +60,7 @@ export default function LoginPage() {
               <Label>Password</Label>
               <Input type="password" placeholder="Enter your password" {...register("password", { required: true })} />
             </div>
-            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+            {error ? <p className="text-sm text-negative-foreground">{error}</p> : null}
             <Button className="w-full" type="submit">Login</Button>
           </form>
           <p className="mt-4 text-center text-sm">

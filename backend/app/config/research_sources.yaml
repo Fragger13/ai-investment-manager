@@ -176,3 +176,180 @@ sources:
     refresh_frequency: weekly
     categories_covered: [mutual funds, fund research]
     enabled: true
+
+  # ── Indian financial news (major) ─────────────────────────────────────────
+  - source_name: Moneycontrol Markets
+    source_type: rss
+    base_url: https://www.moneycontrol.com/
+    feed_url: https://www.moneycontrol.com/rss/marketreports.xml
+    reliability_score: 78
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [market news, equity, sectors]
+    enabled: true
+
+  - source_name: Business Standard Markets
+    source_type: rss
+    base_url: https://www.business-standard.com/
+    feed_url: https://www.business-standard.com/rss/markets-106.rss
+    reliability_score: 80
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [markets, macro, policy]
+    enabled: true
+
+  - source_name: BQ Prime
+    source_type: rss
+    base_url: https://www.bqprime.com/
+    feed_url: https://www.bqprime.com/feed
+    reliability_score: 82
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [markets, business, policy]
+    enabled: true
+
+  - source_name: CNBC TV18
+    source_type: rss
+    base_url: https://www.cnbctv18.com/
+    feed_url: https://www.cnbctv18.com/rss/market.xml
+    reliability_score: 76
+    allowed_ingestion_method: rss
+    refresh_frequency: hourly
+    categories_covered: [markets, sectors]
+    enabled: true
+
+  - source_name: Outlook Money
+    source_type: rss
+    base_url: https://www.outlookindia.com/business/
+    feed_url: https://www.outlookindia.com/rss/outlookmoney.xml
+    reliability_score: 74
+    allowed_ingestion_method: rss
+    refresh_frequency: daily
+    categories_covered: [personal finance, mutual funds, taxes]
+    enabled: true
+
+  # ── Independent / underdog research blogs (high signal-to-noise) ──────────
+  - source_name: Capitalmind
+    source_type: rss
+    base_url: https://www.capitalmind.in/
+    feed_url: https://www.capitalmind.in/feed/
+    reliability_score: 84
+    allowed_ingestion_method: rss
+    refresh_frequency: daily
+    categories_covered: [research, macro, equity, debt, sectors]
+    enabled: true
+
+  - source_name: FreeFincal
+    source_type: rss
+    base_url: https://freefincal.com/
+    feed_url: https://freefincal.com/feed/
+    reliability_score: 82
+    allowed_ingestion_method: rss
+    refresh_frequency: daily
+    categories_covered: [personal finance, mutual funds, retirement]
+    enabled: true
+
+  - source_name: Subramoney
+    source_type: rss
+    base_url: https://www.subramoney.com/
+    feed_url: https://www.subramoney.com/feed/
+    reliability_score: 80
+    allowed_ingestion_method: rss
+    refresh_frequency: daily
+    categories_covered: [personal finance, behavioral, mutual funds]
+    enabled: true
+
+  - source_name: Stable Investor
+    source_type: rss
+    base_url: https://stableinvestor.com/
+    feed_url: https://stableinvestor.com/feed
+    reliability_score: 78
+    allowed_ingestion_method: rss
+    refresh_frequency: weekly
+    categories_covered: [retirement, personal finance, asset allocation]
+    enabled: true
+
+  - source_name: JagoInvestor
+    source_type: rss
+    base_url: https://www.jagoinvestor.com/
+    feed_url: https://www.jagoinvestor.com/feed
+    reliability_score: 76
+    allowed_ingestion_method: rss
+    refresh_frequency: weekly
+    categories_covered: [personal finance, mutual funds, taxes]
+    enabled: true
+
+  # ── Fundamentals / analytics ──────────────────────────────────────────────
+  - source_name: Screener.in
+    source_type: article
+    base_url: https://www.screener.in/
+    reliability_score: 86
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: daily
+    categories_covered: [fundamentals, equity, ratios]
+    enabled: true
+
+  - source_name: Trendlyne
+    source_type: article
+    base_url: https://trendlyne.com/
+    reliability_score: 80
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: daily
+    categories_covered: [technical, momentum, analyst consensus]
+    enabled: true
+
+  - source_name: Tijori Finance
+    source_type: article
+    base_url: https://www.tijorifinance.com/
+    reliability_score: 78
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: weekly
+    categories_covered: [research, deep dives, equity, sectors]
+    enabled: true
+
+  # ── Govt / macro / policy ─────────────────────────────────────────────────
+  - source_name: PIB India
+    source_type: rss
+    base_url: https://pib.gov.in/
+    feed_url: https://pib.gov.in/rss/lreleng.xml
+    reliability_score: 92
+    allowed_ingestion_method: rss
+    refresh_frequency: daily
+    categories_covered: [policy, macro, schemes]
+    enabled: true
+
+  - source_name: IMF India
+    source_type: article
+    base_url: https://www.imf.org/en/Countries/IND
+    reliability_score: 92
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: monthly
+    categories_covered: [macro, growth, fiscal]
+    enabled: true
+
+  - source_name: World Bank India
+    source_type: article
+    base_url: https://www.worldbank.org/en/country/india
+    reliability_score: 92
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: monthly
+    categories_covered: [macro, growth, fiscal]
+    enabled: true
+
+  - source_name: Trading Economics India
+    source_type: api
+    base_url: https://tradingeconomics.com/india/
+    reliability_score: 84
+    allowed_ingestion_method: public_pages_only
+    refresh_frequency: daily
+    categories_covered: [macro, rates, gdp, cpi, currency]
+    enabled: true
+
+  - source_name: FRED St Louis Fed
+    source_type: api
+    base_url: https://fred.stlouisfed.org/
+    reliability_score: 95
+    allowed_ingestion_method: public_api
+    refresh_frequency: daily
+    categories_covered: [global macro, us rates, inflation]
+    enabled: true

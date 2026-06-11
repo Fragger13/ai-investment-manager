@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Equity">
+  <rect width="64" height="64" rx="18" fill="#DBEAFE"/>
+  <path d="M15 47h34" stroke="#1D4ED8" stroke-width="3" stroke-linecap="round"/>
+  <path d="M18 42 29 31l8 7 12-16" fill="none" stroke="#2563EB" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="49" cy="22" r="4" fill="#1D4ED8"/>
+</svg>

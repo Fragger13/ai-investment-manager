@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class AddedInvestment(BaseModel):
@@ -9,11 +9,96 @@ class AddedInvestment(BaseModel):
     notes: str = ""
 
 
+HOLDING_ASSET_CLASSES = {
+    "stock", "mutualFund", "etf", "crypto", "gold", "silver",
+    "realEstate", "bond", "nps", "fd", "cash", "epfPpf", "other",
+}
+
+
+class Holding(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = ""
+    assetClass: str = Field(default="other", validation_alias=AliasChoices("assetClass", "asset_class"))
+    name: str = ""
+    symbol: str = ""
+    schemeCode: str = Field(default="", validation_alias=AliasChoices("schemeCode", "scheme_code"))
+    units: float = 0.0
+    currentValue: float = Field(default=0.0, validation_alias=AliasChoices("currentValue", "current_value"))
+    valueAtCost: float = Field(default=0.0, validation_alias=AliasChoices("valueAtCost", "value_at_cost"))
+    hasSip: bool = Field(default=False, validation_alias=AliasChoices("hasSip", "has_sip"))
+    sipAmount: float = Field(default=0.0, validation_alias=AliasChoices("sipAmount", "sip_amount"))
+    source: str = "manual"
+    lastPricedAt: str = Field(default="", validation_alias=AliasChoices("lastPricedAt", "last_priced_at"))
+
+    @model_validator(mode="after")
+    def normalize(self):
+        if self.assetClass not in HOLDING_ASSET_CLASSES:
+            self.assetClass = "other"
+        if self.source not in {"manual", "upload", "live"}:
+            self.source = "manual"
+        return self
+
+
 class EmiPlan(BaseModel):
     mode: Literal["lumpsum", "emi"] = "lumpsum"
     interestRate: float = 8.5
     tenureYears: int = 10
     downPayment: int = 0
+
+
+class EmiLoan(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    productType: str = Field(default="", validation_alias=AliasChoices("productType", "product_type"))
+    name: str = ""
+    principalAmount: int = Field(default=0, validation_alias=AliasChoices("principalAmount", "principal_amount"))
+    totalInterestAmount: int = Field(default=0, validation_alias=AliasChoices("totalInterestAmount", "total_interest_amount"))
+    totalEmiAmount: int = Field(default=0, validation_alias=AliasChoices("totalEmiAmount", "total_emi_amount"))
+    startDate: str = Field(default="", validation_alias=AliasChoices("startDate", "start_date"))
+    endDate: str = Field(default="", validation_alias=AliasChoices("endDate", "end_date"))
+    monthlyEmiAmount: int = Field(default=0, validation_alias=AliasChoices("monthlyEmiAmount", "monthly_emi_amount"))
+    estimatedInterestRate: float = Field(default=0, validation_alias=AliasChoices("estimatedInterestRate", "estimated_interest_rate"))
+
+    @model_validator(mode="after")
+    def synchronize_calculated_fields(self):
+        months = _months_between(self.startDate, self.endDate)
+        if months > 0 and self.principalAmount > 0 and self.totalInterestAmount > 0:
+            self.monthlyEmiAmount = round((self.principalAmount + self.totalInterestAmount) / months)
+            self.estimatedInterestRate = round(self.totalInterestAmount / self.principalAmount / (months / 12) * 100, 2)
+        if not self.totalEmiAmount and months > 0 and self.monthlyEmiAmount > 0:
+            self.totalEmiAmount = int(self.monthlyEmiAmount * months)
+        return self
+
+
+class ProfileGoal(BaseModel):
+    type: str = ""
+    customName: str = ""
+    priority: int = 1
+    targetAmount: int = 0
+    currentAmount: int = 0
+    targetDate: str = ""
+    paymentStyle: Literal["lumpsum", "emi"] = "lumpsum"
+    interestRate: float = 8.5
+    tenureYears: int = 5
+    downPayment: int = 0
+    monthlyContribution: int = 0
+    internationalTrips: int = 0
+    domesticTrips: int = 0
+    internationalTripCost: int = 200000
+    domesticTripCost: int = 60000
+    retirementInputType: str = "corpus"
+    desiredMonthlyIncome: int = 0
+    desiredYearlyIncome: int = 0
+    withdrawalRate: float = 4
+    notes: str = ""
+    linkedHoldingIds: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def preserve_legacy_travel_target(self):
+        if self.type == "Travel" and not self.targetAmount:
+            self.targetAmount = int((self.internationalTrips * self.internationalTripCost) + (self.domesticTrips * self.domesticTripCost))
+        return self
 
 
 class OnboardingProfile(BaseModel):
@@ -31,13 +116,16 @@ class OnboardingProfile(BaseModel):
     sideIncome: int = 0
     otherIncome: int = 0
     monthlyCashInflow: int = 0
+    incomeStructureVersion: int = 1
 
     rent: int = 0
     emi: int = 0
     loans: int = 0
+    hasEmiLoans: bool | None = None
     subscriptions: int = 0
     creditCardDebt: int = 0
     monthlyExpenses: int = 0
+    emiLoans: list[EmiLoan] = Field(default_factory=list, validation_alias=AliasChoices("emiLoans", "emi_loans"))
 
     stocksValue: int = 0
     mutualFundsValue: int = 0
@@ -47,6 +135,7 @@ class OnboardingProfile(BaseModel):
     realEstateValue: int = 0
     cashBalance: int = 0
     additionalInvestments: list[AddedInvestment] = Field(default_factory=list)
+    holdings: list[Holding] = Field(default_factory=list)
 
     shortTermLossTolerance: str = ""
     shortTermHorizon: str = ""
@@ -78,6 +167,7 @@ class OnboardingProfile(BaseModel):
     passiveYearlyIncome: int = 0
     withdrawalRate: float = 4
     housePlan: EmiPlan = Field(default_factory=EmiPlan)
+    goals: list[ProfileGoal] = Field(default_factory=list)
 
     spendingDiscipline: str = ""
     emotionalSpendingTendency: str = ""
@@ -86,6 +176,70 @@ class OnboardingProfile(BaseModel):
     tracksExpenses: str = ""
     investsMonthly: str = ""
     panicSellRisk: str = ""
+    investingBlocker: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_profile(cls, value):
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        if int(data.get("incomeStructureVersion") or 0) < 2:
+            data["otherIncome"] = int(data.get("bonusIncome") or 0) + int(data.get("sideIncome") or 0) + int(data.get("otherIncome") or 0)
+            data["bonusIncome"] = 0
+            data["sideIncome"] = 0
+            data["incomeStructureVersion"] = 2
+        loans = data.get("emiLoans") or data.get("emi_loans") or []
+        if not loans and int(data.get("emi") or 0) > 0:
+            loans = [
+                {
+                    "productType": "Other",
+                    "name": "Existing EMI or loan",
+                    "principalAmount": int(data.get("loans") or 0),
+                    "monthlyEmiAmount": int(data.get("emi") or 0),
+                }
+            ]
+        data["emiLoans"] = loans
+        return data
+
+    @model_validator(mode="after")
+    def synchronize_derived_fields(self):
+        self.monthlyCashInflow = int(self.monthlySalary + self.otherIncome)
+        if self.emiLoans:
+            self.emi = sum(item.monthlyEmiAmount for item in self.emiLoans)
+        if not self.volatilityComfort:
+            self.volatilityComfort = self.shortTermVolatilityComfort
+        if self.holdings:
+            sums = {key: 0 for key in ("stock", "mutualFund", "etf", "crypto", "gold", "silver", "realEstate")}
+            extras: list[AddedInvestment] = []
+            extra_type_map = {"bond": "Bonds", "nps": "NPS", "fd": "Fixed deposits", "other": "Other"}
+            for h in self.holdings:
+                if h.assetClass in sums:
+                    sums[h.assetClass] += int(h.currentValue or 0)
+                elif h.assetClass in extra_type_map:
+                    extras.append(AddedInvestment(type=extra_type_map[h.assetClass], value=int(h.currentValue or 0), notes=h.name))
+            self.stocksValue = sums["stock"]
+            self.mutualFundsValue = sums["mutualFund"] + sums["etf"]
+            self.cryptoValue = sums["crypto"]
+            self.goldValue = sums["gold"] + sums["silver"]
+            self.realEstateValue = sums["realEstate"]
+            self.additionalInvestments = extras
+        return self
+
+
+def _months_between(start_date: str, end_date: str) -> int:
+    if not start_date or not end_date:
+        return 0
+    from datetime import date
+
+    try:
+        start = date.fromisoformat(start_date)
+        end = date.fromisoformat(end_date)
+    except ValueError:
+        return 0
+    if end < start:
+        return 0
+    return (end.year - start.year) * 12 + end.month - start.month + 1
 
 
 class ScenarioProjection(BaseModel):
@@ -122,6 +276,7 @@ class Recommendation(BaseModel):
 class GoalProjection(BaseModel):
     id: str
     name: str
+    priority: int = 0
     targetAmount: int
     currentProgress: int
     requiredMonthlyInvestment: int
@@ -147,10 +302,30 @@ class DashboardResponse(BaseModel):
     disclaimer: str
 
 
+class ChatTurn(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     profile: OnboardingProfile | None = None
+    history: list[ChatTurn] = []
+
+
+class ChatCard(BaseModel):
+    type: str  # "metrics" | "recommendation" | "options"
+    intro: str | None = None
+    metrics: list[dict] | None = None  # [{label, amount, icon}]
+    title: str | None = None
+    body: str | None = None
+    icon: str | None = None
+    tone: str | None = None  # "positive" | "warning" | "neutral"
+    options: list[dict] | None = None  # [{label, primary}]
 
 
 class ChatResponse(BaseModel):
     reply: str
+    cards: list[ChatCard] = []
+    suggestions: list[str] = []
+    mood: str = "warm"

@@ -140,6 +140,43 @@ COINGECKO_API_KEY=
 OPENAI_API_KEY=
 ```
 
+## Optional Local LLM With Ollama
+
+The app can use a local open-source LLM for AI chat and explanation rewriting while keeping deterministic fallbacks if Ollama is unavailable.
+
+Install and start Ollama:
+
+```bash
+brew install ollama
+ollama serve
+ollama pull qwen3:8b
+ollama run qwen3:8b
+```
+
+Backend `.env` example:
+
+```env
+LLM_PROVIDER=ollama
+LLM_ENABLED=true
+OLLAMA_BASE_URL=http://localhost:11434
+LLM_MODEL_REASONING=qwen3:8b
+LLM_MODEL_FAST=qwen3:8b
+LLM_MODEL_EXTRACTION=qwen3:8b
+LLM_TIMEOUT_CHAT_SECONDS=20
+LLM_TIMEOUT_ENHANCEMENT_SECONDS=8
+LLM_BATCH_SIZE=2
+```
+
+Then run the backend and frontend normally. Check local LLM status at:
+
+```text
+GET http://127.0.0.1:8000/debug/llm-usage
+```
+
+The endpoint reports provider, model names, Ollama reachability, and fallback status. It does not expose secrets.
+
+`qwen3:8b` is the recommended local model for machines with 16GB RAM. Chat waits for a response for up to 20 seconds. Recommendation, market, and asset copy enhancement runs in the background with an 8-second per-item limit, so core app data remains available if Ollama is slow or offline.
+
 ## Advanced Research Intelligence
 
 Architecture documentation:

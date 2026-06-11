@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.agents.market_data_agent import fetch_market_data
 from app.agents.news_sentiment_agent import extract_news_signals
+from app.agents.web_research_agent import collect_web_research
+from app.services.evidence.evidence_graph_service import save_signal_evidence_links, save_source_reliability_scores
 from app.services.intelligence import now_iso
 from app.services.research.crypto_research_service import fetch_crypto_research
 from app.services.research.fund_research_service import amfi_assets_to_signals, fetch_fund_research
@@ -23,6 +25,13 @@ def refresh_research(db: Session, force: bool = False) -> dict:
         modes.append(mode)
         log_refresh(db, source.source_name, "ok" if items else "failed", mode, message, len(items))
         articles.extend(items[:8])
+
+    web_research = collect_web_research(limit_per_source=6, source_limit=8)
+    for health in web_research["sourceHealth"]:
+        modes.append(health["mode"])
+        log_refresh(db, health["sourceName"], "ok" if health["itemsProcessed"] else "failed", health["mode"], health["message"], health["itemsProcessed"])
+    articles.extend(web_research["articles"])
+    save_source_reliability_scores(db, web_research["reliabilityScores"])
 
     saved_articles = save_articles(db, articles) if articles else []
     article_payloads = [
@@ -56,6 +65,7 @@ def refresh_research(db: Session, force: bool = False) -> dict:
 
     extracted_signals = extract_news_signals(article_payloads) if article_payloads else []
     signals = market_signals + fund_signals + crypto_signals + extracted_signals
+    signals.extend(web_research["signals"])
     if not signals:
         from app.services.research.market_data_service import structured_market_fallback
 
@@ -63,6 +73,7 @@ def refresh_research(db: Session, force: bool = False) -> dict:
         modes.append("fallback")
 
     saved_signals = save_signals(db, signals)
+    save_signal_evidence_links(db, saved_signals)
     saved_assets = save_assets(db, fund_assets + crypto_assets)
     if any(mode == "live" for mode in modes):
         data_mode = "live"
@@ -77,7 +88,7 @@ def refresh_research(db: Session, force: bool = False) -> dict:
     return {
         "status": "refreshed",
         "dataMode": data_mode,
-        "sourcesProcessed": len(configured_rss_sources(sources)) + 3,
+        "sourcesProcessed": len(configured_rss_sources(sources)) + 3 + len(web_research["sourceHealth"]),
         "articlesProcessed": len(saved_articles),
         "signalsGenerated": len(saved_signals),
         "assetsGenerated": len(saved_assets),
