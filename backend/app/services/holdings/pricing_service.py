@@ -117,25 +117,28 @@ def _price_crypto(symbol: str) -> float | None:
     return float(inr) if isinstance(inr, (int, float)) and inr > 0 else None
 
 
+# gold-api.com returns the spot price in USD per troy ounce (1 oz = 31.1035 g).
+_METAL_SYMBOLS = {"gold": "XAU", "silver": "XAG"}
+_USD_INR = 86.0  # rough USD→INR; metals are quoted in USD upstream
+
+
 def _price_metal(metal: str) -> float | None:
-    """metals.live returns USD/oz. Convert to INR/gram (1 oz = 31.1035 grams)."""
-    url = f"https://api.metals.live/v1/spot/{metal}"
-    result = fetch_text(url, timeout=6, retries=1, cache_ttl_seconds=3600, require_json=True)
+    """Spot price in INR/gram for gold/silver via gold-api.com (no key)."""
+    symbol = _METAL_SYMBOLS.get(metal.lower())
+    if not symbol:
+        return None
+    url = f"https://api.gold-api.com/price/{symbol}"
+    result = fetch_text(url, timeout=8, retries=1, cache_ttl_seconds=3600, require_json=True)
     if not result.text:
         return None
     try:
         payload = json.loads(result.text)
     except (ValueError, json.JSONDecodeError):
         return None
-    # API returns a list of {date: price}
-    if isinstance(payload, list) and payload:
-        latest = payload[-1]
-        if isinstance(latest, dict):
-            for value in latest.values():
-                if isinstance(value, (int, float)) and value > 0:
-                    usd_per_oz = float(value)
-                    inr_per_gram = (usd_per_oz / 31.1035) * 83.0  # rough USD→INR
-                    return inr_per_gram
+    price = payload.get("price") if isinstance(payload, dict) else None
+    if isinstance(price, (int, float)) and price > 0:
+        usd_per_oz = float(price)
+        return (usd_per_oz / 31.1035) * _USD_INR
     return None
 
 

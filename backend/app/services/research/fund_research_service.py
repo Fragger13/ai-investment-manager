@@ -1,13 +1,16 @@
 """Fund research ingestion from AMFI.
 
-Previously this module pinned research output to four hardcoded scheme
-names (e.g. "UTI Nifty 50 Index Fund", "SBI Liquid Fund"). That meant
-every profile saw the same specific AMC product as a recommendation,
-regardless of what AMFI actually had on file. This rewrite produces
-**category-level candidates** ("Large-cap index mutual fund", "Liquid
-fund", etc.) and uses real AMFI scheme matches as supporting evidence.
-Specific scheme selection is delegated to the user/advisor — the engine
-no longer brands recommendations with a particular AMC.
+Each category (large-cap index, liquid, flexi-cap, gold, …) is resolved to a
+**specific, named scheme** so the user does not have to do the extra work of
+choosing which fund to buy. Selection is data-driven: among Direct + Growth
+plans from major AMCs, funds are ranked by trailing returns computed from NAV
+history (returns are net of expense ratio, so the cheaper/better fund wins) —
+see ``fund_picker_service``. The top pick becomes the recommendation's
+``instrumentName``; runner-up funds and the trailing returns are surfaced in
+the summary. Real AMFI scheme matches stay attached as evidence.
+
+If the picker can't resolve a category (network down, no match), the entry
+falls back to a brand-neutral category label as before.
 """
 
 from __future__ import annotations
@@ -107,7 +110,117 @@ FUND_CATEGORIES = [
         "suitability": "Suitable for investors who want lower volatility than pure equity for 3-5 year goals.",
         "risks": "Equity component still falls in market corrections; rebalancing rules vary by AMC.",
     },
+    {
+        "category_name": "Gilt fund",
+        "instrument_label": "Gilt (government bond) fund",
+        "asset_type": "Debt mutual fund",
+        "keywords": ["gilt"],
+        "summary_lead": "AMFI lists gilt funds that invest in government securities (sovereign-credit, no default risk).",
+        "suitability": "Suitable for 3-5 year goals where you want sovereign-credit bonds and can tolerate interest-rate swings.",
+        "risks": "NAV falls when interest rates rise (duration risk); returns vary with the rate cycle.",
+    },
+    {
+        "category_name": "Corporate bond fund",
+        "instrument_label": "Corporate bond fund",
+        "asset_type": "Debt mutual fund",
+        "keywords": ["corporate bond"],
+        "summary_lead": "AMFI lists corporate bond funds investing mostly in high-rated (AA+/AAA) company bonds.",
+        "suitability": "Suitable for 2-4 year goals wanting slightly higher yield than gilts with mostly high-grade credit.",
+        "risks": "Credit-quality and interest-rate risk; verify the portfolio's rating profile.",
+    },
+    {
+        "category_name": "Banking & PSU fund",
+        "instrument_label": "Banking & PSU debt fund",
+        "asset_type": "Debt mutual fund",
+        "keywords": ["banking", "psu"],
+        "summary_lead": "AMFI lists Banking & PSU debt funds investing in bonds of banks and public-sector entities.",
+        "suitability": "Suitable for 2-4 year goals wanting relatively high credit quality with moderate duration.",
+        "risks": "Interest-rate and (limited) credit risk; returns vary with the rate cycle.",
+    },
+    {
+        "category_name": "Arbitrage fund",
+        "instrument_label": "Arbitrage fund",
+        "asset_type": "Debt mutual fund",
+        "keywords": ["arbitrage"],
+        "summary_lead": "AMFI lists arbitrage funds that earn from cash-futures spreads with low directional risk (equity taxation).",
+        "suitability": "Suitable as a low-risk parking option for 6-18 months, often more tax-efficient than debt funds for high earners.",
+        "risks": "Returns depend on spreads and can be low in calm markets; not a guaranteed product.",
+    },
 ]
+
+
+# Maps each category to a fund_picker spec so the generic label can be
+# replaced with a specific, return-ranked scheme.
+_PICKER_KEYS = {
+    "Large-cap index fund": "large_cap_index",
+    "Liquid fund": "liquid",
+    "Overnight fund": "overnight",
+    "Short-duration debt fund": "short_duration",
+    "Flexi-cap fund": "flexi_cap",
+    "Mid-cap fund": "mid_cap",
+    "Small-cap fund": "small_cap",
+    "ELSS / tax-saving fund": "elss",
+    "Hybrid balanced fund": "hybrid",
+    "Gilt fund": "gilt",
+    "Corporate bond fund": "corporate_bond",
+    "Banking & PSU fund": "banking_psu",
+    "Arbitrage fund": "arbitrage",
+}
+
+
+def category_key_for_name(category_name: str) -> str | None:
+    """Map a human category name (e.g. 'Flexi-cap fund') to a factor-engine key."""
+    return _PICKER_KEYS.get(category_name)
+
+
+def _perf_clause(fund: dict) -> str:
+    bits = []
+    for label, key in (("1Y", "return1y"), ("3Y", "return3y"), ("5Y", "return5y")):
+        val = fund.get(key)
+        if isinstance(val, (int, float)):
+            bits.append(f"{label} {val:.1f}%")
+    return ", ".join(bits) if bits else "returns unavailable"
+
+
+def _factor_clause(fund: dict) -> str:
+    """Risk-adjusted highlights for the summary (the analyst-grade angle)."""
+    bits = []
+    if fund.get("sortino") is not None:
+        bits.append(f"Sortino {fund['sortino']}")
+    if fund.get("maxDrawdown") is not None:
+        bits.append(f"worst drawdown {fund['maxDrawdown']}%")
+    if fund.get("downCapture") is not None:
+        bits.append(f"down-capture {fund['downCapture']}")
+    if fund.get("alpha") is not None:
+        bits.append(f"alpha {fund['alpha']}% vs Nifty 50")
+    return ", ".join(bits)
+
+
+def _fund_entry(fund: dict, score: int | None = None) -> dict:
+    """Display + factor payload for a fund in an asset's specificFunds list."""
+    long_ret = next((fund.get(k) for k in ("cagr5y", "cagr3y", "cagr1y") if fund.get(k) is not None), None)
+    basis = "5Y" if fund.get("cagr5y") is not None else "3Y" if fund.get("cagr3y") is not None else "1Y"
+    return {
+        "name": fund["name"],
+        "fundHouse": fund.get("fundHouse", ""),
+        "schemeCode": fund["schemeCode"],
+        "plan": fund.get("plan", "Direct - Growth"),
+        "latestNav": fund.get("latestNav", 0.0),
+        "navDate": fund.get("navDate", ""),
+        "return1y": fund.get("cagr1y"),
+        "return3y": fund.get("cagr3y"),
+        "return5y": fund.get("cagr5y"),
+        "rankReturn": long_ret,
+        "rankBasis": basis,
+        "sharpe": fund.get("sharpe"),
+        "sortino": fund.get("sortino"),
+        "calmar": fund.get("calmar"),
+        "maxDrawdown": fund.get("maxDrawdown"),
+        "downCapture": fund.get("downCapture"),
+        "alpha": fund.get("alpha"),
+        "volatility": fund.get("volatility"),
+        "compositeScore": score,
+    }
 
 
 def _fetch_text(url: str, timeout: int = 10) -> tuple[str, str]:
@@ -124,7 +237,19 @@ def fetch_amfi_nav_text() -> tuple[str, str, str]:
 
 
 def parse_amfi_nav(text: str, source_url: str, data_mode: str) -> list[dict]:
-    """Emit category-level fund candidates with real AMFI evidence attached."""
+    """Emit specific, factor-ranked fund picks per category (with AMFI evidence).
+
+    Selection ranks the category's Direct+Growth pool on a *risk-adjusted* factor
+    composite (Sortino/Calmar/drawdown/down-capture/consistency), not trailing
+    CAGR. The chosen funds carry their full factor bundle so the recommendation
+    engine can re-rank them per the user's profile/goal at request time.
+    """
+    from app.services.research.fund_factor_service import (
+        category_candidates,
+        category_percentiles,
+        score_fund,
+    )
+
     timestamp = now_iso()
     assets: list[dict] = []
     lines = [line.strip() for line in text.splitlines() if ";" in line]
@@ -140,35 +265,71 @@ def parse_amfi_nav(text: str, source_url: str, data_mode: str) -> list[dict]:
                     break
         if not matches:
             continue
-        # Take up to 3 matched schemes as evidence — proof the category is
-        # populated today, without pinning the recommendation to a specific AMC.
-        evidence: list[dict] = []
-        for parts in matches[:3]:
-            scheme_name = parts[3].strip()
-            nav = parts[4].strip()
-            nav_date = parts[5].strip() if len(parts) > 5 else ""
-            evidence.append(
+
+        # Resolve the category to specific schemes ranked on risk-adjusted factors.
+        picker_key = _PICKER_KEYS.get(category["category_name"])
+        candidates = category_candidates(picker_key, amfi_text=text) if picker_key else []
+        ranked: list[dict] = []
+        if candidates:
+            pcts = category_percentiles(candidates)
+            scored = [(score_fund(c, pcts.get(c["schemeCode"], {}))["score"], c) for c in candidates]
+            scored.sort(key=lambda item: item[0], reverse=True)
+            ranked = [_fund_entry(c, score=s) for s, c in scored[:3]]
+
+        if ranked:
+            top = ranked[0]
+            instrument_name = f"{top['name']} ({top['plan']})"
+            alternatives = [p["name"] for p in ranked[1:]]
+            alt_clause = f" Other strong options: {'; '.join(alternatives)}." if alternatives else ""
+            factor_clause = _factor_clause(top)
+            factor_text = f" Risk-adjusted profile: {factor_clause}." if factor_clause else ""
+            summary = (
+                f"{top['name']} is a specific {category['category_name'].lower()} chosen by ranking "
+                f"Direct-plan funds on risk-adjusted quality, not just trailing return.{factor_text} "
+                f"Trailing returns (net of expenses): {_perf_clause(top)}.{alt_clause} {category['summary_lead']}"
+            )
+            evidence = [
                 {
                     "sourceName": "AMFI India",
                     "sourceUrl": source_url,
                     "dataMode": data_mode,
-                    "scheme": scheme_name,
-                    "nav": nav,
-                    "navDate": nav_date,
+                    "scheme": pick["name"],
+                    "nav": str(pick.get("latestNav", "")),
+                    "navDate": pick.get("navDate", ""),
+                    "returns": _perf_clause(pick),
                 }
-            )
+                for pick in ranked
+            ]
+            confidence = 86 if data_mode == "live" else 58
+        else:
+            instrument_name = category["instrument_label"]
+            summary = f"{category['summary_lead']} {len(matches)} matching schemes are available in AMFI's latest NAV file."
+            evidence = [
+                {
+                    "sourceName": "AMFI India",
+                    "sourceUrl": source_url,
+                    "dataMode": data_mode,
+                    "scheme": parts[3].strip(),
+                    "nav": parts[4].strip(),
+                    "navDate": parts[5].strip() if len(parts) > 5 else "",
+                }
+                for parts in matches[:3]
+            ]
+            confidence = 82 if data_mode == "live" else 55
+
         assets.append(
             {
-                "instrumentName": category["instrument_label"],
+                "instrumentName": instrument_name,
                 "assetType": category["asset_type"],
                 "category": category["category_name"],
-                "summary": f"{category['summary_lead']} {len(matches)} matching schemes are available in AMFI's latest NAV file.",
+                "summary": summary,
                 "suitabilityNotes": category["suitability"],
                 "riskNotes": category["risks"],
                 "evidence": evidence,
                 "dataMode": data_mode,
-                "confidenceScore": 82 if data_mode == "live" else 55,
+                "confidenceScore": confidence,
                 "retrievedAt": timestamp,
+                "specificFunds": ranked,
             }
         )
     return assets

@@ -84,17 +84,14 @@ def _reason(asset: ResearchAsset, bucket: str, supporting: list[dict]) -> str:
 
 
 def _ticker(name: str) -> str:
-    return {
-        "HDFC Bank Ltd": "HDFCBANK",
-        "ICICI Bank Ltd": "ICICIBANK",
-        "Reliance Industries Ltd": "RELIANCE",
-        "Infosys Ltd": "INFY",
-        "Bharat Electronics Ltd": "BEL",
-        "Larsen & Toubro Ltd": "LT",
-        "Kaynes Technology India Ltd": "KAYNES",
-        "KPIT Technologies Ltd": "KPITTECH",
-        "Bitcoin": "BTC",
-        "Ethereum": "ETH",
-        "Solana": "SOL",
-        "Chainlink": "LINK",
-    }.get(name, "")
+    try:  # resolve live from the NSE constituent universe (no hardcoded tickers)
+        from app.services.research.equity_factor_service import ticker_from_constituents
+
+        equity = ticker_from_constituents(name).replace(".NS", "")
+        if equity:
+            return equity
+        from app.services.research.crypto_factor_service import crypto_ticker_for_name
+
+        return crypto_ticker_for_name(name)
+    except Exception:  # noqa: BLE001
+        return ""

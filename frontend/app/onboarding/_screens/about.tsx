@@ -2,7 +2,7 @@
 
 import { ChoiceCard } from "../_components/choice-card";
 import { PapaBubble, PapaMood } from "../_components/papa-bubble";
-import { TextField } from "../_lib/field-helpers";
+import { CityField, TextField } from "../_lib/field-helpers";
 import { ScreenContext } from "../_flow/types";
 
 const FAMILY_OPTIONS = [
@@ -22,14 +22,20 @@ export function AboutScreen({ form, values }: ScreenContext) {
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField name="name" label="Your name" placeholder="e.g., Rohan Sharma" autoFocus />
+          <TextField
+            name="name"
+            label="Your name"
+            placeholder="e.g., Rohan Sharma"
+            autoFocus
+            sanitize={(v) => v.replace(/[^\p{L}\s.'-]/gu, "")}
+          />
           <TextField
             name="dateOfBirth"
             type="date"
             label="Date of birth"
             helper={values.age ? `Age: ${values.age}` : "Your age helps me plan retirement and risk."}
           />
-          <TextField name="city" label="City" placeholder="e.g., Bengaluru" />
+          <CityField name="city" label="City" placeholder="Start typing, e.g., Beng…" />
           <TextField name="occupation" label="What do you do?" placeholder="e.g., Product manager, founder, student" />
         </div>
 

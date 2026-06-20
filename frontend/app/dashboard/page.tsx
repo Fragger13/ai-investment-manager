@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { PapaBubble, type PapaMood } from "@/app/onboarding/_components/papa-bubble";
-import { emptyDashboard, isOnboardingComplete, profileCompletionPercent, totalMonthlyEmi } from "@/lib/profile";
+import { currentBudgetMonth, emptyDashboard, isOnboardingComplete, profileCompletionPercent, totalMonthlyEmi } from "@/lib/profile";
 import { inr } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { DashboardData, OnboardingProfile } from "@/types";
@@ -41,8 +41,16 @@ export default function DashboardPage() {
   }, [profile, saveProfile, token]);
 
   const needsProfile = !profile && !data.summary.monthlyIncome;
-  const commitments = (profile?.rent || 0) + (profile?.subscriptions || 0) + totalMonthlyEmi(profile?.emiLoans, profile?.emi);
-  const available = Math.max(data.summary.monthlyIncome - data.summary.monthlyExpenses - commitments, data.summary.investableSurplus, 0);
+  // Total monthly outflow: rent + everyday expenses + EMIs. (subscriptions are
+  // bundled inside monthlyExpenses during onboarding, so they're not added again.)
+  const commitments = (profile?.rent || 0) + (profile?.monthlyExpenses || 0) + totalMonthlyEmi(profile?.emiLoans, profile?.emi);
+  // What's left to invest this month. If the user gave an explicit "invest this
+  // month" figure for the current month, that takes precedence; otherwise it's
+  // income minus all commitments.
+  const overrideActive = (profile?.investableThisMonth || 0) > 0 && profile?.investableThisMonthMonth === currentBudgetMonth();
+  const available = overrideActive
+    ? Number(profile?.investableThisMonth || 0)
+    : Math.max((data.summary.monthlyIncome || 0) - commitments, 0);
   const userHasGoals = (profile?.goals?.length || 0) > 0;
   const topGoals = userHasGoals ? data.goals.slice(0, 3) : [];
   const topActions = data.recommendations.slice(0, 3);
@@ -321,7 +329,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
       <div className="min-w-0 flex-1">
         <p className="text-sm text-muted-foreground">Monthly Commitments</p>
         <p className="mt-1 text-2xl font-semibold text-foreground">{inr(total)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Rent, EMIs, subscriptions</p>
+        <p className="mt-1 text-sm text-muted-foreground">Rent, EMIs, monthly expenses</p>
       </div>
       {canOpen ? (
         <span className="shrink-0 text-muted-foreground">
@@ -356,7 +364,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
               <div className="grid gap-3 sm:grid-cols-3">
                 <CommitSummaryTile label="Rent" amount={summary.rent} icon={Home} />
                 <CommitSummaryTile label="Loans / EMIs" amount={summary.totalEmi} icon={Repeat} />
-                <CommitSummaryTile label="Subscriptions" amount={summary.subscriptions} icon={Receipt} />
+                <CommitSummaryTile label="Monthly expenses" amount={summary.monthlyExpenses} icon={Receipt} />
               </div>
 
               {summary.loans.length ? (
@@ -374,12 +382,11 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
                           </div>
                           <p className="shrink-0 text-base font-semibold text-foreground">{inr(loan.monthlyEmi)}<span className="ml-1 text-xs font-normal text-muted-foreground">/mo</span></p>
                         </div>
-                        <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                          <CommitFact label="Principal" value={loan.principal ? inr(loan.principal) : "—"} />
-                          <CommitFact label="Interest" value={loan.totalInterest ? inr(loan.totalInterest) : "—"} />
-                          <CommitFact label="Rate" value={loan.rate ? `${loan.rate.toFixed(1)}%` : "—"} />
-                          <CommitFact label="Window" value={loan.window} icon={CalendarRange} />
-                        </dl>
+                        {loan.window ? (
+                          <dl className="mt-3 grid grid-cols-1 gap-3 text-xs">
+                            <CommitFact label="Window" value={loan.window} icon={CalendarRange} />
+                          </dl>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -447,7 +454,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
   const empty = {
     rent: 0,
     totalEmi: 0,
-    subscriptions: 0,
+    monthlyExpenses: 0,
     loans: [] as LoanRow[],
     simpleRows: [] as SimpleRow[],
     items: [] as SimpleRow[],
@@ -482,7 +489,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
 
   const simpleRows: SimpleRow[] = [];
   if (profile.rent > 0) simpleRows.push({ id: "rent", name: "Rent", amount: profile.rent, icon: Home });
-  if (profile.subscriptions > 0) simpleRows.push({ id: "subs", name: "Subscriptions", amount: profile.subscriptions, icon: Receipt });
+  if (profile.monthlyExpenses > 0) simpleRows.push({ id: "expenses", name: "Monthly expenses", amount: profile.monthlyExpenses, icon: Receipt });
 
   // Only fall back to the consolidated EMI line when nothing else can be
   // unpacked. The CommitmentsCard renders a hint pointing the user to the
@@ -492,7 +499,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
   return {
     rent: profile.rent || 0,
     totalEmi,
-    subscriptions: profile.subscriptions || 0,
+    monthlyExpenses: profile.monthlyExpenses || 0,
     loans,
     simpleRows,
     items: simpleRows.length || loans.length || legacyEmiOnly

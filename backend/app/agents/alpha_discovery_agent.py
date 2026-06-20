@@ -6,92 +6,81 @@ from app.services.recommendations.suitability_scoring_service import ProfileCont
 
 
 def discover_alpha_assets(existing_names: set[str], signals: list[dict], context: ProfileContext, regime: dict) -> list[ResearchAsset]:
+    """Data-driven alpha: surface stocks from the LIVE NSE universe that are
+    genuinely beating the market (positive alpha vs Nifty 50 + strong momentum),
+    rather than a hardcoded watchlist. Crypto watchlist stays fixed until Pass 3.
+    """
     if context.surplus <= 0:
         return []
     timestamp = now_iso()
-    candidates = [
-        _candidate(
-            "Bharat Electronics Ltd",
-            "Equity share",
-            "Event-driven defence opportunity",
-            "Defence electronics candidate tied to defence capex and geopolitical risk themes. This is not a core holding; size it as a capped tactical idea.",
-            "Use only for users who can accept stock-specific and valuation risk.",
-            "Order execution, valuation compression, policy delays, and broad market corrections can hurt returns.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=BEL",
-            timestamp,
-            66,
-        ),
-        _candidate(
-            "Larsen & Toubro Ltd",
-            "Equity share",
-            "Event-driven infrastructure capex opportunity",
-            "Infrastructure and capital-goods proxy for public/private capex tailwinds. It is more cyclical than an index fund.",
-            "Suitable as a small goal-aligned equity satellite when long-term risk capacity exists.",
-            "Execution delays, margin pressure, election/policy shifts, and valuation risk can affect outcomes.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=LT",
-            timestamp,
-            68,
-        ),
-        _candidate(
-            "Kaynes Technology India Ltd",
-            "Equity share",
-            "Underdog electronics manufacturing opportunity",
-            "Higher-risk electronics manufacturing candidate linked to India manufacturing and EV/electronics supply-chain themes.",
-            "Watchlist or very small tactical allocation only for aggressive profiles.",
-            "Small/mid-cap valuation, execution, liquidity, and margin risks are high.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=KAYNES",
-            timestamp,
-            58,
-        ),
-        _candidate(
-            "KPIT Technologies Ltd",
-            "Equity share",
-            "Underdog EV software opportunity",
-            "Auto software candidate linked to EV and software-defined vehicle themes. Treat as a high-risk watchlist idea unless evidence strengthens.",
-            "Suitable only as a capped satellite for users with high risk comfort.",
-            "Client concentration, growth normalization, valuation, and technology-cycle risks are high.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=KPITTECH",
-            timestamp,
-            58,
-        ),
-        _candidate(
-            "Solana",
-            "Crypto asset",
-            "Crypto tactical watchlist",
-            "Large-cap layer-1 crypto watchlist idea for high-risk profiles only. Prefer watchlist until source-backed crypto signals improve.",
-            "Only suitable after emergency fund and core investments are in place.",
-            "Extreme volatility, outages, regulatory uncertainty, liquidity stress, and narrative reversal can cause large losses.",
-            "https://www.coingecko.com/en/coins/solana",
-            timestamp,
-            50,
-        ),
-        _candidate(
-            "Chainlink",
-            "Crypto asset",
-            "Crypto narrative watchlist",
-            "Oracle and tokenized real-world asset narrative watchlist idea. Keep as watchlist unless evidence and risk capacity are strong.",
-            "Only suitable as a tiny speculative watchlist for aggressive users.",
-            "Protocol competition, token economics, regulation, and crypto market drawdowns can hurt returns.",
-            "https://www.coingecko.com/en/coins/chainlink",
-            timestamp,
-            48,
-        ),
-    ]
-    allowed = []
-    text = " ".join(f"{signal.get('summary', '')} {' '.join(signal.get('sectors', []))} {' '.join(signal.get('macroThemes', []))}" for signal in signals).lower()
-    for candidate in candidates:
-        if candidate.instrument_name in existing_names:
-            continue
-        if candidate.asset_key == "crypto" and not context.short_term_risk_ok:
-            continue
-        if "defence" in candidate.category.lower() and not any(term in text for term in ["defence", "geopolitical", "budget", "capex"]):
-            candidate.confidence_score -= 6
-        if "infrastructure" in candidate.category.lower() and not any(term in text for term in ["infra", "capex", "budget", "construction"]):
-            candidate.confidence_score -= 6
-        if "underdog" in candidate.category.lower() and regime.get("regime") == "risk-off":
-            candidate.confidence_score -= 8
-        allowed.append(candidate)
-    return allowed
+    candidates: list[ResearchAsset] = []
+
+    try:
+        from app.services.research.equity_factor_service import top_equity_candidates
+
+        pool = top_equity_candidates(limit=40, exclude=list(existing_names))
+        # Rank by genuine outperformance: alpha vs Nifty 50 then 12m momentum.
+        pool.sort(key=lambda c: ((c["factors"].get("alpha") or -99), (c["factors"].get("momentum12m") or -99)), reverse=True)
+        for cand in pool:
+            f = cand["factors"]
+            alpha = f.get("alpha")
+            if alpha is None or alpha <= 1.0:  # only real market-beaters
+                continue
+            bits = [f"alpha {alpha}% vs Nifty 50"]
+            if f.get("momentum12m") is not None:
+                bits.append(f"12m momentum {f['momentum12m']}%")
+            if f.get("sortino") is not None:
+                bits.append(f"Sortino {f['sortino']}")
+            candidates.append(
+                _candidate(
+                    cand["name"],
+                    "Equity share",
+                    "Event-driven alpha opportunity",
+                    f"{cand['name']} is beating the market on risk-adjusted terms ({', '.join(bits)}). "
+                    "A capped, goal-aligned equity satellite — not a core holding.",
+                    "Suitable as a small satellite for users with long-term risk capacity who accept single-stock risk.",
+                    "Single-stock, valuation, sector-cycle, and broad-market drawdown risks apply.",
+                    f"https://www.nseindia.com/get-quotes/equity?symbol={cand['ticker'].replace('.NS', '')}",
+                    timestamp,
+                    min(74, 55 + int(alpha)),
+                )
+            )
+            if len(candidates) >= 4:
+                break
+    except Exception:  # noqa: BLE001 — equity data must never break discovery
+        candidates = []
+
+    # Crypto watchlist from the LIVE CoinGecko universe (no hardcoded coins):
+    # the highest-momentum large-cap coins, for high-risk profiles only.
+    if context.short_term_risk_ok:
+        try:
+            from app.services.research.crypto_factor_service import top_crypto_candidates
+
+            pool = top_crypto_candidates(limit=12, exclude=list(existing_names))
+            pool.sort(key=lambda c: (c["factors"].get("momentum12m") or -99), reverse=True)
+            for cand in pool[:2]:
+                f = cand["factors"]
+                mom = f.get("momentum12m")
+                if mom is None:
+                    continue
+                candidates.append(
+                    _candidate(
+                        cand["name"],
+                        "Crypto asset",
+                        "Crypto narrative watchlist",
+                        f"{cand['name']} shows strong momentum ({mom}% 12m) in the live crypto universe; a tiny "
+                        "speculative watchlist idea only — keep capped unless risk capacity is high.",
+                        "Only suitable as a tiny speculative watchlist for aggressive users after core investing is in place.",
+                        "Extreme volatility, regulation, liquidity stress, and narrative reversal can cause large losses.",
+                        f"https://www.coingecko.com/en/coins/{cand['coinId']}",
+                        timestamp,
+                        50,
+                    )
+                )
+        except Exception:  # noqa: BLE001
+            pass
+
+    return [c for c in candidates if c.instrument_name not in existing_names]
 
 
 def discover_alpha_opportunities(assets: list[dict], market_signals: list[dict], technicals: dict[str, dict], fundamentals: dict[str, dict], liquidity: dict[str, dict], regime: dict) -> list[dict]:

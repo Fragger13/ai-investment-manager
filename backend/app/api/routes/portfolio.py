@@ -4,18 +4,33 @@ import json
 from datetime import UTC, datetime
 from math import pow
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user_action_event import UserActionEvent
 from app.schemas.financial import OnboardingProfile
+from app.services.holdings.pricing_service import _price_metal
 from app.services.intelligence import allocation, monthly_income, net_worth, total_emi_payments
 from app.services.memory.adaptive_memory_service import snapshot_portfolio
 from app.services.optimization.portfolio_optimizer import latest_optimization, optimize_portfolio
 from app.services.profile_resolution import latest_saved_profile, resolve_profile
 
 router = APIRouter()
+
+
+@router.get("/metal-price/{metal}")
+def metal_price(metal: str) -> dict:
+    """Live spot price in INR per gram for gold/silver (best-effort).
+
+    Used by onboarding to auto-value physical metal holdings from grams.
+    Returns inrPerGram=0 when the upstream source is unavailable.
+    """
+    metal = metal.strip().lower()
+    if metal not in {"gold", "silver"}:
+        raise HTTPException(status_code=400, detail="Unsupported metal. Use 'gold' or 'silver'.")
+    per_gram = _price_metal(metal) or 0.0
+    return {"metal": metal, "inrPerGram": round(per_gram, 2)}
 
 
 def _latest_profile(db: Session) -> OnboardingProfile:

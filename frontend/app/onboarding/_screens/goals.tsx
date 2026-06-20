@@ -24,7 +24,6 @@ const GOAL_OPTIONS = [
   { value: "Travel", label: "Travel", emoji: "✈️" },
   { value: "Debt repayment", label: "Pay off debt", emoji: "💳" },
   { value: "Business/startup", label: "Start a business", emoji: "🚀" },
-  { value: "Wealth creation", label: "Build wealth", emoji: "📈" },
   { value: "Other", label: "Something else", emoji: "✨" }
 ];
 

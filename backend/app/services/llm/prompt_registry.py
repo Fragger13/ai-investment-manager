@@ -149,6 +149,12 @@ def recommendation_explanation_prompt(recommendation: dict[str, Any], cards: lis
         "contradictorySignals": recommendation.get("contradictorySignals", [])[:2],
         "risk": recommendation.get("risks") or recommendation.get("primaryRisk") or recommendation.get("whatCanGoWrong"),
         "validation": recommendation.get("validation"),
+        # Quant factor facts (funds) — already-computed numbers for the model to
+        # phrase. The safety rule forbids inventing any figures beyond these.
+        "fundFactors": _compact_fund_factors(recommendation.get("factorInsights", {})),
+        "factorDrivers": recommendation.get("factorDrivers", [])[:3],
+        "marketReasoning": recommendation.get("currentMarketReasoning"),
+        "goalFunding": _compact_goal_funding(recommendation.get("goalFunding", {})),
         "fallbackCards": _compact_cards(cards),
     }
     return (
@@ -267,6 +273,25 @@ def _compact_rec(rec: dict[str, Any]) -> dict[str, Any]:
         "reason": rec.get("conciseReason") or rec.get("userSpecificReasoning"),
         "risk": rec.get("primaryRisk") or rec.get("whatCanGoWrong"),
         "portfolioImpact": rec.get("allocationImpact"),
+    }
+
+
+def _compact_fund_factors(insights: dict[str, Any]) -> dict[str, Any]:
+    """Only the headline factor numbers, for the LLM to phrase (never invent)."""
+    if not insights:
+        return {}
+    keys = ("sortino", "calmar", "maxDrawdown3y", "downCapture", "alpha", "volatility", "sortinoPercentile", "drawdownPercentile")
+    return {k: insights[k] for k in keys if insights.get(k) is not None}
+
+
+def _compact_goal_funding(funding: dict[str, Any]) -> dict[str, Any]:
+    if not funding:
+        return {}
+    return {
+        "fundingPercent": funding.get("fundingPercent"),
+        "requiredMonthly": funding.get("requiredMonthlyInvestment"),
+        "gap": funding.get("gap"),
+        "fix": funding.get("fix"),
     }
 
 

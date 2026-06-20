@@ -43,80 +43,90 @@ def _asset_rank(asset: ResearchAsset, goals: list[dict], regime: dict) -> int:
 
 
 def _institutional_candidate_assets(existing_names: set[str]) -> list[ResearchAsset]:
+    """Equity stock candidates from the LIVE NSE universe, ranked on real factors
+    (no hardcoded tickers). Crypto remains a small fixed set until Pass 3."""
     timestamp = now_iso()
-    candidates = [
+    candidates: list[ResearchAsset] = []
+
+    try:
+        from app.services.research.equity_factor_service import top_equity_candidates
+
+        for cand in top_equity_candidates(limit=12, exclude=list(existing_names)):
+            f = cand["factors"]
+            symbol = cand["ticker"].replace(".NS", "")
+            metric_bits = []
+            if f.get("sortino") is not None:
+                metric_bits.append(f"Sortino {f['sortino']}")
+            if f.get("maxDrawdown3y") is not None:
+                metric_bits.append(f"worst 3y drawdown {f['maxDrawdown3y']}%")
+            if f.get("alpha") is not None:
+                metric_bits.append(f"alpha {f['alpha']}% vs Nifty 50")
+            metrics = ", ".join(metric_bits) or "risk-adjusted metrics computed from price history"
+            summary = (
+                f"{cand['name']} surfaced from the live NSE universe and ranks well on risk-adjusted "
+                f"factors ({metrics}). Use only as a diversified stock sleeve, not a replacement for "
+                f"core funds or emergency money."
+            )
+            candidates.append(
+                _candidate(
+                    cand["name"],
+                    "Equity share",
+                    cand.get("industry") or "Large-cap stock",
+                    summary,
+                    "Suitable for a small satellite stock allocation for users who accept single-stock risk and already hold core funds.",
+                    "Single stocks can underperform the market, face company-specific shocks, and need periodic review.",
+                    f"https://www.nseindia.com/get-quotes/equity?symbol={symbol}",
+                    timestamp,
+                )
+            )
+    except Exception:  # noqa: BLE001 — equity data must never break screening
+        candidates = []
+
+    # Crypto satellites from the LIVE CoinGecko top-market-cap universe (no
+    # hardcoded coins), ranked on real risk-adjusted factors.
+    try:
+        from app.services.research.crypto_factor_service import top_crypto_candidates
+
+        for cand in top_crypto_candidates(limit=2, exclude=list(existing_names)):
+            f = cand["factors"]
+            bits = []
+            if f.get("sortino") is not None:
+                bits.append(f"Sortino {f['sortino']}")
+            if f.get("maxDrawdown3y") is not None:
+                bits.append(f"worst drawdown {f['maxDrawdown3y']}%")
+            metrics = ", ".join(bits) or "risk-adjusted metrics from price history"
+            candidates.append(
+                _candidate(
+                    cand["name"],
+                    "Crypto asset",
+                    "Crypto satellite",
+                    f"{cand['name']} surfaced from the live top-market-cap crypto universe and ranks well on "
+                    f"risk-adjusted factors ({metrics}). For a very small satellite allocation only after "
+                    "emergency fund, debt, and core investments are handled.",
+                    "Suitable only for users who can tolerate large temporary or permanent losses.",
+                    "Crypto can fall sharply; regulation, liquidity, and market-cycle risks are high.",
+                    f"https://www.coingecko.com/en/coins/{cand['coinId']}",
+                    timestamp,
+                )
+            )
+    except Exception:  # noqa: BLE001 — crypto data must never break screening
+        pass
+
+    # Fixed Deposit — a guaranteed-return fixed-income option (no market data).
+    # Surfaces for safety / near-term goals via the normal suitability flow.
+    candidates.append(
         _candidate(
-            "HDFC Bank Ltd",
-            "Equity share",
-            "Large-cap private bank stock",
-            "Large private bank stock candidate for direct equity exposure. Use only as a diversified stock allocation, not as a replacement for emergency money.",
-            "Suitable only for users who accept stock-specific risk and already have core diversification.",
-            "Single stocks can underperform the market, face company-specific shocks, and require periodic review.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=HDFCBANK",
+            "Bank Fixed Deposit",
+            "Fixed deposit",
+            "Guaranteed fixed-income (debt)",
+            "Bank FD is a capital-guaranteed option returning roughly 6.5-7.5% p.a. (varies by bank/tenure). "
+            "Best for money you cannot afford to lose or need on a fixed date; returns are taxable at slab rate.",
+            "Suitable for emergency money, very conservative investors, and near-term goals where capital safety beats higher returns.",
+            "Returns are locked at booking and may trail inflation/debt funds; premature withdrawal carries a penalty.",
+            "https://www.rbi.org.in/",
             timestamp,
-        ),
-        _candidate(
-            "ICICI Bank Ltd",
-            "Equity share",
-            "Large-cap private bank stock",
-            "Large bank stock candidate for a direct equity sleeve where the user wants stock exposure beyond index funds.",
-            "Suitable for a small satellite stock allocation inside long-term goals.",
-            "Banking stocks are sensitive to credit cycles, rates, regulation, and asset-quality surprises.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=ICICIBANK",
-            timestamp,
-        ),
-        _candidate(
-            "Reliance Industries Ltd",
-            "Equity share",
-            "Large-cap diversified stock",
-            "Diversified large-cap stock candidate across energy, retail, telecom, and digital businesses.",
-            "Suitable only as part of a basket, not as a concentrated bet.",
-            "Conglomerate execution, commodity cycles, regulation, and valuation risk can affect returns.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=RELIANCE",
-            timestamp,
-        ),
-        _candidate(
-            "Infosys Ltd",
-            "Equity share",
-            "Large-cap IT services stock",
-            "IT services stock candidate for global technology services exposure within an equity basket.",
-            "Suitable for long-term investors who can tolerate sector cycles.",
-            "IT stocks face currency, global demand, margin, and client spending risks.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=INFY",
-            timestamp,
-        ),
-        _candidate(
-            "Nippon India ETF Bank BeES",
-            "Tactical ETF",
-            "Banking sector tactical opportunity",
-            "Sector ETF candidate for tactical banking exposure when market signals support financial-sector rotation.",
-            "Use only as a capped tactical allocation after priority goals and emergency money are protected.",
-            "Sector ETFs can be volatile and should not become a core retirement allocation.",
-            "https://www.nseindia.com/get-quotes/equity?symbol=BANKBEES",
-            timestamp,
-            category_key="tactical",
-        ),
-        _candidate(
-            "Bitcoin",
-            "Crypto asset",
-            "Crypto satellite",
-            "Crypto candidate for users with high risk capacity and aspirational goals only.",
-            "Suitable only after emergency fund, debt pressure, and core long-term investments are handled.",
-            "Crypto can fall sharply, regulation can change, and liquidity can deteriorate in stress periods.",
-            "https://www.coingecko.com/en/coins/bitcoin",
-            timestamp,
-        ),
-        _candidate(
-            "Ethereum",
-            "Crypto asset",
-            "Crypto satellite",
-            "Crypto candidate for a very small satellite allocation where high volatility is acceptable.",
-            "Suitable only for users who can tolerate large temporary or permanent losses.",
-            "Smart-contract, regulation, competition, and market-cycle risks are high.",
-            "https://www.coingecko.com/en/coins/ethereum",
-            timestamp,
-        ),
-    ]
+        )
+    )
     return [asset for asset in candidates if asset.instrument_name not in existing_names]
 
 

@@ -18,7 +18,7 @@ type AuthState = {
   emailVerified: boolean;
   profile: OnboardingProfile | null;
   login: (email: string, password: string) => Promise<{ emailVerified: boolean; onboardingComplete: boolean }>;
-  register: (name: string, email: string, password: string) => Promise<{ emailVerified: boolean }>;
+  register: (name: string, email: string, password: string) => Promise<{ emailVerified: boolean; sent: boolean }>;
   verifyEmail: (email: string, code: string) => Promise<void>;
   logout: () => void;
   saveProfile: (profile: OnboardingProfile, complete?: boolean) => void;
@@ -49,14 +49,10 @@ export const useAuthStore = create<AuthState>()(
         };
       },
       register: async (name, email, password) => {
+        // No account exists until the email code is verified — so there are no
+        // tokens to store yet. Just relay whether the code email went out.
         const response = await api.register(name, email, password);
-        set({
-          token: response.access_token,
-          user: { name: response.name, email: response.email },
-          onboardingComplete: response.onboarding_complete,
-          emailVerified: response.email_verified ?? false
-        });
-        return { emailVerified: response.email_verified ?? false };
+        return { emailVerified: response.email_verified ?? false, sent: response.sent };
       },
       verifyEmail: async (email, code) => {
         const response = await api.verifyEmail(email, code);

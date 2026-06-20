@@ -12,9 +12,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
     onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False)
-    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    verification_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
-    verification_code_expires: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # A `users` row only exists once email is verified (see PendingRegistration),
+    # so this is True for every real account. Kept for API-response compatibility.
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     profile = relationship("FinancialProfile", back_populates="user", uselist=False)
     goals = relationship("Goal", back_populates="user")

@@ -117,6 +117,10 @@ class OnboardingProfile(BaseModel):
     otherIncome: int = 0
     monthlyCashInflow: int = 0
     incomeStructureVersion: int = 1
+    # Current-month investable override + payday timing (see intelligence.investable_surplus).
+    investableThisMonth: int = 0
+    investableThisMonthMonth: str = ""  # YYYY-MM the override applies to
+    salaryDay: str = ""  # "Last working day" | "1st of the month" | "Variable"
 
     rent: int = 0
     emi: int = 0
@@ -255,9 +259,24 @@ class SourceLink(BaseModel):
     retrievedAt: str
 
 
+class FundPick(BaseModel):
+    name: str
+    fundHouse: str = ""
+    schemeCode: str = ""
+    plan: str = "Direct - Growth"
+    latestNav: float = 0.0
+    navDate: str = ""
+    return1y: float | None = None
+    return3y: float | None = None
+    return5y: float | None = None
+    rankReturn: float | None = None
+    rankBasis: str = ""
+
+
 class Recommendation(BaseModel):
     id: str
     assetClass: str
+    specificFunds: list[FundPick] = Field(default_factory=list)
     suggestedAllocation: int
     suggestedMonthlyAmount: int
     strategyType: str

@@ -259,6 +259,14 @@ class AdvancedRecommendation(BaseModel):
     intelligenceLayerSupport: dict[str, Any] = Field(default_factory=dict)
     confidenceTier: str = ""
     fusionNotes: list[str] = Field(default_factory=list)
+    # Quant factor engine (funds): real risk-adjusted metrics + personalized fit
+    isFundPick: bool = False
+    fundFactors: dict[str, Any] = Field(default_factory=dict)
+    factorInsights: dict[str, Any] = Field(default_factory=dict)
+    factorDrivers: list[str] = Field(default_factory=list)
+    factorScore: int = 0
+    diversification: dict[str, Any] = Field(default_factory=dict)
+    goalFunding: dict[str, Any] = Field(default_factory=dict)
     disclaimer: str
 
 
@@ -294,6 +302,7 @@ class AdvancedRecommendationResponse(BaseModel):
     validationSummary: dict[str, Any] = Field(default_factory=dict)
     investorCluster: dict[str, Any] = Field(default_factory=dict)
     factorScores: dict[str, Any] = Field(default_factory=dict)
+    goalFunding: dict[str, Any] = Field(default_factory=dict)
     recommendationGroups: dict[str, Any] = Field(default_factory=dict)
     consolidationSummary: dict[str, Any] = Field(default_factory=dict)
     cacheStatus: str = ""

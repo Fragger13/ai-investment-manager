@@ -46,14 +46,36 @@ from app.services.intelligence import DISCLAIMER
 from app.services.backtesting_service import initialize_recommendation_performance, model_metadata
 from app.services.optimization.portfolio_optimizer import optimize_portfolio
 from app.services.recommendations.asset_screening_service import signals_for_asset
+from app.services.recommendations.goal_funding_service import solve_goal_funding
 from app.services.recommendations.recommendation_builder import build_recommendation
 from app.services.recommendations.suitability_scoring_service import build_profile_context
+from app.services.research.fund_factor_service import (
+    category_candidates,
+    category_percentiles,
+    diversification_insight,
+    expected_return_from_factors,
+    score_fund,
+)
+from app.services.research.fund_research_service import category_key_for_name
+from app.services.research.equity_factor_service import (
+    equity_factors,
+    equity_universe,
+    ticker_from_constituents,
+)
+from app.services.research.crypto_factor_service import (
+    crypto_ticker_for_name,
+    crypto_universe,
+    factors_for_symbol,
+)
 
 
 def generate_institutional_recommendations(db: Session, profile: OnboardingProfile | None = None) -> dict:
     profile = profile or OnboardingProfile()
     context = build_profile_context(profile)
     goals = build_goal_hierarchy(profile)
+    funding = solve_goal_funding(profile)
+    holding_codes = [h.schemeCode for h in (profile.holdings or []) if getattr(h, "schemeCode", "")]
+    selected_fund_codes: list[str] = []
     factors = analyze_investor_factors(context, goals)
     cluster = assign_investor_cluster(factors)
     assets, signals = screen_assets_for_institutional_engine(db, goals, {"regime": "balanced"})
@@ -82,6 +104,14 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
         if fit["suitabilityScore"] < 42:
             continue
         goal = select_goal_for_asset(asset.asset_key, goals)
+        # For fund assets, pick the specific scheme per the user's profile/goal
+        # using the risk-adjusted factor engine + diversification vs holdings,
+        # and let the fund's real quality move its suitability.
+        fund_choice = _personalize_fund(asset, context, goal, selected_fund_codes, holding_codes, regime)
+        if not fund_choice:
+            fund_choice = _personalize_equity(asset, context, goal, regime) or _personalize_crypto(asset, context, goal, regime)
+        if fund_choice:
+            fit["suitabilityScore"] = max(5, min(96, round(fit["suitabilityScore"] + (fund_choice["score"] - 50) * 0.25)))
         sizing = size_position(context, asset, goal, portfolio_plan, regime)
         if sizing["suggestedAllocationPercentage"] <= 0 or sizing["suggestedMonthlyAmount"] <= 0:
             continue
@@ -140,6 +170,7 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
             historical_validation,
             portfolio_optimization,
             asset_intelligence,
+            fund_choice=fund_choice,
         )
         recommendations.append(enriched)
         asset_key_counts[asset.asset_key] = asset_key_counts.get(asset.asset_key, 0) + 1
@@ -147,6 +178,7 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
             break
 
     recommendations = rerank_recommendations(recommendations)
+    _apply_goal_funding(recommendations, funding)
     for index, recommendation in enumerate(recommendations, start=1):
         recommendation["priorityOrder"] = index
 
@@ -165,8 +197,139 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
         "validationSummary": validation,
         "investorCluster": cluster,
         "factorScores": factors,
+        "goalFunding": funding,
     }
     return consolidate_recommendation_response(result)
+
+
+def _personalize_fund(asset, context, goal: dict, selected_codes: list[str], holding_codes: list[str], regime: dict) -> dict | None:
+    """Pick the specific fund for a category using the factor engine + the user's
+    profile/goal + diversification vs existing holdings. Mutates the asset's
+    instrument name to the chosen scheme. Returns None for non-fund assets."""
+    key = category_key_for_name(asset.category)
+    if not key:
+        return None
+    candidates = category_candidates(key)
+    if not candidates:
+        return None
+    pcts = category_percentiles(candidates)
+    best: tuple | None = None
+    best_total: float | None = None
+    for cand in candidates:
+        scored = score_fund(cand, pcts.get(cand["schemeCode"], {}), context, goal)
+        div = diversification_insight(cand["schemeCode"], holding_codes, selected_codes)
+        total = scored["score"] + div["scoreDelta"]
+        if best_total is None or total > best_total:
+            best_total, best = total, (cand, scored, div)
+    if not best:
+        return None
+    cand, scored, div = best
+    asset.instrument_name = f"{cand['name']} ({cand.get('plan', 'Direct - Growth')})"
+    selected_codes.append(cand["schemeCode"])
+    return {
+        "factors": cand,
+        "score": scored["score"],
+        "drivers": scored["drivers"],
+        "insights": scored["insights"],
+        "diversification": div,
+        "expectedReturn": expected_return_from_factors(cand, key, regime),
+        "categoryKey": key,
+    }
+
+
+def _personalize_equity(asset, context, goal: dict, regime: dict) -> dict | None:
+    """Attach real factor analysis + factor-based expected return to an equity
+    stock asset (sourced live from the NSE universe). The stock is the asset, so
+    no re-pick; its factors move its suitability. Returns None for non-stocks."""
+    if asset.asset_key not in {"equity", "tactical"} or category_key_for_name(asset.category):
+        return None
+    ticker = ticker_from_constituents(asset.instrument_name)
+    if not ticker:
+        return None
+    factors = equity_factors(ticker, asset.instrument_name, asset.category)
+    if not factors:
+        return None
+    universe = equity_universe()
+    pcts = category_percentiles(universe) if universe else {}
+    scored = score_fund(factors, pcts.get(factors["schemeCode"], {}), context, goal)
+    return {
+        "factors": factors,
+        "score": scored["score"],
+        "drivers": scored["drivers"],
+        "insights": scored["insights"],
+        "diversification": {},
+        "expectedReturn": expected_return_from_factors(factors, "equity_stock", regime),
+        "categoryKey": "equity_stock",
+    }
+
+
+def _personalize_crypto(asset, context, goal: dict, regime: dict) -> dict | None:
+    """Attach real factor analysis + factor-based expected return to a crypto
+    asset (sourced live from the CoinGecko top-market-cap universe)."""
+    if asset.asset_key != "crypto":
+        return None
+    factors = factors_for_symbol(asset.instrument_name, asset.instrument_name)
+    if not factors:
+        return None
+    universe = crypto_universe()
+    pcts = category_percentiles(universe) if universe else {}
+    scored = score_fund(factors, pcts.get(factors["schemeCode"], {}), context, goal)
+    return {
+        "factors": factors,
+        "score": scored["score"],
+        "drivers": scored["drivers"],
+        "insights": scored["insights"],
+        "diversification": {},
+        "expectedReturn": expected_return_from_factors(factors, "crypto", regime),
+        "categoryKey": "crypto",
+    }
+
+
+def _fund_market_reasoning(fund_choice: dict) -> str:
+    """Plain-language, numbers-grounded reasoning for the chosen fund."""
+    f = fund_choice["factors"]
+    div = fund_choice.get("diversification", {})
+    bits = []
+    if f.get("sortino") is not None:
+        bits.append(f"Sortino {f['sortino']}")
+    if f.get("maxDrawdown3y") is not None:
+        bits.append(f"worst 3y drawdown {f['maxDrawdown3y']}%")
+    if f.get("alpha") is not None:
+        bits.append(f"alpha {f['alpha']}% vs Nifty 50")
+    if f.get("downCapture") is not None:
+        bits.append(f"down-capture {f['downCapture']}")
+    metric_clause = f" ({', '.join(bits)})" if bits else ""
+    parts = [f"{f['name']} was selected on risk-adjusted quality, not just past return{metric_clause}."]
+    drivers = fund_choice.get("drivers", [])
+    if drivers:
+        parts.append(drivers[0] + ".")
+    corr = div.get("correlationToHoldings")
+    if div.get("diversifies") and corr is not None:
+        parts.append(f"It is only {corr} correlated to your existing holdings, so it improves diversification.")
+    elif div.get("redundant"):
+        parts.append("Note: it overlaps heavily with another pick, so treat them as one position.")
+    return " ".join(parts)
+
+
+def _apply_goal_funding(recommendations: list[dict], funding: dict) -> None:
+    """Attach each goal's funding status (required SIP, funding %, gap, fix) to
+    its recommendations, so the user sees whether the plan reaches the goal and
+    what to change if not. Per-asset SIPs keep the surplus-based glide-path
+    sizing; the funding plan reports the honest required-vs-allocated picture."""
+    plans = {p["name"]: p for p in funding.get("goals", [])}
+    for rec in recommendations:
+        plan = plans.get(rec.get("goalTag", ""))
+        if not plan:
+            continue
+        rec["goalFunding"] = {
+            "fundingPercent": plan["fundingPercent"],
+            "requiredMonthlyInvestment": plan["requiredMonthlyInvestment"],
+            "allocatedMonthlyInvestment": plan["allocatedMonthlyInvestment"],
+            "gap": plan["gap"],
+            "onTrack": plan["onTrack"],
+            "fix": plan["fix"],
+            "timeHorizonMonths": plan["timeHorizonMonths"],
+        }
 
 
 def _enrich(
@@ -195,6 +358,7 @@ def _enrich(
     historical_validation: dict,
     portfolio_optimization: dict,
     asset_intelligence: dict,
+    fund_choice: dict | None = None,
 ) -> dict:
     base["suggestedMonthlyAmount"] = fit["suggestedMonthlyAmount"]
     base["suggestedAllocationPercentage"] = fit["suggestedAllocationPercentage"]
@@ -218,7 +382,11 @@ def _enrich(
     base["reviewDate"] = _review_date_from_cadence(timing["reviewCadence"])
     base["exitOrRebalanceCondition"] = tactical["rebalanceLogic"]
     base["whyNow"] = regime["summary"]
-    base["expectedReturn"] = _expected_return(fit["assetKey"], base["assetType"], base["recommendationType"], regime, tactical)
+    if fund_choice and fund_choice.get("expectedReturn"):
+        # Forward estimate derived from the fund's own NAV history, not a static table.
+        base["expectedReturn"] = fund_choice["expectedReturn"]
+    else:
+        base["expectedReturn"] = _expected_return(fit["assetKey"], base["assetType"], base["recommendationType"], regime, tactical)
     base["confidenceScore"] = min(95, max(base["confidenceScore"], round((base["confidenceScore"] + conviction["convictionScore"]) / 2)))
     base["suitabilityScore"] = fit["suitabilityScore"]
     base["marketRegime"] = regime["regime"]
@@ -340,6 +508,16 @@ def _enrich(
         f"uses the {regime['regime']} market regime, and is sized inside a {portfolio_plan['riskBudget']} portfolio budget."
     )
     base["fullResearchNotes"] = _full_research_notes(base, fundamental, technical, contrarian, sector_rotation, geopolitical, macro_event, crypto_narrative)
+    if fund_choice:
+        base["isFundPick"] = True
+        base["fundFactors"] = fund_choice["factors"]
+        base["factorInsights"] = fund_choice["insights"]
+        base["factorDrivers"] = fund_choice["drivers"]
+        base["factorScore"] = fund_choice["score"]
+        base["diversification"] = fund_choice["diversification"]
+        # Re-anchor the market reasoning on the fund actually chosen for this
+        # profile (the research-time summary may name a different default fund).
+        base["currentMarketReasoning"] = _fund_market_reasoning(fund_choice)
     base.update(_final_schema_aliases(base))
     base = enrich_recommendation_explainability(None, base, llm_enhance=False)
     return base
@@ -358,30 +536,7 @@ def _validation_asset(asset, base: dict) -> dict:
 
 
 def _ticker_for_validation(name: str, fallback: str = "") -> str:
-    tickers = {
-        "HDFC Bank Ltd": "HDFCBANK.NS",
-        "ICICI Bank Ltd": "ICICIBANK.NS",
-        "Reliance Industries Ltd": "RELIANCE.NS",
-        "Infosys Ltd": "INFY.NS",
-        "Tata Consultancy Services Ltd": "TCS.NS",
-        "Sun Pharmaceutical Industries Ltd": "SUNPHARMA.NS",
-        "ONGC Ltd": "ONGC.NS",
-        "Larsen & Toubro Ltd": "LT.NS",
-        "Bharat Electronics Ltd": "BEL.NS",
-        "Hindustan Aeronautics Ltd": "HAL.NS",
-        "Kaynes Technology India Ltd": "KAYNES.NS",
-        "KPIT Technologies Ltd": "KPITTECH.NS",
-        "Nippon India ETF Bank BeES": "BANKBEES.NS",
-        "Nippon India ETF Nifty 50 BeES": "NIFTYBEES.NS",
-        "Nippon India ETF Gold BeES": "GOLDBEES.NS",
-        "Bitcoin": "BTC",
-        "Ethereum": "ETH",
-        "Solana": "SOL",
-        "Chainlink": "LINK",
-    }
-    if name in tickers:
-        return tickers[name]
-    return fallback
+    return ticker_from_constituents(name) or crypto_ticker_for_name(name) or fallback
 
 
 def _asset_intelligence_snapshot(db: Session, asset) -> dict:
@@ -661,14 +816,17 @@ def _recommendation_type(asset_key: str, asset_type: str, instrument_name: str, 
 
 
 def _asset_count_caps(cluster: dict) -> dict[str, int]:
+    # Per-class ceilings (not a fixed order — final ranking is class-agnostic).
+    # Fixed-income variety (gilt/corporate/banking-PSU/arbitrage/liquid) is now
+    # available, so debt caps allow a couple of options for those who need safety.
     risk = cluster.get("riskProfile", "moderate")
     if risk == "conservative":
-        return {"debt": 2, "equity": 5, "gold": 2, "crypto": 0, "tactical": 1, "other": 1}
+        return {"debt": 4, "equity": 5, "gold": 2, "crypto": 0, "tactical": 1, "other": 2}
     if risk == "very_aggressive":
-        return {"debt": 1, "equity": 11, "gold": 2, "crypto": 4, "tactical": 4, "other": 1}
+        return {"debt": 2, "equity": 11, "gold": 2, "crypto": 4, "tactical": 4, "other": 1}
     if risk == "aggressive":
-        return {"debt": 1, "equity": 10, "gold": 2, "crypto": 3, "tactical": 3, "other": 1}
-    return {"debt": 1, "equity": 8, "gold": 2, "crypto": 2, "tactical": 2, "other": 1}
+        return {"debt": 2, "equity": 10, "gold": 2, "crypto": 3, "tactical": 3, "other": 1}
+    return {"debt": 3, "equity": 8, "gold": 2, "crypto": 2, "tactical": 2, "other": 2}
 
 
 def _opportunity_scores(
@@ -1026,18 +1184,7 @@ def _expected_return(asset_key: str, asset_type: str, recommendation_type: str, 
 
 
 def _ticker_for(name: str) -> str:
-    tickers = {
-        "HDFC Bank Ltd": "HDFCBANK",
-        "ICICI Bank Ltd": "ICICIBANK",
-        "Reliance Industries Ltd": "RELIANCE",
-        "Infosys Ltd": "INFY",
-        "Nippon India ETF Bank BeES": "BANKBEES",
-        "Nippon India ETF Nifty 50 BeES": "NIFTYBEES",
-        "Nippon India ETF Gold BeES": "GOLDBEES",
-        "Bitcoin": "BTC",
-        "Ethereum": "ETH",
-    }
-    return tickers.get(name, "")
+    return ticker_from_constituents(name).replace(".NS", "") or crypto_ticker_for_name(name)
 
 
 def _concentration_impact(asset_key: str, allocation: int) -> str:

@@ -9,7 +9,7 @@ import { OnboardingProfile } from "@/types";
 
 type HabitField = keyof Pick<
   OnboardingProfile,
-  "spendingDiscipline" | "emotionalSpendingTendency" | "riskReaction" | "tracksExpenses" | "investsMonthly" | "investingBlocker"
+  "spendingDiscipline" | "emotionalSpendingTendency" | "tracksExpenses" | "investsMonthly" | "investingBlocker"
 >;
 
 type Option = { value: string; title: string; emoji: string };
@@ -49,15 +49,6 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
       { value: "Rarely", title: "Rarely", emoji: "🌪️" },
       { value: "Sometimes", title: "Sometimes", emoji: "🌤️" },
       { value: "Often", title: "Like clockwork", emoji: "📆" }
-    ]
-  },
-  {
-    field: "riskReaction",
-    question: "Markets fall 10% in one week. Your move?",
-    options: [
-      { value: "I stay calm", title: "Stay calm", emoji: "😌" },
-      { value: "I get worried", title: "Get worried", emoji: "😟" },
-      { value: "I may sell", title: "Might sell", emoji: "😰" }
     ]
   },
   {

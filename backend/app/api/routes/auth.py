@@ -16,30 +16,36 @@ from app.schemas.auth import (
     VerificationStatusResponse,
     VerifyEmailRequest,
 )
-from app.services.email.verification_service import VerificationError, generate_and_send_code, resend_code, verify_code
+from app.services.email.verification_service import (
+    VerificationError,
+    resend_code,
+    start_registration,
+    verify_and_create_user,
+)
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=AuthResponse)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
+@router.post("/register", response_model=VerificationStatusResponse)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> VerificationStatusResponse:
+    # The account is NOT created here. We stash a pending registration and email
+    # a code; the real `users` row is created only when the code is verified.
     users = UserRepository(db)
     email = str(payload.email).strip().lower()
     if users.get_by_email(email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    user = users.create(name=payload.name, email=email, password_hash=hash_password(payload.password))
-    # Send verification email. Errors here do not block registration —
-    # the user can hit /auth/resend-verification from the frontend.
     try:
-        generate_and_send_code(db, user)
-    except VerificationError:
-        pass
-    return AuthResponse(
-        access_token=create_access_token(user.email),
-        refresh_token=create_refresh_token(user.email),
-        name=user.name,
-        email=user.email,
-        email_verified=user.email_verified,
+        result = start_registration(
+            db, name=payload.name, email=email, password_hash=hash_password(payload.password)
+        )
+    except VerificationError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    return VerificationStatusResponse(
+        email=email,
+        email_verified=False,
+        sent=result.ok,
+        provider=result.provider,
+        detail=result.error,
     )
 
 
@@ -69,11 +75,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
 @router.post("/verify-email", response_model=AuthResponse)
 def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> AuthResponse:
     users = UserRepository(db)
-    user = users.get_by_email(str(payload.email).strip().lower())
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    email = str(payload.email).strip().lower()
+    # An existing user means this email was already verified and registered.
+    # Don't hand out tokens here (no password proof) — send them to log in.
+    if users.get_by_email(email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     try:
-        verify_code(db, user, payload.code)
+        user = verify_and_create_user(db, email, payload.code)
     except VerificationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return AuthResponse(
@@ -89,18 +97,16 @@ def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> 
 @router.post("/resend-verification", response_model=VerificationStatusResponse)
 def resend_verification(payload: ResendVerificationRequest, db: Session = Depends(get_db)) -> VerificationStatusResponse:
     users = UserRepository(db)
-    user = users.get_by_email(str(payload.email).strip().lower())
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if user.email_verified:
-        return VerificationStatusResponse(email=user.email, email_verified=True, sent=False, detail="Already verified")
+    email = str(payload.email).strip().lower()
+    if users.get_by_email(email):
+        return VerificationStatusResponse(email=email, email_verified=True, sent=False, detail="Already verified")
     try:
-        result = resend_code(db, user)
+        result = resend_code(db, email)
     except VerificationError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     return VerificationStatusResponse(
-        email=user.email,
-        email_verified=user.email_verified,
+        email=email,
+        email_verified=False,
         sent=result.ok,
         provider=result.provider,
         detail=result.error,

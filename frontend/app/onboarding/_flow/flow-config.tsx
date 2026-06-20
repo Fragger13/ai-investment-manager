@@ -49,7 +49,7 @@ export function buildScreens(
   screens.push({
     id: "income",
     sectionId: "income",
-    fields: ["monthlySalary", "otherIncome"],
+    fields: ["monthlySalary", "otherIncome", "investableThisMonth", "salaryDay"],
     render: IncomeScreen
   });
 
@@ -117,7 +117,6 @@ export function buildScreens(
     fields: [
       "spendingDiscipline",
       "emotionalSpendingTendency",
-      "riskReaction",
       "tracksExpenses",
       "investsMonthly",
       "investmentPsychology",

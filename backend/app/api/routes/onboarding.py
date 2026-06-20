@@ -13,7 +13,7 @@ from app.models.recommendation import RecommendationRecord
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.financial import OnboardingProfile
-from app.services.intelligence import build_dashboard, monthly_income, now_iso, profile_to_dict
+from app.services.intelligence import build_dashboard, current_ist_month, monthly_income, now_iso, profile_to_dict
 from app.services.memory.adaptive_memory_service import snapshot_profile
 
 router = APIRouter()
@@ -33,7 +33,6 @@ REQUIRED_TEXT_FIELDS = [
     "spendingDiscipline",
     "emotionalSpendingTendency",
     "investmentPsychology",
-    "riskReaction",
     "tracksExpenses",
     "investsMonthly",
     "panicSellRisk",
@@ -110,6 +109,11 @@ def save_onboarding(
                 detail=f"Onboarding is incomplete. Missing: {', '.join(sorted(set(missing)))}",
             )
     user = _current_user_from_authorization(authorization, db)
+    # Stamp the "invest this month" override with the month it applies to, so the
+    # dashboard uses it only for the current month and auto-reverts to the
+    # computed surplus afterwards.
+    if profile.investableThisMonth > 0:
+        profile.investableThisMonthMonth = current_ist_month()
     dashboard = build_dashboard(profile)
     payload = profile_to_dict(profile)
     record = FinancialProfile(

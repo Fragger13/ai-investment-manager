@@ -5,6 +5,7 @@ from app.models.portfolio import Portfolio
 from app.models.recommendation import RecommendationRecord
 from app.models.uploaded_document import UploadedDocument
 from app.models.user import User
+from app.models.pending_registration import PendingRegistration
 from app.models.activity_record import ActivityRecord
 from app.models.asset_research import AssetResearch
 from app.models.asset_correlation_cache import AssetCorrelationCache
@@ -60,6 +61,7 @@ from app.models.llm_enhancement_record import LlmEnhancementRecord
 
 __all__ = [
     "User",
+    "PendingRegistration",
     "FinancialProfile",
     "Goal",
     "InvestmentPreference",

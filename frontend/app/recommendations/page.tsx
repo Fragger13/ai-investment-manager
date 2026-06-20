@@ -15,7 +15,7 @@ import { cn, inr } from "@/lib/utils";
 import { emptyDashboard } from "@/lib/profile";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { AdvancedRecommendation, AdvancedRecommendationResponse, DashboardData } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, DashboardData, FundFactorInsights, GoalFundingPlan, GoalFundingStatus } from "@/types";
 
 const emptyAdvanced: AdvancedRecommendationResponse = {
   recommendations: [],
@@ -52,6 +52,10 @@ type ActionItem = {
   goalName?: string;
   ctaLabel: string;
   explanationCards: { title: string; summary: string }[];
+  isFundPick?: boolean;
+  factorDrivers?: string[];
+  factorInsights?: FundFactorInsights;
+  goalFunding?: GoalFundingStatus;
 };
 
 export default function RecommendationsPage() {
@@ -80,8 +84,12 @@ export default function RecommendationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
   const items = useMemo(() => mergeIntoActionItems(data.recommendations, dashboard), [data.recommendations, dashboard]);
-  const grouped = useMemo(() => groupItems(items), [items]);
+  const grouped = useMemo(
+    () => layerItems(items, new Set(actionsTaken.map((entry) => entry.key))),
+    [items, actionsTaken]
+  );
   const visible = grouped[activeTab];
   const confidence = planConfidence(items);
   const confidenceTone: "good" | "warn" | "danger" = confidence >= 75 ? "good" : confidence >= 55 ? "warn" : "danger";
@@ -97,6 +105,8 @@ export default function RecommendationsPage() {
       </div>
 
       <SavedByYouSection />
+
+      <GoalFundingSection plan={data.goalFunding} />
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex gap-1 rounded-full border border-border bg-surface p-1">
@@ -119,10 +129,10 @@ export default function RecommendationsPage() {
       </div>
 
       {activeTab === "Must Do" ? (
-        <Section heading="Must Do" subtitle="High-impact actions recommended for you right now.">
+        <Section heading="Must Do" subtitle="Your 3 highest-priority actions right now. Finish one and the next moves up automatically.">
           <div className="space-y-3">
             {visible.map((item) => <MustDoRow key={item.key} item={item} />)}
-            {!visible.length ? <EmptyRow text="No must-do items right now. Check the Consider tab for items worth reviewing." /> : null}
+            {!visible.length ? <EmptyRow text="You're all caught up on top actions. Check the Consider tab for what's next." /> : null}
           </div>
         </Section>
       ) : null}
@@ -209,6 +219,63 @@ function SavedByYouSection() {
   );
 }
 
+function GoalFundingSection({ plan }: { plan?: GoalFundingPlan }) {
+  if (!plan || !plan.goals?.length) return null;
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Will this plan reach your goals?</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Your investable surplus mapped to each goal, priority first. Honest funding — not a promise.</p>
+        </div>
+        <Badge tone={plan.fullyFundsAll ? "good" : "warn"}>{plan.fullyFundsAll ? "On track" : "Gaps to close"}</Badge>
+      </div>
+      <div className="mt-3 space-y-2">
+        {plan.goals.map((goal) => {
+          const tone = goal.fundingPercent >= 98 ? "good" : goal.fundingPercent >= 60 ? "warn" : "danger";
+          return (
+            <Card key={goal.id}>
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="line-clamp-1 text-sm font-semibold text-foreground">{goal.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Needs {inr(goal.requiredMonthlyInvestment)}/mo · allocated {inr(goal.allocatedMonthlyInvestment)}/mo
+                    </p>
+                  </div>
+                  <span className={cn("shrink-0 text-sm font-semibold", tone === "good" ? "text-positive-foreground" : tone === "warn" ? "text-warning-foreground" : "text-negative-foreground")}>
+                    {goal.fundingPercent}% funded
+                  </span>
+                </div>
+                <Progress value={goal.fundingPercent} className="mt-2 h-1.5" />
+                {goal.fix ? <p className="mt-2 text-xs text-muted-foreground">{goal.fix}</p> : null}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FactorChips({ item }: { item: ActionItem }) {
+  const fi = item.factorInsights;
+  if (!item.isFundPick || !fi) return null;
+  const chips: string[] = [];
+  if (fi.sortino != null) chips.push(`Sortino ${fi.sortino}`);
+  if (fi.maxDrawdown3y != null) chips.push(`Worst 3y drop ${fi.maxDrawdown3y}%`);
+  if (fi.downCapture != null) chips.push(`Down-capture ${fi.downCapture}`);
+  if (fi.alpha != null) chips.push(`Alpha ${fi.alpha}%`);
+  if (!chips.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {chips.slice(0, 4).map((chip) => (
+        <span key={chip} className="rounded-full bg-surface-soft px-2 py-0.5 text-[11px] text-muted-foreground">{chip}</span>
+      ))}
+    </div>
+  );
+}
+
 function Section({ heading, subtitle, children }: { heading: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
@@ -270,6 +337,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
           <div className="min-w-0">
             <p className="line-clamp-1 text-lg font-semibold text-foreground">{item.title}</p>
             <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">Why: {item.reason}</p>
+            <FactorChips item={item} />
           </div>
         </div>
 
@@ -571,6 +639,10 @@ function recToItem(rec: AdvancedRecommendation): ActionItem {
     goalName: rec.linkedGoals?.[0]?.name || rec.goalTag,
     ctaLabel: "Take Action",
     explanationCards: explanation,
+    isFundPick: rec.isFundPick,
+    factorDrivers: rec.factorDrivers,
+    factorInsights: rec.factorInsights,
+    goalFunding: rec.goalFunding,
   };
 }
 
@@ -582,14 +654,29 @@ function shortReason(rec: AdvancedRecommendation, cards: { summary: string }[]) 
   return sentence.length > 80 ? `${sentence.slice(0, 78)}…` : sentence;
 }
 
-function groupItems(items: ActionItem[]): Record<TabName, ActionItem[]> {
-  const must = items.filter((item) => item.bucket === "Must Do").sort((a, b) => (impactRank(b.impact) - impactRank(a.impact)) || (b.confidence - a.confidence));
-  const consider = items.filter((item) => item.bucket === "Consider").sort((a, b) => b.confidence - a.confidence);
-  const explore = items.filter((item) => item.bucket === "Explore").sort((a, b) => b.confidence - a.confidence);
+// Cap the active plan at the 3 highest-priority pending actions. Everything
+// else cascades into Consider, then Explore. Completed actions are dropped from
+// the active plan so finishing one automatically promotes the next item up —
+// the plan keeps updating and re-ordering itself as the user makes progress.
+const MUST_DO_LIMIT = 3;
+const CONSIDER_LIMIT = 8;
+const EXPLORE_LIMIT = 15;
+
+function priorityScore(item: ActionItem): number {
+  const bucketWeight = item.bucket === "Must Do" ? 2 : item.bucket === "Consider" ? 1 : 0;
+  return bucketWeight * 1000 + impactRank(item.impact) * 100 + item.confidence;
+}
+
+function layerItems(items: ActionItem[], takenKeys: Set<string>): Record<TabName, ActionItem[]> {
+  const ranked = items
+    .filter((item) => !takenKeys.has(item.key))
+    .sort((a, b) => priorityScore(b) - priorityScore(a));
+  const mustDo = ranked.slice(0, MUST_DO_LIMIT);
+  const overflow = ranked.slice(MUST_DO_LIMIT);
   return {
-    "Must Do": must.slice(0, 6),
-    Consider: consider.slice(0, 8),
-    Explore: explore.slice(0, 12),
+    "Must Do": mustDo,
+    Consider: overflow.slice(0, CONSIDER_LIMIT),
+    Explore: overflow.slice(CONSIDER_LIMIT, CONSIDER_LIMIT + EXPLORE_LIMIT),
   };
 }
 

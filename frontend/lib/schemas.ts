@@ -65,7 +65,7 @@ const profileGoalSchema = z.object({
 });
 
 export const onboardingSchema = z.object({
-  name: z.string().min(2),
+  name: z.string().min(2).regex(/^[\p{L}\s.'-]+$/u, "Use letters only."),
   dateOfBirth: z.string().min(8),
   age: z.coerce.number().min(1),
   occupation: z.string().min(2),
@@ -77,6 +77,9 @@ export const onboardingSchema = z.object({
   otherIncome: numeric,
   monthlyCashInflow: numeric,
   incomeStructureVersion: z.coerce.number().default(2),
+  investableThisMonth: numeric.optional().default(0),
+  investableThisMonthMonth: z.string().optional().default(""),
+  salaryDay: z.string().min(1, "Pick when you usually get paid."),
   rent: numeric,
   emi: numeric,
   loans: numeric,
@@ -133,7 +136,6 @@ export const onboardingSchema = z.object({
   spendingDiscipline: z.string().min(1),
   emotionalSpendingTendency: z.string().min(1),
   investmentPsychology: z.string().min(1),
-  riskReaction: z.string().min(1),
   tracksExpenses: z.string().min(1),
   investsMonthly: z.string().min(1),
   panicSellRisk: z.string().min(1),

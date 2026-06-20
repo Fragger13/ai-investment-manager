@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { api, ApiError } from "@/lib/api";
 import { onboardingSchema } from "@/lib/schemas";
-import { ageFromDob, normalizeProfileForForm, totalMonthlyEmi } from "@/lib/profile";
+import { ageFromDob, currentBudgetMonth, normalizeProfileForForm, totalMonthlyEmi } from "@/lib/profile";
 import { useAuthStore } from "@/store/auth-store";
 import { OnboardingProfile } from "@/types";
 import { OnboardingShell } from "./_components/onboarding-shell";
@@ -130,13 +130,16 @@ export default function OnboardingPage() {
       "10-15%": "Balanced",
       "15%+": "Higher growth with more ups and downs"
     };
-    const reactionToPanic: Record<string, string> = {
-      "I stay calm": "Rarely", "I get worried": "Sometimes", "I may sell": "Often"
+    // Panic-sell tendency is inferred from how big a long-term drawdown the user
+    // can sit through (Risk section) — the "markets fall 10%" habit question was
+    // removed as a duplicate of this signal.
+    const drawdownToPanic: Record<string, string> = {
+      "0-10%": "Often", "10-25%": "Sometimes", "25%+": "Rarely"
     };
     const loss = values.shortTermLossTolerance || "";
     const vol = lossToVolatility[loss] || values.shortTermVolatilityComfort || "";
     const psych = lossToPsychology[loss] || values.investmentPsychology || "";
-    const panic = reactionToPanic[values.riskReaction || ""] || values.panicSellRisk || "";
+    const panic = drawdownToPanic[values.drawdownTolerance || ""] || values.panicSellRisk || "";
     if (vol && vol !== values.shortTermVolatilityComfort) {
       form.setValue("shortTermVolatilityComfort", vol, { shouldValidate: false });
     }
@@ -146,7 +149,7 @@ export default function OnboardingPage() {
     if (panic && panic !== values.panicSellRisk) {
       form.setValue("panicSellRisk", panic, { shouldValidate: false });
     }
-  }, [values.shortTermLossTolerance, values.riskReaction, values.shortTermVolatilityComfort, values.investmentPsychology, values.panicSellRisk, form]);
+  }, [values.shortTermLossTolerance, values.drawdownTolerance, values.shortTermVolatilityComfort, values.investmentPsychology, values.panicSellRisk, form]);
 
   // Handle query-param entrypoints
   useEffect(() => {
@@ -225,7 +228,10 @@ export default function OnboardingPage() {
         monthlyCashInflow: valuesToSubmit.monthlySalary + valuesToSubmit.otherIncome,
         incomeStructureVersion: 2,
         emi: totalMonthlyEmi(valuesToSubmit.emiLoans),
-        volatilityComfort: valuesToSubmit.shortTermVolatilityComfort
+        volatilityComfort: valuesToSubmit.shortTermVolatilityComfort,
+        // Stamp the "invest this month" override with the current month so the
+        // dashboard applies it right away (the backend stamps the same way).
+        investableThisMonthMonth: Number(valuesToSubmit.investableThisMonth || 0) > 0 ? currentBudgetMonth() : ""
       };
       await api.saveOnboarding(normalized, token);
       saveProfile(normalized, true);

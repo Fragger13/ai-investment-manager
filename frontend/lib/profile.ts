@@ -1,5 +1,12 @@
 import { DashboardData, EmiLoan, Holding, HoldingAssetClass, Investment, OnboardingProfile } from "@/types";
 
+// IST wall-clock month (YYYY-MM), matching the backend's stamp in
+// save_onboarding / intelligence.current_ist_month. Used to decide whether the
+// "invest this month" override still applies to the current month.
+export function currentBudgetMonth(): string {
+  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 7);
+}
+
 export const blankProfile: OnboardingProfile = {
   name: "",
   dateOfBirth: "",
@@ -13,6 +20,9 @@ export const blankProfile: OnboardingProfile = {
   otherIncome: 0,
   monthlyCashInflow: 0,
   incomeStructureVersion: 2,
+  investableThisMonth: 0,
+  investableThisMonthMonth: "",
+  salaryDay: "",
   rent: 0,
   emi: 0,
   loans: 0,
@@ -69,7 +79,6 @@ export const blankProfile: OnboardingProfile = {
   spendingDiscipline: "",
   emotionalSpendingTendency: "",
   investmentPsychology: "",
-  riskReaction: "",
   tracksExpenses: "",
   investsMonthly: "",
   panicSellRisk: "",
@@ -245,7 +254,6 @@ function legacyEmiLoan(monthlyEmiAmount: number, principalAmount = 0): EmiLoan {
 export const behavioralProfileFields: (keyof OnboardingProfile)[] = [
   "spendingDiscipline",
   "emotionalSpendingTendency",
-  "riskReaction",
   "tracksExpenses",
   "investsMonthly",
   "investmentPsychology",
@@ -276,7 +284,6 @@ export function profileCompletionPercent(profile?: OnboardingProfile | null): nu
     Number(profile.retirementAge || 0) > 0,
     Boolean(profile.spendingDiscipline),
     Boolean(profile.emotionalSpendingTendency),
-    Boolean(profile.riskReaction),
     Boolean(profile.tracksExpenses),
     Boolean(profile.investsMonthly),
     Boolean(profile.investingBlocker),

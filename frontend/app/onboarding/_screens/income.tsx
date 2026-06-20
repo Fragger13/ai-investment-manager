@@ -1,12 +1,20 @@
 "use client";
 
+import { ChoiceCard } from "../_components/choice-card";
 import { CurrencyField } from "../_lib/field-helpers";
 import { formatINR } from "@/lib/currency";
 import { ScreenWrap } from "./about";
 import { ScreenContext } from "../_flow/types";
 
-export function IncomeScreen({ values }: ScreenContext) {
+const SALARY_DAY_OPTIONS = [
+  { value: "Last working day", emoji: "📅", helper: "End of every month" },
+  { value: "1st of the month", emoji: "🗓️", helper: "Start of every month" },
+  { value: "Variable", emoji: "🔀", helper: "Not fixed / irregular" }
+];
+
+export function IncomeScreen({ form, values }: ScreenContext) {
   const inflow = Number(values.monthlySalary || 0) + Number(values.otherIncome || 0);
+  const salaryDay = values.salaryDay || "";
   return (
     <ScreenWrap
       papa="Don't round up too much. Your bank account knows the truth."
@@ -24,6 +32,32 @@ export function IncomeScreen({ values }: ScreenContext) {
           <Tile label="Salary" value={formatINR(values.monthlySalary || 0)} />
           <Tile label="Other income" value={formatINR(values.otherIncome || 0)} />
           <Tile label="Total inflow" value={formatINR(inflow)} highlight />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CurrencyField
+            name="investableThisMonth"
+            label="How much can you invest this month?"
+            placeholder="e.g., 30,000"
+            helper="Just for this month — later months auto-use income minus expenses."
+            optional
+          />
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-medium text-[#0F172A]">When do you usually get your salary?<span className="ml-1 text-red-500" aria-hidden>*</span></p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {SALARY_DAY_OPTIONS.map((option) => (
+              <ChoiceCard
+                key={option.value}
+                title={option.value}
+                helper={option.helper}
+                emoji={option.emoji}
+                selected={salaryDay === option.value}
+                onSelect={() => form.setValue("salaryDay", option.value, { shouldValidate: true })}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </ScreenWrap>

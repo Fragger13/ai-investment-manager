@@ -66,6 +66,31 @@ function holdingsForClass(values: OnboardingProfile, assetClasses: HoldingAssetC
   return (values.holdings || []).filter((h) => assetClasses.includes(h.assetClass));
 }
 
+// Live ₹/gram spot for physical metals, used to auto-value gold/silver from
+// grams during onboarding. Cached at module level so the three entry surfaces
+// (single dialog, manual list, upload preview) share one fetch.
+let metalPriceCache: { gold: number; silver: number } | null = null;
+function useMetalPrices(): { gold: number; silver: number } {
+  const [prices, setPrices] = useState<{ gold: number; silver: number }>(metalPriceCache || { gold: 0, silver: 0 });
+  useEffect(() => {
+    if (metalPriceCache) return;
+    let active = true;
+    Promise.all([
+      api.metalPrice("gold").catch(() => ({ inrPerGram: 0 })),
+      api.metalPrice("silver").catch(() => ({ inrPerGram: 0 })),
+    ]).then(([g, s]) => {
+      metalPriceCache = { gold: g.inrPerGram || 0, silver: s.inrPerGram || 0 };
+      if (active) setPrices(metalPriceCache);
+    });
+    return () => { active = false; };
+  }, []);
+  return prices;
+}
+
+function isMetalClass(c: HoldingAssetClass | string): boolean {
+  return c === "gold" || c === "silver";
+}
+
 // ─────────────────────────── Intro ───────────────────────────
 
 export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
@@ -283,7 +308,7 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
             >
               {parsing ? <Loader2 className="h-7 w-7 animate-spin text-[#138A3C]" /> : <Upload className="h-7 w-7 text-[#138A3C]" />}
               <p className="text-[15px] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more XIRR files"}</p>
-              <p className="text-[12px] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech — select multiple if you have more than one broker</p>
+              <p className="text-[12px] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech, etc. — select multiple if you have more than one broker</p>
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
             {error ? <p className="text-[13px] text-negative-foreground">{error}</p> : null}
@@ -437,22 +462,9 @@ const LUMPSUM_TILES: { value: LumpsumField; label: string; emoji: string; placeh
   { value: "epfPpfValue", label: "EPF / PPF", emoji: "🏛️", placeholder: "Latest balance", helper: "Long-term retirement savings." },
 ];
 
-const ADDITIONAL_TYPES = [
-  "Gold",
-  "Silver",
-  "Crypto",
-  "Real estate",
-  "Bonds",
-  "NPS",
-  "Fixed deposits",
-  "Recurring deposits",
-  "Sovereign gold bonds",
-  "International stocks",
-  "ESOPs",
-  "RSUs",
-  "Insurance-linked investments",
-  "Other",
-];
+// Keep the manual "Other investments" choices identical to the upload-flow
+// "Other investments" list (OTHERS_OPTIONS) so the two paths match.
+const ADDITIONAL_TYPES = OTHERS_OPTIONS.map((o) => o.label);
 
 type AdditionalInvestment = { type: string; value: number; notes?: string };
 
@@ -467,7 +479,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
     // Pull pre-existing scalar values into the editor so users don't lose them
     // when we relocate those buckets into Other investments.
     const goldScalar = Number(values.goldValue || 0);
-    if (goldScalar > 0 && !existingTypes.has("Gold")) seeded.push({ type: "Gold", value: goldScalar, notes: "" });
+    if (goldScalar > 0 && !existingTypes.has("Gold (physical)")) seeded.push({ type: "Gold (physical)", value: goldScalar, notes: "" });
     const cryptoScalar = Number(values.cryptoValue || 0);
     if (cryptoScalar > 0 && !existingTypes.has("Crypto")) seeded.push({ type: "Crypto", value: cryptoScalar, notes: "" });
     const realEstateScalar = Number(values.realEstateValue || 0);
@@ -484,7 +496,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
     const sumOfType = (type: string) =>
       cleaned.filter((r) => r.type === type).reduce((sum, r) => sum + Number(r.value || 0), 0);
     form.setValue("additionalInvestments", cleaned, { shouldValidate: true, shouldDirty: true });
-    form.setValue("goldValue", sumOfType("Gold") + sumOfType("Sovereign gold bonds"), { shouldDirty: true });
+    form.setValue("goldValue", sumOfType("Gold (physical)"), { shouldDirty: true });
     form.setValue("cryptoValue", sumOfType("Crypto"), { shouldDirty: true });
     form.setValue("realEstateValue", sumOfType("Real estate"), { shouldDirty: true });
     setDialogOpen(false);
@@ -755,12 +767,36 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
     return seeded.length ? seeded : [{ id: uid("h"), assetClass: "", currentValue: 0, notes: "" }];
   });
 
+  const metalPrices = useMetalPrices();
+
   const updateRow = (index: number, patch: Partial<OtherDraft>) => {
     setDraftList((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
+  // For physical metals, grams drive the value: recompute currentValue from the
+  // live ₹/gram whenever grams or the fetched price change.
+  const setRowGrams = (index: number, assetClass: HoldingAssetClass | "", grams: number) => {
+    const perGram = isMetalClass(assetClass) ? metalPrices[assetClass as "gold" | "silver"] : 0;
+    const patch: Partial<OtherDraft> = { units: grams };
+    if (perGram > 0) patch.currentValue = Math.round(perGram * grams);
+    updateRow(index, patch);
+  };
+
+  useEffect(() => {
+    setDraftList((prev) => prev.map((r) => {
+      if (isMetalClass(r.assetClass) && Number(r.units) > 0) {
+        const perGram = metalPrices[r.assetClass as "gold" | "silver"];
+        if (perGram > 0) {
+          const cv = Math.round(perGram * Number(r.units));
+          if (cv !== r.currentValue) return { ...r, currentValue: cv };
+        }
+      }
+      return r;
+    }));
+  }, [metalPrices]);
+
   const commit = () => {
-    const cleaned = draftList.filter((r) => r.assetClass && Number(r.currentValue) > 0);
+    const cleaned = draftList.filter((r) => r.assetClass && (isMetalClass(r.assetClass) ? Number(r.units) > 0 : Number(r.currentValue) > 0));
     const all = readHoldings(form);
     const otherIds = new Set(existing.map((h) => h.id));
     const kept = all.filter((h) => !otherIds.has(h.id));
@@ -832,11 +868,17 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[13px]">Value today</Label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
-                      <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.currentValue || 0) ? formatIndianCurrencyInput(Number(row.currentValue)) : ""} onChange={(e) => updateRow(index, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
-                    </div>
+                    <Label className="text-[13px]">Value today{isMetalClass(row.assetClass) ? <span className="ml-1 font-normal text-[#6B7280]">(auto)</span> : null}</Label>
+                    {isMetalClass(row.assetClass) ? (
+                      <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
+                        {metalPrices[row.assetClass as "gold" | "silver"] > 0 ? formatINR(Number(row.currentValue || 0)) : "Awaiting price…"}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
+                        <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.currentValue || 0) ? formatIndianCurrencyInput(Number(row.currentValue)) : ""} onChange={(e) => updateRow(index, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[13px]">{nameLabel}</Label>
@@ -857,8 +899,16 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </div>
                     {unitLbl ? (
                       <div className="space-y-1">
-                        <Label className="text-[13px] text-[#6B7280]">{unitLbl} (optional)</Label>
-                        <Input type="number" inputMode="decimal" placeholder="e.g., 25" value={Number(row.units || 0) === 0 ? "" : Number(row.units)} onChange={(e) => updateRow(index, { units: Number(e.target.value || 0) })} />
+                        <Label className="text-[13px] text-[#6B7280]">{unitLbl}{isMetalClass(row.assetClass) ? <span className="ml-1 text-red-500" aria-hidden>*</span> : " (optional)"}</Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="e.g., 25"
+                          value={Number(row.units || 0) === 0 ? "" : Number(row.units)}
+                          onChange={(e) => isMetalClass(row.assetClass)
+                            ? setRowGrams(index, row.assetClass, Number(e.target.value || 0))
+                            : updateRow(index, { units: Number(e.target.value || 0) })}
+                        />
                       </div>
                     ) : null}
                     {isCrypto ? (
@@ -920,9 +970,22 @@ function HoldingEditorDialog({
   symbolPlaceholder?: string;
   symbolField?: "symbol" | "schemeCode";
 }) {
-  const isUnitClass = ["stock", "etf", "mutualFund", "crypto", "gold", "silver"].includes(holding.assetClass);
+  const isMetal = isMetalClass(holding.assetClass);
+  const isUnitClass = ["stock", "etf", "mutualFund", "crypto"].includes(holding.assetClass);
   const canSip = ["stock", "etf", "mutualFund", "crypto"].includes(holding.assetClass);
-  const canSave = holding.name.trim().length > 0 && holding.currentValue > 0;
+  const metalPrices = useMetalPrices();
+  const perGram = isMetal ? metalPrices[holding.assetClass as "gold" | "silver"] : 0;
+  useEffect(() => {
+    if (isMetal && perGram > 0 && Number(holding.units) > 0) {
+      const cv = Math.round(perGram * Number(holding.units));
+      if (cv !== holding.currentValue) onChange({ ...holding, currentValue: cv });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perGram, holding.units]);
+  const cost = Number(holding.valueAtCost || 0);
+  const pl = cost > 0 ? holding.currentValue - cost : 0;
+  const plPct = cost > 0 ? (pl / cost) * 100 : 0;
+  const canSave = holding.name.trim().length > 0 && (isMetal ? Number(holding.units) > 0 : holding.currentValue > 0);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -944,28 +1007,52 @@ function HoldingEditorDialog({
               <p className="text-[12px] text-[#4B5563]">Helps us refresh prices live later.</p>
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Current value</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
-                <Input className="pl-7" inputMode="numeric" value={formatIndianCurrencyInput(Number(holding.currentValue || 0))} onChange={(e) => onChange({ ...holding, currentValue: parseIndianCurrencyInput(e.target.value) })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
-                <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
-              </div>
-            </div>
-            {isUnitClass ? (
+          {isMetal ? (
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">{unitFieldLabel(holding.assetClass)}</Label>
-                <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="Optional" />
+                <Label className="text-[13px]">Grams<span className="ml-1 text-red-500" aria-hidden>*</span></Label>
+                <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="e.g., 50" autoFocus />
               </div>
-            ) : null}
-          </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Current value <span className="text-[#4B5563] font-normal">(auto)</span></Label>
+                <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
+                  {perGram > 0 ? formatINR(holding.currentValue) : "Awaiting live price…"}
+                </div>
+                <p className="text-[12px] text-[#4B5563]">{perGram > 0 ? `Live ₹${formatIndianCurrencyInput(Math.round(perGram))}/g — updates with the market.` : "We'll value this on the next price refresh."}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(optional)</span></Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+                {cost > 0 ? <p className={cn("text-[12px] font-medium", pl >= 0 ? "text-positive-foreground" : "text-negative-foreground")}>P&L {formatINR(pl)} ({plPct.toFixed(1)}%)</p> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Current value</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" value={formatIndianCurrencyInput(Number(holding.currentValue || 0))} onChange={(e) => onChange({ ...holding, currentValue: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+              </div>
+              {isUnitClass ? (
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">{unitFieldLabel(holding.assetClass)}</Label>
+                  <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="Optional" />
+                </div>
+              ) : null}
+            </div>
+          )}
           {canSip ? (
             <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
               <label className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]">

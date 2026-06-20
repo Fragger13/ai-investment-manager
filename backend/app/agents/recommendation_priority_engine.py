@@ -24,14 +24,19 @@ def _importance_score(recommendation: dict[str, Any]) -> int:
     portfolio_bonus = 8 if recommendation.get("helpsDiversification") else 0
     urgency = 8 if recommendation.get("strategyBucket") in {"Tactical", "Underdog", "Event-driven"} else 0
     defensive_bonus = 6 if recommendation.get("strategyBucket") == "Defensive" and recommendation.get("marketRegime") in {"risk-off", "high volatility", "defensive"} else 0
+    # Ranking is class-agnostic: what matters is how well the idea fits THIS user
+    # and advances their goals — so personalized suitability + factor quality +
+    # goal priority drive the score, not the asset class.
     score = (
         goal_score * 0.18
-        + recommendation.get("riskAdjustedScore", 0) * 0.18
-        + recommendation.get("evidenceScore", 0) * 0.17
-        + recommendation.get("convictionScore", 0) * 0.16
-        + recommendation.get("validationScore", 0) * 0.1
-        + consensus.get("agreementScore", 0) * 0.11
-        + recommendation.get("asymmetryScore", 0) * 0.06
+        + recommendation.get("suitabilityScore", 0) * 0.14
+        + recommendation.get("riskAdjustedScore", 0) * 0.14
+        + recommendation.get("factorScore", 0) * 0.10
+        + recommendation.get("evidenceScore", 0) * 0.11
+        + recommendation.get("convictionScore", 0) * 0.12
+        + recommendation.get("validationScore", 0) * 0.08
+        + consensus.get("agreementScore", 0) * 0.07
+        + recommendation.get("asymmetryScore", 0) * 0.04
         + portfolio_bonus
         + urgency
         + defensive_bonus
@@ -71,12 +76,10 @@ def _surface_group(recommendation: dict[str, Any]) -> str:
 
 
 def _sort_key(recommendation: dict[str, Any]) -> tuple[int, int, int]:
-    group_rank = {
-        "Top Recommendations": 5,
-        "Asset Intelligence Picks": 4,
-        "Tactical Opportunities": 3,
-        "Defensive": 3,
-        "Risks To Review": 2,
-        "Watchlist": 1,
-    }.get(recommendation.get("surfaceGroup", ""), 2)
-    return (group_rank, recommendation.get("importanceScore", 0), recommendation.get("finalScore", 0))
+    # Class-agnostic: rank purely by how well the idea serves the user (importance
+    # score blends goal priority + suitability + factor quality + conviction).
+    # The only structural floor is that not-yet-actionable "watchlist" ideas sink
+    # below actionable ones — a great fund, stock, bond, or crypto can otherwise
+    # outrank any other class if it is genuinely better for this user's goals.
+    actionable = 0 if (recommendation.get("recommendationState") == "watchlist" or str(recommendation.get("action", "")).lower() == "watchlist") else 1
+    return (actionable, recommendation.get("importanceScore", 0), recommendation.get("finalScore", 0))

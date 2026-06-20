@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from math import ceil
 
 from app.schemas.financial import OnboardingProfile
+
+# India Standard Time offset — used to decide which calendar month the
+# user's "invest this month" override currently applies to.
+IST = timedelta(hours=5, minutes=30)
+
+
+def current_ist_month() -> str:
+    return (datetime.now(UTC) + IST).strftime("%Y-%m")
 
 
 DISCLAIMER = (
@@ -33,6 +41,19 @@ def calculate_age(date_of_birth: str, fallback: int = 0) -> int:
 
 def monthly_income(profile: OnboardingProfile) -> int:
     return int(profile.monthlySalary + profile.otherIncome)
+
+
+def investable_surplus(profile: OnboardingProfile, computed_surplus: int) -> int:
+    """This month's investable amount.
+
+    If the user gave an explicit "how much can I invest this month" figure and
+    it was stamped for the current calendar month, use it. Otherwise (and
+    automatically once the month rolls over) fall back to the computed surplus
+    of income minus expenses and EMIs.
+    """
+    if profile.investableThisMonth > 0 and profile.investableThisMonthMonth == current_ist_month():
+        return int(profile.investableThisMonth)
+    return int(computed_surplus)
 
 
 def total_emi_payments(profile: OnboardingProfile) -> int:
@@ -122,7 +143,7 @@ def health_agent(profile: OnboardingProfile) -> dict:
     income = monthly_income(profile)
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - emi_total, 0))
     savings_rate = (surplus / income * 100) if income else 0
     expense_burden = (profile.monthlyExpenses / income * 100) if income else 0
     debt_burden = (emi_total / income * 100) if income else 0
@@ -243,9 +264,34 @@ def research_agent(profile: OnboardingProfile) -> list[dict]:
     ]
 
 
+def _named_funds(category_key: str, limit: int = 3) -> list[dict]:
+    """Resolve specific funds for a category, degrading to [] on any failure.
+
+    Imported lazily to avoid a circular import (fund_picker -> fund_research ->
+    intelligence) at module load time.
+    """
+    try:
+        from app.services.research.fund_picker_service import pick_funds
+
+        return pick_funds(category_key, limit=limit)
+    except Exception:  # noqa: BLE001 — pricing/network must never break the dashboard
+        return []
+
+
+def _fund_phrase(funds: list[dict]) -> str:
+    """A short 'e.g. <fund> (<rank>% <basis> return)' clause for reasoning text."""
+    if not funds:
+        return ""
+    top = funds[0]
+    basis = top.get("rankBasis") or ""
+    ret = top.get("rankReturn")
+    perf = f" ({ret:.0f}% {basis} return)" if isinstance(ret, (int, float)) and basis else ""
+    return f" A specific low-cost Direct-plan option today is {top['name']}{perf}."
+
+
 def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     income = monthly_income(profile)
-    surplus = max(income - profile.monthlyExpenses - total_emi_payments(profile), 0)
+    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - total_emi_payments(profile), 0))
     emergency_goal = next((goal for goal in profile.goals if goal.type == "Emergency fund"), None)
     emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or profile.monthlyExpenses * 6, profile.monthlyExpenses * 6)
     emergency_gap = max(emergency_needed - profile.cashBalance, 0)
@@ -268,10 +314,15 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     tactical_percent = round(tactical_allocation * scale)
     gold_percent = max(0, 100 - equity_percent - debt_percent - tactical_percent)
 
+    equity_funds = _named_funds("large_cap_index")
+    debt_funds = _named_funds("liquid")
+    gold_funds = _named_funds("gold")
+
     recommendations = [
         {
             "id": "rec-nifty50-index",
             "assetClass": "Nifty 50 index fund or Nifty 50 ETF",
+            "specificFunds": equity_funds,
             "suggestedAllocation": equity_percent,
             "suggestedMonthlyAmount": amount(equity_percent),
             "strategyType": "Long-term growth",
@@ -279,7 +330,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Review yearly or if your goal timeline changes.",
             "confidenceScore": 84 if high_long_term_risk else 74,
             "riskLevel": "Medium",
-            "reasoning": "This gives diversified exposure to large Indian companies and fits a long-term wealth goal better than picking individual stocks as a beginner.",
+            "reasoning": "This gives diversified exposure to large Indian companies and fits a long-term wealth goal better than picking individual stocks as a beginner." + _fund_phrase(equity_funds),
             "whatCanGoWrong": "Equity markets can fall sharply for months or years. Do not use this for money needed soon.",
             "suitableFor": "Long-term goals such as retirement, financial freedom, or a goal more than 7 years away.",
             "timeHorizon": "7+ years",
@@ -294,6 +345,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
         {
             "id": "rec-liquid-debt",
             "assetClass": "Liquid fund or short-duration debt fund",
+            "specificFunds": debt_funds,
             "suggestedAllocation": debt_percent,
             "suggestedMonthlyAmount": amount(debt_percent),
             "strategyType": "Stability and emergency money",
@@ -301,7 +353,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Use this money for emergencies or short-term planned expenses.",
             "confidenceScore": 90 if emergency_gap else 78,
             "riskLevel": "Low",
-            "reasoning": "You need money that is easier to access and moves less before taking more investment risk.",
+            "reasoning": "You need money that is easier to access and moves less before taking more investment risk." + _fund_phrase(debt_funds),
             "whatCanGoWrong": "Returns can be modest and may change with interest rates. Credit risk depends on the fund.",
             "suitableFor": "Emergency fund, near-term goals, or users uncomfortable with market swings.",
             "timeHorizon": "0-3 years",
@@ -316,6 +368,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
         {
             "id": "rec-gold-sgb",
             "assetClass": "Gold ETF or Sovereign Gold Bond",
+            "specificFunds": gold_funds,
             "suggestedAllocation": gold_percent,
             "suggestedMonthlyAmount": amount(gold_percent),
             "strategyType": "Diversification",
@@ -323,7 +376,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Review if gold crosses 15% of total net worth.",
             "confidenceScore": 72,
             "riskLevel": "Medium",
-            "reasoning": "A small gold investment can reduce dependence on only shares and mutual funds.",
+            "reasoning": "A small gold investment can reduce dependence on only shares and mutual funds." + _fund_phrase(gold_funds),
             "whatCanGoWrong": "Gold can remain flat for long periods and does not create business earnings.",
             "suitableFor": "Users who want some protection from currency and market stress.",
             "timeHorizon": "3+ years",
@@ -499,7 +552,7 @@ def build_dashboard(profile: OnboardingProfile) -> dict:
     profile.monthlyCashInflow = income
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - emi_total, 0))
     savings_rate = (surplus / income * 100) if income else 0
     risk_profile = "Higher growth comfort" if profile.volatilityComfort == "High" else "More stability preferred" if profile.volatilityComfort == "Low" else "Balanced growth"
     health = health_agent(profile)

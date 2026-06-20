@@ -100,6 +100,14 @@ export type AuthResponse = {
   email_verified: boolean;
 };
 
+export type VerificationStatus = {
+  email: string;
+  email_verified: boolean;
+  sent: boolean;
+  provider?: string;
+  detail?: string;
+};
+
 export const api = {
   async login(email: string, password: string): Promise<AuthResponse> {
     return request("/auth/login", {
@@ -107,7 +115,7 @@ export const api = {
       body: JSON.stringify({ email, password })
     });
   },
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
+  async register(name: string, email: string, password: string): Promise<VerificationStatus> {
     return request("/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password })
@@ -119,7 +127,7 @@ export const api = {
       body: JSON.stringify({ email, code })
     });
   },
-  async resendVerification(email: string): Promise<{ email: string; email_verified: boolean; sent: boolean; provider?: string; detail?: string }> {
+  async resendVerification(email: string): Promise<VerificationStatus> {
     return request("/auth/resend-verification", {
       method: "POST",
       body: JSON.stringify({ email })
@@ -348,6 +356,9 @@ export const api = {
   },
   async rebalancingSuggestions(): Promise<PortfolioRebalancingSuggestion[]> {
     return request("/portfolio/rebalancing-suggestions");
+  },
+  async metalPrice(metal: "gold" | "silver"): Promise<{ metal: string; inrPerGram: number }> {
+    return request(`/portfolio/metal-price/${metal}`);
   },
   async memoryTimeline(): Promise<MemoryTimeline> {
     return request("/memory/timeline");
