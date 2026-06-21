@@ -57,6 +57,20 @@ _SESSION: dict = {"crumb": "", "cookie": "", "ts": 0.0}
 _SESSION_TTL = 1800
 _UA = _BROWSER["User-Agent"]
 
+# Circuit breaker: when Yahoo rate-limits this IP (429), stop hammering it for a
+# cooldown so the recommendation pipeline degrades FAST (equities simply absent)
+# instead of retrying 60+ symbols x several attempts. Self-recovers after cooldown.
+_YAHOO_COOLDOWN = 1800
+_YAHOO_STATE: dict = {"downUntil": 0.0}
+
+
+def _yahoo_available() -> bool:
+    return time.time() >= _YAHOO_STATE["downUntil"]
+
+
+def _trip_yahoo() -> None:
+    _YAHOO_STATE["downUntil"] = time.time() + _YAHOO_COOLDOWN
+
 
 def _curl(args: list[str], timeout: int = 12) -> str:
     try:
@@ -93,6 +107,8 @@ def _yahoo_auth() -> tuple[str, str]:
         return _SESSION["cookie"], _SESSION["crumb"]
     _curl(["-c", _COOKIE_FILE, "-o", os.devnull, "https://fc.yahoo.com"])  # sets consent cookie
     crumb = _curl(["-b", _COOKIE_FILE, "https://query2.finance.yahoo.com/v1/test/getcrumb"]).strip()
+    if "Too Many" in crumb or "429" in crumb:
+        _trip_yahoo()  # IP is rate-limited — stop trying for the cooldown
     if len(crumb) > 24 or "<" in crumb or "Too Many" in crumb:
         crumb = ""  # guard against error pages / rate-limit responses
     cookie = _read_cookie_header()
@@ -105,6 +121,8 @@ def _yahoo_fetch(url: str) -> str:
     """Authenticated Yahoo GET via fetch_text (so results are disk-cached and
     survive restarts / partial throttling). Falls back to an un-crumbed request,
     which succeeds on query2 when the IP is not rate-limited."""
+    if not _yahoo_available():
+        return ""  # circuit breaker tripped — degrade fast, don't hammer Yahoo
     cookie, crumb = _yahoo_auth()
     headers = {**_BROWSER, **({"Cookie": cookie} if cookie else {})}
     attempts = []
@@ -115,6 +133,9 @@ def _yahoo_fetch(url: str) -> str:
         result = fetch_text(full, timeout=12, retries=1, cache_ttl_seconds=_CACHE_TTL, require_json=True, headers=headers)
         if result.text:
             return result.text
+        if result.status_code == 429:
+            _trip_yahoo()  # rate-limited — stop the per-symbol retry storm
+            break
     return ""
 
 

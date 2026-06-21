@@ -2,10 +2,11 @@
 
 import { Moon, Sun } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 export type Theme = "light" | "dark";
 
-export const THEME_STORAGE_KEY = "ai-investment-manager-theme";
+export { THEME_STORAGE_KEY };
 
 type ThemeContextValue = {
   theme: Theme;

@@ -247,7 +247,9 @@ def _timeout_for_task(task: LLMTask) -> int:
     if task == "summarize":
         return min(10, max(3, int(settings.llm_timeout_summarize_seconds or 8)))
     if task in {"recommendation_explanation", "asset_explanation", "market_signal_copy", "market_explanation"}:
-        return min(10, max(3, int(settings.llm_timeout_enhancement_seconds or 10)))
+        # Background enhancement (not in the request path) — allow qwen3 enough time
+        # to actually generate, so explanations don't always fall back to templates.
+        return min(30, max(3, int(settings.llm_timeout_enhancement_seconds or 30)))
     return min(max(3, int(settings.llm_timeout_seconds or 25)), 10)
 
 

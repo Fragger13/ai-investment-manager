@@ -44,7 +44,7 @@ def generate(payload: AdvancedRecommendationRequest, db: Session = Depends(get_d
             _ensure_response_llm_enhanced(cached)
             cached["recommendations"] = hydrate_and_schedule_recommendations(cached.get("recommendations", []))
             cached["cacheStatus"] = "cached"
-            set_cached("recommendations", cache_key, cached, ttl_seconds=240)
+            set_cached("recommendations", cache_key, cached, ttl_seconds=1800)
             return cached
     result = generate_advanced_recommendations(profile, db)
     _ensure_goal_impacts(result)
@@ -56,7 +56,7 @@ def generate(payload: AdvancedRecommendationRequest, db: Session = Depends(get_d
         persist_recommendation_explainability(db, recommendation)
         save_advanced_recommendation(db, recommendation)
     result["cacheStatus"] = "fresh"
-    set_cached("recommendations", cache_key, result, ttl_seconds=240)
+    set_cached("recommendations", cache_key, result, ttl_seconds=1800)
     return result
 
 

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     llm_model_summarize: str = "qwen2.5:7b"
     llm_timeout_seconds: int = 25
     llm_timeout_chat_seconds: int = 25
-    llm_timeout_enhancement_seconds: int = 10
+    llm_timeout_enhancement_seconds: int = 30
     llm_timeout_summarize_seconds: int = 8
     llm_retries: int = 1
     llm_batch_size: int = 2

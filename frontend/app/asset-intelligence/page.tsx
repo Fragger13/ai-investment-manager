@@ -68,19 +68,22 @@ export default function AssetIntelligencePage() {
     setLoading(true);
     try {
       if (refresh) await api.refreshAssetResearch().catch(() => null);
-      const [nextRecommendations, nextAssets, nextAlpha, nextCrypto] = await Promise.all([
-        api.generateAdvancedRecommendations(profile, false),
-        api.assetIntelligence(),
-        api.alphaOpportunities(),
-        api.cryptoOpportunities()
+      // Render the fast Discover data immediately — do NOT block it on the slow
+      // advanced-recommendation pipeline (which can take minutes when live market
+      // data is throttled).
+      const [nextAssets, nextAlpha, nextCrypto] = await Promise.all([
+        api.assetIntelligence().catch(() => []),
+        api.alphaOpportunities().catch(() => []),
+        api.cryptoOpportunities().catch(() => [])
       ]);
-      setRecommendations(nextRecommendations);
       setAssets(nextAssets);
       setAlpha(nextAlpha);
       setCrypto(nextCrypto);
     } finally {
       setLoading(false);
     }
+    // Personalized recommendations stream in separately when ready.
+    api.generateAdvancedRecommendations(profile, false).then(setRecommendations).catch(() => null);
   }, [profile]);
 
   useEffect(() => { load(false); }, [load]);

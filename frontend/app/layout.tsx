@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ThemeProvider, THEME_STORAGE_KEY } from "@/components/theme-provider";
+import { ThemeProvider } from "@/components/theme-provider";
+import { THEME_STORAGE_KEY } from "@/lib/theme";
 import { caveat, inter } from "@/lib/fonts";
 import "./globals.css";
 
