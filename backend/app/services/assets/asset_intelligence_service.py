@@ -34,7 +34,7 @@ def refresh_asset_intelligence(db: Session, risk_profile: str = "moderate") -> d
     signals = market_signal_list(db, limit=120)
     impact_maps = impact_map_list(db, limit=120)
     regime = latest_market_regime(db)
-    assets = _dedupe_assets(base_asset_universe() + map_signals_to_assets(signals, impact_maps))
+    assets = _dedupe_assets(base_asset_universe() + map_signals_to_assets(signals, impact_maps) + _reddit_underdog_assets())
     sector_scores = _sector_scores_from_impact_maps(impact_maps)
 
     technical_by_name: dict[str, dict] = {}
@@ -77,6 +77,63 @@ def refresh_asset_intelligence(db: Session, risk_profile: str = "moderate") -> d
         "dataMode": _combined_mode(research_assets),
         "retrievedAt": now_iso(),
     }
+
+
+def _reddit_underdog_assets() -> list[dict]:
+    """Underdog names trending in curated subreddits that we don't already hold/
+    recommend, each **factor-checked** against the live quant engine before being
+    fed into the Discover research pipeline. Reddit only nominates; the factor check
+    decides whether a name is even researched. Degrades to [] on any error."""
+    try:
+        from app.services.research.reddit_research_service import discover_underdogs
+
+        nominations = discover_underdogs(set(), limit=4)
+    except Exception:  # noqa: BLE001 — community data must never break Discover
+        return []
+
+    out: list[dict] = []
+    for nom in nominations:
+        try:
+            factors = None
+            if nom["assetClass"] == "equity":
+                from app.services.research.equity_factor_service import equity_factors
+
+                factors = equity_factors(nom["ticker"], nom["name"])
+                ticker, asset_class, asset_type = nom["ticker"], "equity", "Equity share"
+            elif nom["assetClass"] == "crypto":
+                from app.services.research.crypto_factor_service import factors_for_symbol
+
+                factors = factors_for_symbol(nom["ticker"], nom["name"])
+                ticker, asset_class, asset_type = f"{nom['ticker']}-USD", "crypto", "Crypto asset"
+            else:
+                continue
+            if not factors or factors.get("sortino") is None:
+                continue  # could not validate on factors -> do not surface
+
+            subs = ", ".join(f"r/{s}" for s in nom.get("subreddits", [])[:2]) or "community forums"
+            evidence = [
+                {"sourceName": f"Reddit {subs}", "sourceUrl": sp.get("url", ""), "dataMode": "limited"}
+                for sp in nom.get("samplePosts", [])[:2]
+                if sp.get("url")
+            ]
+            out.append(
+                {
+                    "name": nom["name"],
+                    "ticker": ticker,
+                    "assetClass": asset_class,
+                    "assetType": asset_type,
+                    "sectors": [],
+                    "reasonForInclusion": (
+                        f"Surfaced from community discussion on {subs} ({nom['mentionCount']} recent mentions) "
+                        f"and clears our risk-adjusted factor screen (Sortino {factors['sortino']}). "
+                        "Community chatter is noisy — research before acting."
+                    ),
+                    "evidence": evidence,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def asset_research(db: Session) -> list[dict]:
@@ -197,8 +254,11 @@ def _asset_research_payload(asset: dict, technical: dict, fundamental: dict, liq
     action = _action(liquidity, technical, fundamental, crypto)
     evidence = (asset.get("evidence", []) + fundamental.get("evidence", []) + (crypto.get("evidence", []) if crypto else []))[:8]
     data_mode = "live" if technical.get("dataMode") == "live" or any(item.get("dataMode") == "live" for item in evidence) else technical.get("dataMode", "limited")
+    reason = asset.get("reasonForInclusion", "")
     summary = complete_sentence_summary(
-        f"{asset['name']} is classified as {action}. Technical setup: {technical.get('breakoutStatus', 'limited data')}; "
+        f"{asset['name']} is classified as {action}. "
+        + (f"{reason} " if reason else "")
+        + f"Technical setup: {technical.get('breakoutStatus', 'limited data')}; "
         f"fundamental score {fundamental.get('fundamentalScore', 50)} with {fundamental.get('dataCompleteness', 'low')} data completeness. "
         f"Liquidity: {liquidity.get('liquidityScore', 50)}. This is decision-support research, not a return promise."
     )

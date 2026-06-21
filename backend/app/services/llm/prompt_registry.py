@@ -155,6 +155,7 @@ def recommendation_explanation_prompt(recommendation: dict[str, Any], cards: lis
         "factorDrivers": recommendation.get("factorDrivers", [])[:3],
         "marketReasoning": recommendation.get("currentMarketReasoning"),
         "goalFunding": _compact_goal_funding(recommendation.get("goalFunding", {})),
+        "communitySentiment": _compact_community((recommendation.get("sentimentSignal") or {}).get("community", {})),
         "fallbackCards": _compact_cards(cards),
     }
     return (
@@ -292,6 +293,19 @@ def _compact_goal_funding(funding: dict[str, Any]) -> dict[str, Any]:
         "requiredMonthly": funding.get("requiredMonthlyInvestment"),
         "gap": funding.get("gap"),
         "fix": funding.get("fix"),
+    }
+
+
+def _compact_community(community: dict[str, Any]) -> dict[str, Any]:
+    """Reddit community sentiment facts for the model to phrase (never invent).
+    Empty when the asset is not being discussed."""
+    if not community or not community.get("mentionCount"):
+        return {}
+    return {
+        "sentiment": community.get("sentiment"),
+        "mentions": community.get("mentionCount"),
+        "subreddits": community.get("subreddits", [])[:3],
+        "note": "social chatter, noisy and not advice",
     }
 
 

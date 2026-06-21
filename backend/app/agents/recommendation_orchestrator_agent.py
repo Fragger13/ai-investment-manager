@@ -332,6 +332,41 @@ def _apply_goal_funding(recommendations: list[dict], funding: dict) -> None:
         }
 
 
+def _attach_community_sentiment(base: dict, fit: dict, fund_choice: dict | None) -> None:
+    """Best-effort Reddit community sentiment for the chosen asset. The quant engine
+    has already made the pick; this only adds visible context and feeds a small,
+    bounded confidence nudge in the priority engine. Never raises."""
+    try:
+        from app.services.research.reddit_research_service import community_sentiment_for
+
+        asset_key = fit.get("assetKey", "")
+        if fund_choice:
+            asset_class = "fund"
+        elif asset_key == "crypto":
+            asset_class = "crypto"
+        elif asset_key in {"equity", "tactical"}:
+            asset_class = "equity"
+        else:
+            asset_class = ""
+        if not asset_class:
+            return
+        community = community_sentiment_for(base.get("instrumentName", ""), asset_class)
+        if not community:
+            return
+        if not isinstance(base.get("sentimentSignal"), dict):
+            base["sentimentSignal"] = {}
+        base["sentimentSignal"]["community"] = community
+        cb = base.get("confidenceBreakdown")
+        if isinstance(cb, dict):
+            cb["communitySentiment"] = {
+                "sentiment": community["sentiment"],
+                "mentionCount": community["mentionCount"],
+                "score": community["sentimentScore"],
+            }
+    except Exception:  # noqa: BLE001 — Reddit must never break recommendations
+        pass
+
+
 def _enrich(
     base: dict,
     fit: dict,
@@ -498,7 +533,8 @@ def _enrich(
     base["assetIntelligenceBacked"] = bool(asset_intelligence)
     base["investorCluster"] = cluster
     base["factorScores"] = factors
-    base["sentimentSignal"] = sentiment
+    base["sentimentSignal"] = sentiment if isinstance(sentiment, dict) else {"summary": sentiment}
+    _attach_community_sentiment(base, fit, fund_choice)
     base["dynamicStockRank"] = stock_rank or {}
     base["relatedRecommendations"] = related_recommendation_candidates(base["instrumentName"], graph)
     base["knowledgeGraphNotes"] = relationship_explanation(base["instrumentName"], graph)

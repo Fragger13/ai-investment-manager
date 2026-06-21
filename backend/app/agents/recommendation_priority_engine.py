@@ -40,12 +40,29 @@ def _importance_score(recommendation: dict[str, Any]) -> int:
         + portfolio_bonus
         + urgency
         + defensive_bonus
+        # Bounded community-sentiment nudge: at most +6 / -5, gated by mention count
+        # so noisy chatter can refine — never decide — the quant pick.
+        + _community_nudge((recommendation.get("sentimentSignal") or {}).get("community"))
     )
     if recommendation.get("recommendationState") == "watchlist" or str(recommendation.get("action", "")).lower() == "watchlist":
         score -= 14
     if recommendation.get("qualityWarnings"):
         score -= min(18, len(recommendation.get("qualityWarnings", [])) * 4)
     return max(1, min(99, round(score)))
+
+
+def _community_nudge(community: Any) -> float:
+    """Small, bounded adjustment from Reddit community sentiment. Returns 0 unless
+    there is enough chatter (>= 3 mentions); caps at +6 (positive) / -5 (negative)
+    and scales with mention count so it can refine ranking but not flip a pick."""
+    if not isinstance(community, dict):
+        return 0.0
+    mentions = int(community.get("mentionCount", 0) or 0)
+    if mentions < 3:
+        return 0.0
+    sentiment_score = float(community.get("sentimentScore", 50) or 50)
+    strength = min(1.0, mentions / 12)
+    return max(-5.0, min(6.0, (sentiment_score - 50) / 8 * strength))
 
 
 def _confidence_tier(recommendation: dict[str, Any]) -> str:

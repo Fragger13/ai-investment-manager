@@ -709,6 +709,19 @@ export type FundFactorInsights = {
   historyYears?: number | null;
 };
 
+export type CommunitySentiment = {
+  source?: string;
+  mentionCount: number;
+  sentiment: "positive" | "negative" | "mixed" | "neutral";
+  sentimentScore?: number;
+  bullishTerms?: string[];
+  bearishTerms?: string[];
+  subreddits?: string[];
+  samplePosts?: { title: string; url: string; subreddit?: string }[];
+  disclaimer?: string;
+  asOf?: string;
+};
+
 export type GoalFundingStatus = {
   fundingPercent: number;
   requiredMonthlyInvestment: number;

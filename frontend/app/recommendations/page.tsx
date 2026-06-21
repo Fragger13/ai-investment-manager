@@ -15,7 +15,7 @@ import { cn, inr } from "@/lib/utils";
 import { emptyDashboard } from "@/lib/profile";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { AdvancedRecommendation, AdvancedRecommendationResponse, DashboardData, FundFactorInsights, GoalFundingPlan, GoalFundingStatus } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, CommunitySentiment, DashboardData, FundFactorInsights, GoalFundingPlan, GoalFundingStatus } from "@/types";
 
 const emptyAdvanced: AdvancedRecommendationResponse = {
   recommendations: [],
@@ -56,6 +56,7 @@ type ActionItem = {
   factorDrivers?: string[];
   factorInsights?: FundFactorInsights;
   goalFunding?: GoalFundingStatus;
+  community?: CommunitySentiment;
 };
 
 export default function RecommendationsPage() {
@@ -276,6 +277,26 @@ function FactorChips({ item }: { item: ActionItem }) {
   );
 }
 
+function CommunityChip({ item }: { item: ActionItem }) {
+  const c = item.community;
+  if (!c || !c.mentionCount) return null;
+  const emoji = c.sentiment === "positive" ? "👍" : c.sentiment === "negative" ? "👎" : c.sentiment === "mixed" ? "↔️" : "💬";
+  const label =
+    c.sentiment === "positive" ? "Mostly positive" : c.sentiment === "negative" ? "Mostly negative" : c.sentiment === "mixed" ? "Mixed views" : "Neutral";
+  const subs = (c.subreddits || []).slice(0, 2).map((s) => `r/${s}`).join(", ");
+  return (
+    <div className="mt-2">
+      <span
+        title={c.disclaimer || "Community chatter is noisy and can be biased — context, not advice."}
+        className="inline-flex items-center gap-1 rounded-full bg-surface-soft px-2 py-0.5 text-[11px] text-muted-foreground"
+      >
+        {emoji} Reddit: {label} · {c.mentionCount} mention{c.mentionCount === 1 ? "" : "s"}
+        {subs ? ` (${subs})` : ""}
+      </span>
+    </div>
+  );
+}
+
 function Section({ heading, subtitle, children }: { heading: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
@@ -338,6 +359,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
             <p className="line-clamp-1 text-lg font-semibold text-foreground">{item.title}</p>
             <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">Why: {item.reason}</p>
             <FactorChips item={item} />
+            <CommunityChip item={item} />
           </div>
         </div>
 
@@ -421,6 +443,7 @@ function ConsiderRow({ item }: { item: ActionItem }) {
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.title}</p>
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Why: {item.reason}</p>
+          <CommunityChip item={item} />
         </div>
         <Badge tone="warn" className="hidden sm:inline-flex">{item.confidence}%</Badge>
         <span className="rounded-full p-1.5 text-muted-foreground">
@@ -643,6 +666,7 @@ function recToItem(rec: AdvancedRecommendation): ActionItem {
     factorDrivers: rec.factorDrivers,
     factorInsights: rec.factorInsights,
     goalFunding: rec.goalFunding,
+    community: (rec.sentimentSignal as { community?: CommunitySentiment } | undefined)?.community,
   };
 }
 
