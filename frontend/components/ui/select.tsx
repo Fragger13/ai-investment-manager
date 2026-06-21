@@ -10,7 +10,7 @@ export const SelectValue = SelectPrimitive.Value;
 export function SelectTrigger({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>) {
   return (
     <SelectPrimitive.Trigger
-      className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-surface-elevated px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/60", className)}
+      className={cn("flex h-12 w-full items-center justify-between rounded-xl border-2 border-input bg-surface px-4 text-[15px] text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15", className)}
       {...props}
       type="button"
     >
@@ -23,7 +23,7 @@ export function SelectTrigger({ className, children, ...props }: React.Component
 export function SelectContent({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Content className={cn("z-50 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-xl", className)} {...props}>
+      <SelectPrimitive.Content className={cn("z-50 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-pop", className)} {...props}>
         <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
@@ -32,7 +32,7 @@ export function SelectContent({ className, children, ...props }: React.Component
 
 export function SelectItem({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>) {
   return (
-    <SelectPrimitive.Item className={cn("relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-surface-hover data-[highlighted]:bg-surface-hover", className)} {...props}>
+    <SelectPrimitive.Item className={cn("relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2.5 text-[15px] outline-none hover:bg-surface-hover data-[highlighted]:bg-surface-hover", className)} {...props}>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );

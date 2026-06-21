@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Save } from "lucide-react";
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, inter } from "@/lib/fonts";
+import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, sans } from "@/lib/fonts";
 import { ProgressSegments } from "./progress-segments";
 import { CalculatorButton } from "./calculator";
 
@@ -46,8 +46,8 @@ export function OnboardingShell({
 }: OnboardingShellProps) {
   return (
     <main
-      className={`${inter.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
-      style={{ fontFamily: "var(--font-inter)" }}
+      className={`${sans.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-4 py-3 sm:px-10 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-3">

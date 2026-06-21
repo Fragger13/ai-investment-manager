@@ -22,16 +22,13 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const nextTheme =
-      storedTheme === "light" || storedTheme === "dark"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    // Friendly & Bright defaults to light for first-time users; an explicit
+    // saved choice always wins.
+    const nextTheme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "light";
     applyTheme(nextTheme);
     setThemeState(nextTheme);
   }, []);
@@ -56,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         onClick={toggleTheme}
-        className="fixed right-4 top-4 z-[100] grid h-10 w-10 place-items-center rounded-md border border-border bg-surface-elevated text-foreground shadow-lg transition-colors duration-200 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="fixed right-4 top-4 z-[100] grid h-10 w-10 place-items-center rounded-full border border-border bg-surface text-foreground shadow-card transition-colors duration-200 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {theme === "dark" ? <Sun aria-hidden="true" className="h-4 w-4" /> : <Moon aria-hidden="true" className="h-4 w-4" />}
         <span className="sr-only">Switch color theme</span>

@@ -28,6 +28,7 @@ const emptyAdvanced: AdvancedRecommendationResponse = {
 };
 
 const tabs = ["Must Do", "Consider", "Explore"] as const;
+const TAB_LABELS: Record<(typeof tabs)[number], string> = { "Must Do": "Do first", Consider: "Next up", Explore: "Worth a look" };
 type TabName = (typeof tabs)[number];
 
 // Unified action-plan item — covers fund recommendations AND non-investment actions
@@ -99,8 +100,8 @@ export default function RecommendationsPage() {
     <AppShell sidebarExtra={<PlanProgressWidget confidence={confidence} />}>
       <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Your Action Plan</h1>
-          <p className="mt-2 text-base text-muted-foreground">Personalized actions to help you reach your goals.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Your money plan ✨</h1>
+          <p className="mt-2 text-base text-muted-foreground">Simple steps, picked just for you. Do them one at a time — no finance degree needed.</p>
         </div>
         <PlanConfidenceCard confidence={confidence} tone={confidenceTone} />
       </div>
@@ -120,7 +121,7 @@ export default function RecommendationsPage() {
                 activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {tab} ({grouped[tab].length})
+              {TAB_LABELS[tab]} ({grouped[tab].length})
             </button>
           ))}
         </div>
@@ -130,16 +131,16 @@ export default function RecommendationsPage() {
       </div>
 
       {activeTab === "Must Do" ? (
-        <Section heading="Must Do" subtitle="Your 3 highest-priority actions right now. Finish one and the next moves up automatically.">
+        <Section heading="Do this first 💪" subtitle="The 3 things worth doing now. Knock one out and the next one pops up automatically.">
           <div className="space-y-3">
             {visible.map((item) => <MustDoRow key={item.key} item={item} />)}
-            {!visible.length ? <EmptyRow text="You're all caught up on top actions. Check the Consider tab for what's next." /> : null}
+            {!visible.length ? <EmptyRow text="You're all caught up here! 🎉 Peek at the Consider tab for what's next." /> : null}
           </div>
         </Section>
       ) : null}
 
       {activeTab === "Consider" ? (
-        <Section heading="Consider" subtitle="Good actions that may improve your plan when you are ready.">
+        <Section heading="Next up" subtitle="Smart moves to level up your plan when you're ready.">
           <div className="space-y-2">
             {visible.map((item) => <ConsiderRow key={item.key} item={item} />)}
             {!visible.length ? <EmptyRow text="Nothing in this tab yet. Refresh after updating your profile." /> : null}
@@ -148,7 +149,7 @@ export default function RecommendationsPage() {
       ) : null}
 
       {activeTab === "Explore" ? (
-        <Section heading="Explore" subtitle="Other ideas to look at carefully when you have time.">
+        <Section heading="Worth a look" subtitle="Other ideas to explore when you've got a minute.">
           <Card>
             <CardContent className="p-2">
               {visible.length ? visible.map((item, index) => (

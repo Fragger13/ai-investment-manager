@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, ChartPie, Lightbulb, Play, Plus, Sprout, Target, TrendingUp } from "lucide-react";
-import { caveat, inter, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
+import { caveat, sans, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
 
 const script: React.CSSProperties = { fontFamily: SCRIPT_FAMILY };
 
 export default function LandingPage() {
   return (
     <main
-      className={`${inter.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
-      style={{ fontFamily: "var(--font-inter)" }}
+      className={`${sans.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div className="w-full px-6 py-6 sm:px-10 lg:px-16 lg:py-8 xl:px-20">
         <Header />

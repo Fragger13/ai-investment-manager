@@ -48,16 +48,33 @@ const config: Config = {
         "info-soft": "hsl(var(--info-soft))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))"
+        ring: "hsl(var(--ring))",
+        coral: "hsl(var(--coral))",
+        "coral-foreground": "hsl(var(--coral-foreground))",
+        "coral-soft": "hsl(var(--coral-soft))",
+        sun: "hsl(var(--sun))",
+        "sun-foreground": "hsl(var(--sun-foreground))",
+        "sun-soft": "hsl(var(--sun-soft))",
+        grape: "hsl(var(--grape))",
+        "grape-foreground": "hsl(var(--grape-foreground))",
+        "grape-soft": "hsl(var(--grape-soft))"
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        script: ["var(--font-caveat)", "ui-sans-serif", "cursive"]
       },
       boxShadow: {
-        glow: "0 0 40px hsl(var(--primary) / 0.22)",
-        card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.04)"
+        glow: "0 0 44px hsl(var(--primary) / 0.28)",
+        card: "var(--card-shadow)",
+        pop: "var(--shadow-pop)"
       },
       borderRadius: {
-        lg: "0.5rem",
-        md: "0.375rem",
-        sm: "0.25rem"
+        "3xl": "1.75rem",
+        "2xl": "1.5rem",
+        xl: "1.125rem",
+        lg: "1rem",
+        md: "0.75rem",
+        sm: "0.5rem"
       }
     }
   },
