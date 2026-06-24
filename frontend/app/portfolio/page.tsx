@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { InvestmentLogo } from "@/components/investment-logo";
 import { api, ApiError } from "@/lib/api";
 import { availableToInvest } from "@/lib/profile";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { cn, inr } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
@@ -35,7 +36,9 @@ const empty: PortfolioSummary = {
 };
 
 export default function PortfolioPage() {
-  const profile = useAuthStore((state) => state.profile);
+  // Self-heal the profile (like the Dashboard) so "available this month" and
+  // every other profile-derived figure match across tabs even on a direct load.
+  const profile = useEnsureProfile();
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const planItems = usePlanActionsStore((state) => state.planItems);
   const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);

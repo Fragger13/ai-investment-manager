@@ -13,6 +13,7 @@ import { TakeActionDialog } from "@/components/take-action-dialog";
 import { api } from "@/lib/api";
 import { cn, inr } from "@/lib/utils";
 import { availableToInvest, emptyDashboard } from "@/lib/profile";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import {
   ActionItem,
   TAB_LABELS,
@@ -26,7 +27,6 @@ import {
   purposeTag,
   tabs,
 } from "@/lib/plan";
-import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { AdvancedRecommendationResponse, DashboardData } from "@/types";
 
@@ -41,7 +41,9 @@ const emptyAdvanced: AdvancedRecommendationResponse = {
 };
 
 export default function RecommendationsPage() {
-  const profile = useAuthStore((state) => state.profile);
+  // Self-heal the profile (like the Dashboard) so the budget the plan is sized
+  // to ("available this month") matches the other tabs even on a direct load.
+  const profile = useEnsureProfile();
   const [data, setData] = useState<AdvancedRecommendationResponse>(emptyAdvanced);
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export default function RecommendationsPage() {
     setLoading(true);
     try {
       const [recs, dash] = await Promise.all([
-        api.generateAdvancedRecommendations(profile, refreshResearch),
+        profile ? api.generateAdvancedRecommendations(profile, refreshResearch) : Promise.resolve(emptyAdvanced),
         profile ? api.dashboard(profile) : Promise.resolve(emptyDashboard),
       ]);
       setData(recs);
