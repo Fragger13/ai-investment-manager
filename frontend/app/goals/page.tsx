@@ -110,10 +110,10 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <ColorfulIcon icon={icon.icon} accent={icon.accent} label={icon.label} size="md" />
-            <h2 className="text-xl font-semibold text-foreground">{goal.name}</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">{goal.name}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On Track" : "Off Track"}</Badge>
+            <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On track" : "Off track"}</Badge>
             {profileGoal ? (
               <GoalEditDialog
                 mode={{ kind: "edit", index: profileGoal.index, goal: profileGoal.goal }}
@@ -149,20 +149,23 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
           />
         ) : null}
 
-        <div className={`mt-5 flex flex-col gap-2 rounded-xl px-4 py-3 md:flex-row md:items-center md:justify-between ${onTrack ? "bg-positive-soft/60" : "bg-negative-soft/60"}`}>
+        <div className={`mt-5 flex flex-col gap-3 rounded-xl px-4 py-3.5 md:flex-row md:items-center md:justify-between ${onTrack ? "bg-positive-soft/60" : "bg-negative-soft/60"}`}>
           <div className="flex items-start gap-2.5">
-            {onTrack ? <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-positive-foreground" /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-negative-foreground" />}
+            {onTrack ? <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-positive-foreground" /> : <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-negative-foreground" />}
             <div>
-              <p className={`text-sm font-semibold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Reality Check</p>
-              <p className="mt-0.5 text-sm text-foreground/80">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
+              <p className={`text-sm font-bold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Reality check</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
             </div>
           </div>
-          <p className={`shrink-0 text-sm font-semibold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Need {inr(goal.requiredMonthlyInvestment)}/month</p>
+          <div className="shrink-0 md:text-right">
+            <p className="ap-eyebrow">Need / month</p>
+            <p className={`text-xl font-extrabold tracking-tight tnum ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>{inr(goal.requiredMonthlyInvestment)}</p>
+          </div>
         </div>
 
         {!onTrack ? (
           <>
-            <p className="mt-5 text-sm font-semibold text-foreground">Fix Options</p>
+            <p className="mt-5 text-sm font-bold text-foreground">Fix options</p>
             <div className="mt-3 flex flex-wrap gap-3">
               <FixPill icon={ArrowUp} accent="green" title="Increase savings by" value={`${inr(Math.max(Math.round((goal.requiredMonthlyInvestment || 0) * 0.2 / 500) * 500, 500))}/month`} />
               <FixPill icon={CalendarClock} accent="violet" title="Extend timeline by" value={timelineFix(goal)} />
@@ -237,8 +240,8 @@ function LinkedHoldingsRow({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-base font-semibold text-foreground">{value}</p>
+      <p className="ap-eyebrow">{label}</p>
+      <p className="mt-1 text-lg font-bold tracking-tight text-foreground tnum">{value}</p>
     </div>
   );
 }
@@ -255,7 +258,7 @@ function FixPill({ icon: Icon, accent, title, value }: { icon: typeof ArrowUp; a
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="text-sm text-foreground">
-        {title} <span className="font-semibold">{value}</span>
+        {title} <span className="font-bold">{value}</span>
       </span>
     </button>
   );

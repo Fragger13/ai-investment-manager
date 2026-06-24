@@ -190,6 +190,51 @@ body {
   background: hsl(var(--primary) / 0.28);
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   AskPapa type scale — one consistent hierarchy across every screen.
+   Use these so headings, values and labels never compete or drift.
+
+     page title   .ap-title        text-3xl/4xl  · 800   (greeting, page H1)
+     section      .ap-section      text-xl/2xl   · 700   (card-group headings)
+     card title   CardTitle        text-lg       · 700
+     hero number  .ap-stat-xl      text-4xl/5xl  · 800   (the ONE key value)
+     big number   .ap-stat         text-2xl/3xl  · 700   (snapshot values)
+     body         text-[15px]/base · 400-500
+     label        .ap-label        text-sm       · 600   (slate, sits ABOVE a value)
+     helper       .ap-help         text-[13px]   · 500   (muted, still readable)
+     eyebrow      .ap-eyebrow      text-xs       · 700   (tiny uppercase tag only)
+   Financial numbers use tabular figures so columns line up.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .ap-title {
+    @apply text-3xl font-extrabold leading-tight tracking-tight text-foreground md:text-4xl;
+  }
+  .ap-section {
+    @apply text-xl font-bold leading-snug tracking-tight text-foreground md:text-2xl;
+  }
+  .ap-stat-xl {
+    @apply text-4xl font-extrabold leading-none tracking-tight md:text-5xl;
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-stat {
+    @apply text-2xl font-bold leading-tight tracking-tight md:text-3xl;
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-label {
+    @apply text-sm font-semibold text-muted-foreground;
+  }
+  .ap-help {
+    @apply text-[13px] font-medium leading-relaxed text-muted-foreground;
+  }
+  .ap-eyebrow {
+    @apply text-xs font-bold uppercase tracking-wide text-muted-foreground;
+  }
+  /* Tabular figures for any inline number that should align in a column. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 .glass {
   border: 1px solid hsl(var(--border));
   background: hsl(var(--surface));

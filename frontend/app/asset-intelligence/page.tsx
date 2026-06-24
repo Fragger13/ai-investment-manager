@@ -214,7 +214,7 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
           <div className="flex min-w-0 gap-4">
             <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="lg" />
             <div className="min-w-0">
-              <h3 className="line-clamp-1 text-lg font-semibold text-foreground">{idea.name}</h3>
+              <h3 className="line-clamp-1 text-lg font-bold tracking-tight text-foreground">{idea.name}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
               <ul className="mt-2 space-y-1">
                 {idea.bullets.slice(0, 3).map((bullet) => (

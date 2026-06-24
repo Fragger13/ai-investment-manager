@@ -342,7 +342,7 @@ function ChatHeader({ onNewChat }: { onNewChat: () => void }) {
       <div className="flex items-center gap-4">
         <PapaAvatar avatarClass="h-16 w-16" mood="warm" ringClass="ring-2 ring-white shadow-md" />
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Ask Papa</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl">Ask Papa</h1>
           <p
             className="mt-0.5 text-lg leading-tight"
             style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}

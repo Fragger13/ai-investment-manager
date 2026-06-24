@@ -165,8 +165,8 @@ function SavedByYouSection() {
     <div className="mb-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Saved by you</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Investments you added from Discover.</p>
+          <h2 className="ap-section">Saved by you</h2>
+          <p className="mt-0.5 text-[15px] leading-relaxed text-muted-foreground">Investments you added from Discover.</p>
         </div>
         <Badge tone="primary">{items.length}</Badge>
       </div>
@@ -315,8 +315,8 @@ function AmountBlock({ item }: { item: ActionItem }) {
 function Section({ heading, subtitle, children }: { heading: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="text-base font-semibold text-foreground">{heading}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      <h2 className="ap-section">{heading}</h2>
+      <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{subtitle}</p>
       <div className="mt-4">{children}</div>
     </div>
   );

@@ -34,7 +34,7 @@ function Header() {
       <div className="flex items-center gap-3">
         <Link
           href="/login"
-          className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-5 py-2.5 text-sm font-semibold text-[#0F172A] shadow-md ring-1 ring-black/[0.04] transition hover:bg-[#FAFAFA] hover:shadow-lg"
+          className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-5 py-2.5 text-sm font-bold text-[#0F172A] shadow-md ring-1 ring-black/[0.04] transition hover:bg-[#FAFAFA] hover:shadow-lg"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#138A3C] text-[#138A3C]">
             <Play className="h-3 w-3 fill-current" />
@@ -43,7 +43,7 @@ function Header() {
         </Link>
         <Link
           href="/register"
-          className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg"
+          className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-bold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg"
         >
           Get Started <ArrowRight className="h-4 w-4" />
         </Link>
@@ -65,7 +65,7 @@ function Hero() {
           </span>
         </span>
 
-        <h1 className="mt-6 text-[64px] font-bold leading-[1.04] tracking-tight md:text-[76px]">
+        <h1 className="mt-6 text-[64px] font-extrabold leading-[1.04] tracking-tight md:text-[76px]">
           Financial advice
           <br />
           you can trust,
@@ -89,7 +89,7 @@ function Hero() {
         <div className="mt-8 flex flex-wrap items-center gap-6">
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-7 py-3.5 text-base font-semibold text-white shadow transition hover:bg-[#107132]"
+            className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-8 py-4 text-base font-bold text-white shadow-lg ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-xl"
           >
             <Plus className="h-5 w-5" /> Add Goal
           </Link>
@@ -266,7 +266,7 @@ function Features() {
           >
             <feature.Icon className={feature.Icon === PapaAvatarIcon ? "h-12 w-12 object-cover" : "h-5 w-5 text-[#138A3C]"} />
           </div>
-          <h3 className="mt-4 text-base font-bold text-[#0F172A]">{feature.title}</h3>
+          <h3 className="mt-4 text-lg font-bold text-[#0F172A]">{feature.title}</h3>
           <p className="mt-1.5 flex-1 text-sm leading-6 text-[#4B5563]">{feature.text}</p>
           <Link href={feature.href} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#138A3C] hover:underline">
             {feature.cta} <ArrowRight className="h-3.5 w-3.5" />

@@ -54,7 +54,7 @@ export function OnboardingShell({
           <Link href="/" className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/papa-avatar.png" alt="" aria-hidden className="h-14 w-14 rounded-full object-cover ring-2 ring-white shadow-sm" />
-            <span className="text-xl font-semibold text-[#0F172A]">AskPapa</span>
+            <span className="text-xl font-bold text-[#0F172A]">AskPapa</span>
           </Link>
           <div className="flex items-center gap-2">
             <AnimatePresence>
@@ -93,7 +93,7 @@ export function OnboardingShell({
 
         <div className="mt-5">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold uppercase tracking-widest text-[#0F172A]">
+            <p className="text-sm font-bold uppercase tracking-wide text-[#0F172A]">
               Section {Math.min(activeSectionIndex + 1, sections.length)} of {sections.length} · {sectionLabel}
             </p>
             <p className="text-2xl font-semibold sm:text-[28px]" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>

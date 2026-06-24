@@ -113,8 +113,8 @@ export default function DashboardPage() {
                       <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
                       <EditAvailableDialog />
                     </div>
-                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl">{inr(available)}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">Can be invested or saved.</p>
+                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inr(available)}</p>
+                    <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
                   </div>
                   <MoneyJar className="-mt-1 hidden shrink-0 sm:block" />
                 </div>
@@ -129,12 +129,12 @@ export default function DashboardPage() {
               <CardContent className="grid gap-6 p-7 lg:grid-cols-[.85fr_1fr] lg:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-foreground">Financial Health</p>
+                    <p className="ap-eyebrow">Financial health</p>
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </div>
-                  <div className="mt-4 flex items-end gap-2">
-                    <span className="text-5xl font-semibold text-foreground">{data.health.score}</span>
-                    <span className="pb-2 text-lg text-muted-foreground">/ 100</span>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="text-5xl font-extrabold leading-none tracking-tight text-foreground tnum">{data.health.score}</span>
+                    <span className="pb-1.5 text-lg font-semibold text-muted-foreground">/ 100</span>
                   </div>
                   <div className="mt-4 space-y-3">
                     {healthBullets(data, commitments).map((item) => (
@@ -157,9 +157,9 @@ export default function DashboardPage() {
           </div>
 
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-foreground">Money Snapshot</h2>
+            <h2 className="ap-section mb-3">Money snapshot</h2>
             <div className="grid gap-4 md:grid-cols-3">
-              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly Income" value={inr(data.summary.monthlyIncome)} detail="Coming in monthly" />
+              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly income" value={inr(data.summary.monthlyIncome)} detail="Coming in monthly" />
               <CommitmentsCard total={commitments} profile={profile} />
               <NetWorthCard value={inr(data.summary.netWorth)} />
             </div>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
           <div className="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>Your Goals</CardTitle>
+                <CardTitle>Your goals</CardTitle>
                 <Link href="/goals" className="text-sm font-bold text-primary hover:underline">View all goals <ArrowRight className="inline h-4 w-4" /></Link>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -204,8 +204,8 @@ export default function DashboardPage() {
               <div className="flex items-start gap-3">
                 <ColorfulIcon icon={Sparkles} accent="emerald" label="Insight for you" />
                 <div>
-                  <p className="font-semibold text-foreground">Insight for you</p>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{insight}</p>
+                  <p className="font-bold text-foreground">Insight for you</p>
+                  <p className="mt-1 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">{insight}</p>
                 </div>
               </div>
               <Button variant="outline" asChild><Link href="/chat">Explore how <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -223,12 +223,12 @@ function SnapshotCard({ icon, accent, label, value, detail, highlight }: { icon:
       <CardContent className="flex items-center gap-5 p-5">
         <ColorfulIcon icon={icon} accent={accent} label={label} size="lg" />
         <div>
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground/70">
+          <p className="ap-label flex items-center gap-1.5">
             {label}
             {highlight ? <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Total</span> : null}
           </p>
-          <p className={cn("mt-1 text-2xl font-bold", highlight ? "text-primary" : "text-foreground")}>{value}</p>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{detail}</p>
+          <p className={cn("mt-1 text-2xl font-bold tracking-tight tnum", highlight ? "text-primary" : "text-foreground")}>{value}</p>
+          <p className="ap-help mt-1">{detail}</p>
         </div>
       </CardContent>
     </Card>
@@ -240,9 +240,9 @@ function DashboardActionRow({ action }: { action: ActionItem }) {
     <Link href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
       <InvestmentLogo name={action.title} extraHint={action.instrumentName} category={action.category} ticker={action.ticker} size="sm" />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-1 block font-semibold text-foreground">{action.title}</span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
-          <span className="font-semibold text-primary">{amountLabel(action)}</span>
+        <span className="line-clamp-1 block text-[15px] font-bold text-foreground">{action.title}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px]">
+          <span className="font-bold text-primary tnum">{amountLabel(action)}</span>
           <span className="text-muted-foreground">· 🎯 {purposeTag(action)}</span>
         </span>
       </span>
@@ -303,7 +303,7 @@ function EditAvailableDialog() {
       <DialogContent className="w-[min(440px,94vw)] p-0">
         <div className="border-b border-border px-6 py-5 pr-12">
           <DialogTitle className="text-lg font-semibold text-foreground">Available to invest this month</DialogTitle>
-          <DialogDescription className="mt-0.5 text-xs text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
+          <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
         </div>
         <div className="p-6">
           <label htmlFor="edit-available" className="text-sm font-semibold text-foreground">Amount this month</label>
@@ -320,7 +320,7 @@ function EditAvailableDialog() {
             />
             <span className="text-xs text-muted-foreground">/ month</span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
+          <p className="mt-2 text-[13px] text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
           <div className="mt-5 flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
             <Button className="flex-1" onClick={save} disabled={saving || amount <= 0}>{saving ? "Saving…" : "Save"}</Button>
@@ -341,10 +341,10 @@ function NetWorthCard({ value }: { value: string }) {
       </span>
       <div className="relative min-w-0">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-white/90">
-          Net Worth
+          Net worth
           <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Total</span>
         </p>
-        <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white">{value}</p>
+        <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white tnum">{value}</p>
         <p className="mt-0.5 text-sm font-medium text-white/85">Everything you own today</p>
       </div>
     </div>
@@ -470,9 +470,9 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
     >
       <ColorfulIcon icon={CreditCard} accent="violet" label="Monthly Commitments" size="lg" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground/70">Monthly Commitments</p>
-        <p className="mt-1 text-2xl font-bold text-foreground">{inr(total)}</p>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">Rent, EMIs, monthly expenses</p>
+        <p className="ap-label">Monthly commitments</p>
+        <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tnum">{inr(total)}</p>
+        <p className="ap-help mt-1">Rent, EMIs, monthly expenses</p>
       </div>
       {canOpen ? (
         <span className="shrink-0 text-muted-foreground">
