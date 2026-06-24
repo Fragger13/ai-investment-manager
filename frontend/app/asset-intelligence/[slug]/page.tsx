@@ -15,13 +15,14 @@ import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { useAuthStore } from "@/store/auth-store";
 import { api } from "@/lib/api";
 import { inr } from "@/lib/utils";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import type { InvestmentIdea } from "../page";
 
 export default function InvestmentDetailPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
   const slug = decodeURIComponent(params?.slug || "");
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
   const [idea, setIdea] = useState<InvestmentIdea | null>(null);
   const [allIdeas, setAllIdeas] = useState<InvestmentIdea[]>([]);
   const [aboutOpen, setAboutOpen] = useState(false);

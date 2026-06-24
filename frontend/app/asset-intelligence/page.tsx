@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { cn, inr } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth-store";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, CryptoOpportunity, OnboardingProfile } from "@/types";
 
@@ -50,7 +50,7 @@ const emptyAdvanced: AdvancedRecommendationResponse = {
 const tabs: InvestmentIdea["tab"][] = ["Recommended For You", "Trending", "Safe Options", "High Growth", "Under The Radar"];
 
 export default function AssetIntelligencePage() {
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
   const savedCount = usePlanActionsStore((state) => state.planItems.length);
   const [assets, setAssets] = useState<AssetIntelligence[]>([]);
   const [alpha, setAlpha] = useState<AlphaOpportunity[]>([]);

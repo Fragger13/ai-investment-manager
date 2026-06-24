@@ -16,11 +16,13 @@ import { api } from "@/lib/api";
 import { goalIconSpec } from "@/lib/icon-maps";
 import { emptyDashboard } from "@/lib/profile";
 import { inr } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth-store";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
 
 export default function GoalsPage() {
-  const profile = useAuthStore((state) => state.profile);
+  // Recover the profile from the backend if the store is empty (deep load /
+  // pre-rehydration), so goals + funding figures match the other tabs.
+  const profile = useEnsureProfile();
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
 

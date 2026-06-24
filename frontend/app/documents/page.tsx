@@ -14,11 +14,12 @@ import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { mergeProfilePatch } from "@/lib/profile";
 import { inr } from "@/lib/utils";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { useAuthStore } from "@/store/auth-store";
 import { DocumentAnalysis } from "@/types";
 
 export default function DocumentsPage() {
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null);
   const [progress, setProgress] = useState(0);

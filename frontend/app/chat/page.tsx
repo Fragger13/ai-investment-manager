@@ -21,6 +21,7 @@ import {
   type Conversation
 } from "@/lib/chat-store";
 import { cn } from "@/lib/utils";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { useAuthStore } from "@/store/auth-store";
 
 const STARTER_PROMPTS = [
@@ -69,7 +70,7 @@ const TIME_INTRO_LINES: Record<"morning" | "afternoon" | "evening" | "night", st
 };
 
 export default function ChatPage() {
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
   const [state, setState] = useState<ChatState>({ conversations: {}, order: [], activeId: null });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
