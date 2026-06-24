@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, CalendarRange, CheckCircle2, ChevronRight, CircleAlert, CreditCard, Home, Pencil, PiggyBank, Receipt, Repeat, Sprout, Sparkles, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AppShell } from "@/components/app-shell";
@@ -252,23 +253,14 @@ function DashboardActionRow({ action }: { action: ActionItem }) {
 
 function MoneyJar({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 120 120" width="100" height="100" className={className} role="img" aria-label="Savings jar" focusable="false">
-      {/* sparkles */}
-      <path d="M99 28 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#FACC15" />
-      <circle cx="24" cy="46" r="2.5" fill="#34D399" />
-      {/* lid */}
-      <rect x="38" y="24" width="44" height="10" rx="5" fill="#22C55E" />
-      <rect x="30" y="31" width="60" height="14" rx="6" fill="#16A34A" />
-      {/* jar body (glass) */}
-      <path d="M34 46 h52 a6 6 0 0 1 6 6 v44 a14 14 0 0 1 -14 14 h-36 a14 14 0 0 1 -14 -14 v-44 a6 6 0 0 1 6 -6z" fill="#10B981" fillOpacity="0.10" stroke="#15803D" strokeWidth="3" />
-      {/* coins inside */}
-      <ellipse cx="60" cy="99" rx="26" ry="8" fill="#F59E0B" />
-      <ellipse cx="60" cy="91" rx="24" ry="7.5" fill="#FBBF24" />
-      <ellipse cx="60" cy="84" rx="20" ry="7" fill="#FCD34D" />
-      {/* rupee coin */}
-      <circle cx="60" cy="66" r="13" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2" />
-      <text x="60" y="72" textAnchor="middle" fontSize="16" fontWeight="800" fill="#15803D" fontFamily="var(--font-sans)">₹</text>
-    </svg>
+    <Image
+      src="/money-jar.png"
+      alt="Savings jar with coins and a sprout"
+      width={220}
+      height={417}
+      className={cn("h-28 w-auto select-none", className)}
+      priority
+    />
   );
 }
 
