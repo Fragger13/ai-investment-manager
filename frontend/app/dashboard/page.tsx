@@ -353,7 +353,7 @@ function NetWorthCard({ value }: { value: string }) {
 
 function DashboardNudge({ tone, emoji, children }: { tone: "green" | "sun"; emoji: string; children: React.ReactNode }) {
   return (
-    <div className={cn("flex items-center gap-3 rounded-2xl p-3.5", tone === "green" ? "bg-positive-soft/60" : "bg-sun-soft/70")}>
+    <div className={cn("flex items-center gap-3 rounded-2xl border p-3.5", tone === "green" ? "border-positive/20 bg-positive-soft" : "border-sun/30 bg-sun-soft")}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm" aria-hidden>{emoji}</span>
       <p className="text-sm font-medium text-foreground">{children}</p>
     </div>
