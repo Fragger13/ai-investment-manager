@@ -7,6 +7,24 @@ export function currentBudgetMonth(): string {
   return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 7);
 }
 
+export function monthlyCommitments(profile?: OnboardingProfile | null): number {
+  if (!profile) return 0;
+  return Number(profile.rent || 0) + Number(profile.monthlyExpenses || 0) + totalMonthlyEmi(profile.emiLoans, profile.emi);
+}
+
+// The single source of truth for "what can I invest this month". Respects the
+// user's explicit per-month override (investableThisMonth) when it applies to
+// the current IST budget month; otherwise falls back to income − commitments.
+// Used by the dashboard hero, the Plan (to size every action to this budget),
+// and the Portfolio "available to invest" — so all three always agree.
+export function availableToInvest(profile?: OnboardingProfile | null, monthlyIncome?: number): number {
+  if (!profile) return 0;
+  const overrideActive = Number(profile.investableThisMonth || 0) > 0 && profile.investableThisMonthMonth === currentBudgetMonth();
+  if (overrideActive) return Number(profile.investableThisMonth || 0);
+  const income = monthlyIncome ?? (Number(profile.monthlyCashInflow || 0) || Number(profile.monthlySalary || 0) + Number(profile.otherIncome || 0));
+  return Math.max(income - monthlyCommitments(profile), 0);
+}
+
 export const blankProfile: OnboardingProfile = {
   name: "",
   dateOfBirth: "",

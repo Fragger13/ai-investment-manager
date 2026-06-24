@@ -51,8 +51,8 @@ export default function GoalsPage() {
     <AppShell>
       <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Your Goals</h1>
-          <p className="mt-2 text-base text-muted-foreground">Track progress and stay on course.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Your goals 🎯</h1>
+          <p className="mt-2 text-base text-muted-foreground">Each goal, where it stands, and exactly what it takes to get there.</p>
         </div>
         <GoalEditDialog
           mode={{ kind: "add" }}

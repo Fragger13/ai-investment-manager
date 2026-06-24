@@ -10,20 +10,25 @@ import { InvestmentLogo } from "@/components/investment-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { PapaBubble, type PapaMood } from "@/app/onboarding/_components/papa-bubble";
-import { currentBudgetMonth, emptyDashboard, isOnboardingComplete, profileCompletionPercent, totalMonthlyEmi } from "@/lib/profile";
-import { inr } from "@/lib/utils";
+import { availableToInvest, currentBudgetMonth, emptyDashboard, isOnboardingComplete, monthlyCommitments, profileCompletionPercent } from "@/lib/profile";
+import { ActionItem, amountLabel, buildPlan, mergeIntoActionItems, purposeTag } from "@/lib/plan";
+import { cn, inr } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
-import { DashboardData, OnboardingProfile } from "@/types";
+import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { AdvancedRecommendation, DashboardData, OnboardingProfile } from "@/types";
 
 export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const token = useAuthStore((state) => state.token);
   const [data, setData] = useState<DashboardData>(emptyDashboard);
+  const [advRecs, setAdvRecs] = useState<AdvancedRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
 
   useEffect(() => {
     async function load() {
@@ -36,24 +41,34 @@ export default function DashboardPage() {
       }
       setData(activeProfile ? await api.dashboard(activeProfile) : emptyDashboard);
       setLoading(false);
+      // Pull the same advanced recommendations the Plan page uses so the home
+      // "next moves" stay in sync. Non-blocking: cached and fast, but never
+      // holds up the rest of the dashboard.
+      if (activeProfile) {
+        api.generateAdvancedRecommendations(activeProfile, false)
+          .then((res) => setAdvRecs(res.recommendations || []))
+          .catch(() => setAdvRecs([]));
+      }
     }
     load();
   }, [profile, saveProfile, token]);
 
   const needsProfile = !profile && !data.summary.monthlyIncome;
-  // Total monthly outflow: rent + everyday expenses + EMIs. (subscriptions are
-  // bundled inside monthlyExpenses during onboarding, so they're not added again.)
-  const commitments = (profile?.rent || 0) + (profile?.monthlyExpenses || 0) + totalMonthlyEmi(profile?.emiLoans, profile?.emi);
-  // What's left to invest this month. If the user gave an explicit "invest this
-  // month" figure for the current month, that takes precedence; otherwise it's
-  // income minus all commitments.
-  const overrideActive = (profile?.investableThisMonth || 0) > 0 && profile?.investableThisMonthMonth === currentBudgetMonth();
-  const available = overrideActive
-    ? Number(profile?.investableThisMonth || 0)
-    : Math.max((data.summary.monthlyIncome || 0) - commitments, 0);
+  // Total monthly outflow (rent + everyday expenses + EMIs) and what's left to
+  // invest this month — shared helpers so the dashboard, Plan and Portfolio all
+  // agree on the same "available this month" figure.
+  const commitments = monthlyCommitments(profile);
+  const available = availableToInvest(profile, data.summary.monthlyIncome);
   const userHasGoals = (profile?.goals?.length || 0) > 0;
   const topGoals = userHasGoals ? data.goals.slice(0, 3) : [];
-  const topActions = data.recommendations.slice(0, 3);
+  // Same merge + ranking + budget calibration the Plan page runs, so the home
+  // "next moves" are identical to the plan's "Do first" tab — same items AND the
+  // same budget-sized amounts.
+  const takenKeys = useMemo(() => new Set(actionsTaken.map((entry) => entry.key)), [actionsTaken]);
+  const topActions = useMemo(
+    () => buildPlan(mergeIntoActionItems(advRecs, data), takenKeys, available)["Must Do"],
+    [advRecs, data, takenKeys, available]
+  );
   const status = healthStatus(data.health.score);
   const insight = monthlyInsight(data, commitments);
   const completionPercent = profileCompletionPercent(profile);
@@ -62,7 +77,7 @@ export default function DashboardPage() {
     <AppShell sidebarExtra={completionPercent < 100 ? <ProfileCompletionCard percent={completionPercent} /> : null}>
       <section className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">
             {greeting(profile?.name)} <span aria-hidden="true">👋</span>
           </h1>
           <p className="mt-2 text-base text-muted-foreground">{dashboardSubtitle(data.health.score)}</p>
@@ -91,9 +106,17 @@ export default function DashboardPage() {
           <div className="grid gap-5 xl:grid-cols-[.82fr_1.18fr]">
             <Card className="overflow-hidden">
               <CardContent className="p-6">
-                <p className="text-sm text-muted-foreground">Expected available this month</p>
-                <p className="mt-2 text-5xl font-semibold tracking-tight text-positive-foreground md:text-6xl">{inr(available)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Can be invested or saved.</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
+                      <EditAvailableDialog />
+                    </div>
+                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl">{inr(available)}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Can be invested or saved.</p>
+                  </div>
+                  <MoneyJar className="-mt-1 hidden shrink-0 sm:block" />
+                </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button asChild className="rounded-full"><Link href="/chat">What should I do with it? <Sparkles className="h-4 w-4" /></Link></Button>
                   <Button variant="outline" asChild className="rounded-full"><Link href="/recommendations">View my plan <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -137,7 +160,7 @@ export default function DashboardPage() {
             <div className="grid gap-4 md:grid-cols-3">
               <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly Income" value={inr(data.summary.monthlyIncome)} detail="Coming in monthly" />
               <CommitmentsCard total={commitments} profile={profile} />
-              <SnapshotCard icon={PiggyBank} accent="blue" label="Available To Save" value={inr(available)} detail="Can be invested or saved" />
+              <NetWorthCard value={inr(data.summary.netWorth)} />
             </div>
           </section>
 
@@ -145,7 +168,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>Your Goals</CardTitle>
-                <Link href="/goals" className="text-sm font-medium text-primary">View all goals <ArrowRight className="inline h-4 w-4" /></Link>
+                <Link href="/goals" className="text-sm font-bold text-primary hover:underline">View all goals <ArrowRight className="inline h-4 w-4" /></Link>
               </CardHeader>
               <CardContent className="space-y-5">
                 {topGoals.map((goal) => <GoalPreview key={goal.id} goal={goal} />)}
@@ -158,28 +181,19 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : null}
+                {topGoals.length ? <DashboardNudge tone="green" emoji="🎯">Keep going! Small steps today, big freedom tomorrow.</DashboardNudge> : null}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Your Top 3 Actions This Month</CardTitle>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Do this first</CardTitle>
+                <Link href="/recommendations" className="text-sm font-bold text-primary hover:underline">Full plan <ArrowRight className="inline h-4 w-4" /></Link>
               </CardHeader>
               <CardContent className="space-y-3">
-                {topActions.map((action) => {
-                  const title = simpleActionTitle(action.strategyType, action.assetClass);
-                  return (
-                    <Link key={action.id} href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
-                      <InvestmentLogo name={title} category={action.assetClass} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium text-foreground">{title}</span>
-                        <span className="mt-1 line-clamp-1 block text-sm text-muted-foreground">{action.reasoning}</span>
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </Link>
-                  );
-                })}
+                {topActions.map((action) => <DashboardActionRow key={action.key} action={action} />)}
                 {!topActions.length ? <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p> : null}
+                {topActions.length ? <DashboardNudge tone="sun" emoji="💡">Start with these and you&apos;ll see the biggest impact.</DashboardNudge> : null}
               </CardContent>
             </Card>
           </div>
@@ -202,18 +216,155 @@ export default function DashboardPage() {
   );
 }
 
-function SnapshotCard({ icon, accent, label, value, detail }: { icon: typeof WalletCards; accent: "emerald" | "violet" | "blue"; label: string; value: string; detail: string }) {
+function SnapshotCard({ icon, accent, label, value, detail, highlight }: { icon: typeof WalletCards; accent: "emerald" | "violet" | "blue"; label: string; value: string; detail: string; highlight?: boolean }) {
   return (
-    <Card>
+    <Card className={cn(highlight && "border-2 border-primary/35 bg-primary/[0.06] shadow-pop")}>
       <CardContent className="flex items-center gap-5 p-5">
         <ColorfulIcon icon={icon} accent={accent} label={label} size="lg" />
         <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground/70">
+            {label}
+            {highlight ? <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Total</span> : null}
+          </p>
+          <p className={cn("mt-1 text-2xl font-bold", highlight ? "text-primary" : "text-foreground")}>{value}</p>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">{detail}</p>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DashboardActionRow({ action }: { action: ActionItem }) {
+  return (
+    <Link href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
+      <InvestmentLogo name={action.title} extraHint={action.instrumentName} category={action.category} ticker={action.ticker} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-1 block font-semibold text-foreground">{action.title}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+          <span className="font-semibold text-primary">{amountLabel(action)}</span>
+          <span className="text-muted-foreground">· 🎯 {purposeTag(action)}</span>
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
+function MoneyJar({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 120 120" width="100" height="100" className={className} role="img" aria-label="Savings jar" focusable="false">
+      {/* sparkles */}
+      <path d="M99 28 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#FACC15" />
+      <circle cx="24" cy="46" r="2.5" fill="#34D399" />
+      {/* lid */}
+      <rect x="38" y="24" width="44" height="10" rx="5" fill="#22C55E" />
+      <rect x="30" y="31" width="60" height="14" rx="6" fill="#16A34A" />
+      {/* jar body (glass) */}
+      <path d="M34 46 h52 a6 6 0 0 1 6 6 v44 a14 14 0 0 1 -14 14 h-36 a14 14 0 0 1 -14 -14 v-44 a6 6 0 0 1 6 -6z" fill="#10B981" fillOpacity="0.10" stroke="#15803D" strokeWidth="3" />
+      {/* coins inside */}
+      <ellipse cx="60" cy="99" rx="26" ry="8" fill="#F59E0B" />
+      <ellipse cx="60" cy="91" rx="24" ry="7.5" fill="#FBBF24" />
+      <ellipse cx="60" cy="84" rx="20" ry="7" fill="#FCD34D" />
+      {/* rupee coin */}
+      <circle cx="60" cy="66" r="13" fill="#FCD34D" stroke="#F59E0B" strokeWidth="2" />
+      <text x="60" y="72" textAnchor="middle" fontSize="16" fontWeight="800" fill="#15803D" fontFamily="var(--font-sans)">₹</text>
+    </svg>
+  );
+}
+
+function EditAvailableDialog() {
+  const profile = useAuthStore((state) => state.profile);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  const token = useAuthStore((state) => state.token);
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setAmount(availableToInvest(profile));
+  }, [open, profile]);
+
+  if (!profile) return null;
+
+  async function save() {
+    if (!profile) return;
+    setSaving(true);
+    const next = { ...profile, investableThisMonth: Math.max(0, Math.round(amount)), investableThisMonthMonth: currentBudgetMonth() };
+    saveProfile(next, onboardingComplete);
+    try {
+      await api.saveOnboarding(next, token, { partial: true });
+    } catch {
+      /* local update already applied; ignore network error */
+    }
+    setSaving(false);
+    setOpen(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" aria-label="Edit available this month" className="rounded-full p-1 text-muted-foreground transition hover:bg-surface-hover hover:text-primary">
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="w-[min(440px,94vw)] p-0">
+        <div className="border-b border-border px-6 py-5 pr-12">
+          <DialogTitle className="text-lg font-semibold text-foreground">Available to invest this month</DialogTitle>
+          <DialogDescription className="mt-0.5 text-xs text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
+        </div>
+        <div className="p-6">
+          <label htmlFor="edit-available" className="text-sm font-semibold text-foreground">Amount this month</label>
+          <div className="mt-1.5 flex items-center gap-2 rounded-xl border-2 border-input bg-surface px-3">
+            <span className="text-base font-semibold text-muted-foreground">₹</span>
+            <Input
+              id="edit-available"
+              type="number"
+              min={0}
+              value={amount || ""}
+              onChange={(event) => setAmount(Number(event.target.value || 0))}
+              className="border-0 px-0 text-lg focus-visible:ring-0"
+              autoFocus
+            />
+            <span className="text-xs text-muted-foreground">/ month</span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
+          <div className="mt-5 flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="flex-1" onClick={save} disabled={saving || amount <= 0}>{saving ? "Saving…" : "Save"}</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NetWorthCard({ value }: { value: string }) {
+  return (
+    <div className="relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[hsl(157_82%_32%)] via-[hsl(162_74%_34%)] to-[hsl(170_70%_36%)] p-5 text-white shadow-pop">
+      <div aria-hidden className="pointer-events-none absolute -right-7 -top-9 h-28 w-28 rounded-full bg-white/10" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-10 right-6 h-24 w-24 rounded-full bg-white/[0.07]" />
+      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30">
+        <PiggyBank className="h-6 w-6 text-white" />
+      </span>
+      <div className="relative min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-white/90">
+          Net Worth
+          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Total</span>
+        </p>
+        <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white">{value}</p>
+        <p className="mt-0.5 text-sm font-medium text-white/85">Everything you own today</p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardNudge({ tone, emoji, children }: { tone: "green" | "sun"; emoji: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("flex items-center gap-3 rounded-2xl p-3.5", tone === "green" ? "bg-positive-soft/60" : "bg-sun-soft/70")}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm" aria-hidden>{emoji}</span>
+      <p className="text-sm font-medium text-foreground">{children}</p>
+    </div>
   );
 }
 
@@ -327,9 +478,9 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
     >
       <ColorfulIcon icon={CreditCard} accent="violet" label="Monthly Commitments" size="lg" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-muted-foreground">Monthly Commitments</p>
-        <p className="mt-1 text-2xl font-semibold text-foreground">{inr(total)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Rent, EMIs, monthly expenses</p>
+        <p className="text-sm font-semibold text-foreground/70">Monthly Commitments</p>
+        <p className="mt-1 text-2xl font-bold text-foreground">{inr(total)}</p>
+        <p className="mt-1 text-sm font-medium text-muted-foreground">Rent, EMIs, monthly expenses</p>
       </div>
       {canOpen ? (
         <span className="shrink-0 text-muted-foreground">
@@ -537,11 +688,3 @@ function formatLoanDate(value: string) {
   return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
-function simpleActionTitle(strategyType: string, assetClass: string) {
-  const text = `${strategyType} ${assetClass}`.toLowerCase();
-  if (text.includes("emergency")) return "Build Emergency Fund";
-  if (text.includes("debt")) return "Avoid New Debt";
-  if (text.includes("gold")) return "Add Stability With Gold";
-  if (text.includes("sip") || text.includes("equity") || text.includes("fund")) return "Increase SIP";
-  return strategyType || assetClass || "Review Plan";
-}

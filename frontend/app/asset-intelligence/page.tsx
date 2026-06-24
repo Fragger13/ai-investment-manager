@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, Filter, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
+import { Bookmark, Check, RefreshCw, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ColorfulIcon } from "@/components/colorful-icon";
 import { InvestmentLogo } from "@/components/investment-logo";
@@ -51,6 +51,7 @@ const tabs: InvestmentIdea["tab"][] = ["Recommended For You", "Trending", "Safe 
 
 export default function AssetIntelligencePage() {
   const profile = useAuthStore((state) => state.profile);
+  const savedCount = usePlanActionsStore((state) => state.planItems.length);
   const [assets, setAssets] = useState<AssetIntelligence[]>([]);
   const [alpha, setAlpha] = useState<AlphaOpportunity[]>([]);
   const [crypto, setCrypto] = useState<CryptoOpportunity[]>([]);
@@ -125,17 +126,27 @@ export default function AssetIntelligencePage() {
     <AppShell sidebarExtra={<InviteWidget />}>
       <div className="mb-7 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Discover Investments</h1>
-          <p className="mt-2 text-base text-muted-foreground">Curated investment options that match your goals and risk profile.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Discover 🔍</h1>
+          <p className="mt-2 text-base text-muted-foreground">Hand-picked ideas that fit your goals and risk level. Tap any to learn more, then save the ones you like to your plan.</p>
         </div>
         <div className="flex w-full gap-3 xl:w-auto">
           <div className="relative w-full min-w-[260px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search investments, funds..." className="pl-9" />
           </div>
-          <Button variant="outline" onClick={() => load(true)} disabled={loading}><Filter className="h-4 w-4" /> Filters</Button>
+          <Button variant="outline" onClick={() => load(true)} disabled={loading}><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh"}</Button>
         </div>
       </div>
+
+      {savedCount > 0 ? (
+        <Link href="/recommendations" className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 transition hover:bg-primary/10">
+          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Bookmark className="h-4 w-4 fill-current text-primary" />
+            {savedCount} idea{savedCount === 1 ? "" : "s"} saved — they&apos;re in your plan under &ldquo;Saved by you&rdquo;
+          </span>
+          <span className="shrink-0 text-sm font-bold text-primary">View in plan →</span>
+        </Link>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap gap-2">
         {tabs.map((tab) => (
@@ -166,7 +177,7 @@ export default function AssetIntelligencePage() {
           <Button variant="outline" asChild><Link href="/chat">Ask AI Coach <Send className="h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
-      <p className="mt-4 text-xs text-muted-foreground">All investments are subject to market risks. Read scheme-related documents carefully.</p>
+      <p className="mt-4 text-xs text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
     </AppShell>
   );
 }
@@ -223,7 +234,7 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
               {idea.risk} Risk
             </span>
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expected Return</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Est. return</p>
               <p className="text-[15px] font-semibold text-foreground">{idea.expectedReturn}</p>
             </div>
             {idea.livePrice ? (
@@ -231,28 +242,28 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
             ) : null}
           </div>
 
-          {/* Suggested SIP — its own column */}
+          {/* Suggested starting SIP — its own column */}
           <div className="text-left lg:text-center">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{idea.category.toLowerCase().includes("stock") || idea.category === "Crypto" ? "Suggested allocation" : "Suggested SIP"}</p>
-            <p className="mt-0.5 text-[15px] font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / month` : "Review first"}</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Start with</p>
+            <p className="mt-0.5 text-[15px] font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
           </div>
 
-          {/* Right: save bookmark + View Details */}
-          <div className="flex items-center gap-3 justify-self-end">
-            <button
+          {/* Right: save-to-plan + View Details */}
+          <div className="flex items-center gap-2 justify-self-end">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={toggleSave}
               aria-label={inPlan ? "Remove from plan" : "Save to plan"}
               aria-pressed={inPlan}
               className={cn(
-                "hidden h-9 w-9 items-center justify-center rounded-full border transition lg:inline-flex",
-                inPlan
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+                "gap-1.5",
+                inPlan ? "border-primary bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground hover:text-primary"
               )}
             >
-              <Bookmark className={cn("h-4 w-4", inPlan && "fill-current")} />
-            </button>
+              <Bookmark className={cn("h-4 w-4", inPlan && "fill-current")} /> {inPlan ? "Saved" : "Save"}
+            </Button>
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90">View Details</Button>
           </div>
         </CardContent>
@@ -478,18 +489,28 @@ function friendlyCategory(value: string) {
   return value || "Investment";
 }
 
+// Long-term, category-based return *estimates* (not per-fund precise figures and
+// not guarantees). Differentiated by asset class + risk so cards don't all read
+// an identical "8-12%". The "~" + the page footnote make the estimate explicit.
 function expectedReturn(category: string, risk: string) {
   const text = category.toLowerCase();
-  if (text.includes("debt") || text.includes("cash")) return "5-7% p.a.";
-  if (text.includes("gold")) return "5-8% p.a.";
-  if (risk === "High") return "Wide range";
-  return "8-12% p.a.";
+  if (text.includes("debt") || text.includes("cash") || text.includes("bond")) return "~6–7% p.a.";
+  if (text.includes("gold")) return "~6–8% p.a.";
+  if (text.includes("crypto")) return "Highly variable";
+  if (risk === "High") return "~12–16% p.a.";
+  if (risk === "Low") return "~8–10% p.a.";
+  return "~10–12% p.a.";
 }
 
 function suggestedAmount(profile: OnboardingProfile | null, risk: string, category: string) {
   const surplus = Number(profile?.monthlyCashInflow || 0) - Number(profile?.monthlyExpenses || 0) - Number(profile?.emi || 0);
-  const base = Math.max(Math.round((surplus || 20000) * (risk === "High" || category === "Crypto" ? 0.08 : risk === "Low" ? 0.18 : 0.14) / 500) * 500, 0);
-  return base;
+  // A gentle *starter* SIP for browsing — not a full allocation. The real,
+  // goal-based sizing happens in the Plan once an idea is saved. Keeping this a
+  // small slice of surplus (floored at ₹500, capped low) avoids showing an
+  // alarming, identical ₹50k on every card to a beginner.
+  const mult = risk === "High" || category === "Crypto" ? 0.03 : risk === "Low" ? 0.07 : 0.05;
+  const raw = Math.round(((surplus > 0 ? surplus : 20000) * mult) / 500) * 500;
+  return Math.min(Math.max(raw, 500), 5000);
 }
 
 function normalizeRisk(value: string) {

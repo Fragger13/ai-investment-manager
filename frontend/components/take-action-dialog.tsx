@@ -137,7 +137,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {payload.expectedReturn ? (
                   <div className="rounded-xl border border-border bg-surface-soft p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expected Return</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Est. return</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">{payload.expectedReturn}</p>
                   </div>
                 ) : null}

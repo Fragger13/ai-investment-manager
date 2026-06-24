@@ -15,26 +15,26 @@
   --surface-elevated: 0 0% 100%;
   --surface-soft: 38 50% 96%;
   --surface-hover: 36 44% 92%;
-  --foreground: 222 26% 15%;        /* soft ink, not pure black */
-  --text-primary: 222 26% 15%;
-  --text-secondary: 222 13% 46%;
+  --foreground: 222 28% 13%;        /* soft ink, not pure black */
+  --text-primary: 222 28% 13%;
+  --text-secondary: 222 17% 38%;
   --card: 0 0% 100%;
-  --card-foreground: 222 26% 15%;
+  --card-foreground: 222 28% 13%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 26% 15%;
-  --primary: 157 74% 40%;           /* money green */
+  --popover-foreground: 222 28% 13%;
+  --primary: 157 84% 31%;           /* money green — deepened for legible text/links */
   --primary-foreground: 0 0% 100%;
   --secondary: 38 48% 94%;
-  --secondary-foreground: 222 26% 15%;
+  --secondary-foreground: 222 28% 13%;
   --muted: 38 42% 95%;
-  --muted-foreground: 222 13% 46%;
+  --muted-foreground: 222 17% 38%;
   --accent: 157 60% 92%;            /* mint tint */
   --accent-foreground: 158 78% 23%;
   --destructive: 6 88% 61%;
   --destructive-foreground: 0 0% 100%;
-  --border: 36 30% 88%;
-  --input: 36 28% 85%;
-  --ring: 157 74% 40%;
+  --border: 36 30% 86%;
+  --input: 36 28% 82%;
+  --ring: 157 84% 31%;
 
   --positive: 157 62% 37%;
   --positive-foreground: 158 70% 23%;
