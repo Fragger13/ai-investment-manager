@@ -143,8 +143,8 @@ export default function PortfolioPage() {
       {/* Hero — Net Worth */}
       <Card className="mb-6 overflow-hidden">
         <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground">Total Net Worth</p>
-          <p className="mt-2 text-5xl font-semibold tracking-tight text-foreground md:text-6xl">{inr(data.netWorth)}</p>
+          <p className="ap-label">Total Net Worth</p>
+          <p className="mt-2 text-5xl font-extrabold tracking-tight text-foreground md:text-6xl tnum">{inr(data.netWorth)}</p>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
             <span className="inline-flex items-center gap-2 text-positive-foreground">
               <ArrowUpRight className="h-4 w-4" />
@@ -153,7 +153,7 @@ export default function PortfolioPage() {
             {plHoldingCount > 0 ? (
               <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", plRupees >= 0 ? "bg-positive-soft text-positive-foreground" : "bg-negative-soft text-negative-foreground")}>
                 {plRupees >= 0 ? "+" : ""}{inr(plRupees)} ({plPercent >= 0 ? "+" : ""}{plPercent.toFixed(2)}%) overall P&L
-                <span className="text-[10px] opacity-70">· cost {inr(totalInvested)}</span>
+                <span className="text-[11px] font-medium opacity-80">· cost {inr(totalInvested)}</span>
               </span>
             ) : null}
             {actionContributedValue > 0 ? (
@@ -166,7 +166,7 @@ export default function PortfolioPage() {
             <Pill label="Active commitments" value={totalCommitments ? `${inr(totalCommitments)}/mo` : "—"} icon={ArrowUpRight} tone="positive" />
             <Pill label="Available this month" value={inr(available)} icon={Sparkles} tone="info" />
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{watchlistedItems} idea{watchlistedItems === 1 ? "" : "s"} saved in your plan, ready to start.</p>
+          <p className="mt-3 text-[13px] text-muted-foreground">{watchlistedItems} idea{watchlistedItems === 1 ? "" : "s"} saved in your plan, ready to start.</p>
         </CardContent>
       </Card>
 
@@ -184,8 +184,8 @@ export default function PortfolioPage() {
         {/* Projection */}
         <Card>
           <CardContent className="p-6">
-            <p className="text-base font-semibold text-foreground">Projected wealth</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Based on current holdings + monthly commitments from your plan.</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Projected wealth</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">Based on current holdings + monthly commitments from your plan.</p>
             {projection.length ? (
               <div className="mt-4 h-44">
                 <ResponsiveContainer width="100%" height="100%">
@@ -206,18 +206,18 @@ export default function PortfolioPage() {
             ) : null}
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-surface-soft p-3">
-                <p className="text-xs text-muted-foreground">In 12 months</p>
-                <p className="mt-0.5 font-semibold text-foreground">{inr(projectedAt12)}</p>
+                <p className="text-[13px] text-muted-foreground">In 12 months</p>
+                <p className="mt-0.5 text-lg font-bold text-foreground tnum">{inr(projectedAt12)}</p>
               </div>
               <div className="rounded-xl bg-surface-soft p-3">
-                <p className="text-xs text-muted-foreground">In 24 months</p>
-                <p className="mt-0.5 font-semibold text-foreground">{inr(projectedAt24)}</p>
+                <p className="text-[13px] text-muted-foreground">In 24 months</p>
+                <p className="mt-0.5 text-lg font-bold text-foreground tnum">{inr(projectedAt24)}</p>
               </div>
             </div>
             {totalCommitments > 0 ? (
-              <p className="mt-4 text-xs text-muted-foreground">Includes {inr(totalCommitments)}/month from plan actions. Action-built holdings continue to grow each month.</p>
+              <p className="mt-4 text-[13px] text-muted-foreground">Includes {inr(totalCommitments)}/month from plan actions. Action-built holdings continue to grow each month.</p>
             ) : (
-              <p className="mt-4 text-xs text-muted-foreground">Start any action in your plan to see new contributions show up here automatically.</p>
+              <p className="mt-4 text-[13px] text-muted-foreground">Start any action in your plan to see new contributions show up here automatically.</p>
             )}
           </CardContent>
         </Card>
@@ -261,7 +261,7 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
     return (
       <Card>
         <CardContent className="p-6">
-          <p className="text-base font-semibold text-foreground">Holdings mix</p>
+          <p className="text-lg font-bold tracking-tight text-foreground">Holdings mix</p>
           <div className="mt-4 rounded-xl bg-surface-soft p-6 text-center text-sm text-muted-foreground">
             <p>No holdings yet.</p>
             <p className="mt-1">Add your existing investments in your profile, or take action on a recommendation.</p>
@@ -282,8 +282,8 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
       <CardContent className="p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-base font-semibold text-foreground">Holdings mix</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Where your money sits today. Hover a slice for detail.</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Holdings mix</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">Where your money sits today. Hover a slice for detail.</p>
           </div>
           <HoldingsDetailDialog data={data} />
         </div>
@@ -315,9 +315,9 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="max-w-[110px] truncate text-[11px] font-medium text-muted-foreground">{centerLabel}</span>
-              <span className="text-lg font-extrabold tracking-tight text-foreground">{inr(centerValue)}</span>
-              {centerPct != null ? <span className="text-[11px] font-bold text-primary">{centerPct}%</span> : null}
+              <span className="max-w-[110px] truncate text-xs font-semibold text-muted-foreground">{centerLabel}</span>
+              <span className="text-xl font-extrabold tracking-tight text-foreground tnum">{inr(centerValue)}</span>
+              {centerPct != null ? <span className="text-xs font-bold text-primary">{centerPct}%</span> : null}
             </div>
           </div>
 
@@ -334,7 +334,7 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{slice.name}</span>
                   <span className="text-sm font-bold text-foreground">{pct}%</span>
-                  <span className="w-20 shrink-0 text-right text-xs font-medium text-muted-foreground">{inr(slice.value)}</span>
+                  <span className="w-20 shrink-0 text-right text-[13px] font-semibold text-muted-foreground tnum">{inr(slice.value)}</span>
                 </li>
               );
             })}
@@ -354,7 +354,7 @@ function HoldingsDetailDialog({ data }: { data: PortfolioSummary }) {
       <DialogContent className="max-h-[90vh] w-[min(680px,94vw)] overflow-y-auto p-0">
         <div className="border-b border-border px-6 py-5 pr-12">
           <DialogTitle className="text-lg font-semibold text-foreground">Your holdings</DialogTitle>
-          <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+          <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">
             All {data.holdings.length} holdings — including value built up from plan actions. Cost &amp; returns shown where available.
           </DialogDescription>
         </div>
@@ -380,9 +380,9 @@ function HoldingRow({ holding, netWorth }: { holding: PortfolioHolding; netWorth
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="line-clamp-1 text-sm font-semibold text-foreground">{holding.name}</p>
-            {isFromAction ? <Badge tone="primary" className="text-[10px]">From your plan</Badge> : null}
+            {isFromAction ? <Badge tone="primary" className="text-[11px]">From your plan</Badge> : null}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             {holding.category}
             {isFromAction && holding.monthlyContribution ? ` · ${inr(holding.monthlyContribution)}/mo` : ""}
             {isFromAction && holding.since ? ` · since ${formatDate(holding.since)}` : ""}
@@ -396,7 +396,7 @@ function HoldingRow({ holding, netWorth }: { holding: PortfolioHolding; netWorth
               {plr >= 0 ? "+" : ""}{inr(plr)} ({plp >= 0 ? "+" : ""}{plp.toFixed(1)}%)
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">{pct.toFixed(1)}%</p>
+            <p className="text-[13px] text-muted-foreground">{pct.toFixed(1)}%</p>
           )}
         </div>
       </div>
@@ -419,9 +419,9 @@ function Pill({ label, value, icon: Icon, tone }: { label: string; value: string
         <span className={`flex h-6 w-6 items-center justify-center rounded-full ${toneClasses[tone]}`}>
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-[13px] text-muted-foreground">{label}</p>
       </div>
-      <p className="mt-1.5 text-base font-semibold text-foreground">{value}</p>
+      <p className="mt-1.5 text-lg font-bold tracking-tight text-foreground">{value}</p>
     </div>
   );
 }
@@ -436,7 +436,7 @@ function InsightTile({ insight }: { insight: PortfolioSummary["insights"][number
           <Badge tone={tone} className="shrink-0"><Icon className="h-3 w-3" /></Badge>
           <div>
             <p className="text-sm font-semibold text-foreground">{insight.title}</p>
-            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{insight.body}</p>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{insight.body}</p>
           </div>
         </div>
       </CardContent>
@@ -454,9 +454,9 @@ function PortfolioSidebarWidget({ startedActions, committed }: { startedActions:
         <p className="text-sm font-semibold text-foreground">Portfolio momentum</p>
       </div>
       {startedActions > 0 ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{startedActions} active commitment{startedActions === 1 ? "" : "s"} · {inr(committed)}/mo flowing into your plan.</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{startedActions} active commitment{startedActions === 1 ? "" : "s"} · {inr(committed)}/mo flowing into your plan.</p>
       ) : (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">Take action on a plan item to see your portfolio start building here.</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Take action on a plan item to see your portfolio start building here.</p>
       )}
     </div>
   );

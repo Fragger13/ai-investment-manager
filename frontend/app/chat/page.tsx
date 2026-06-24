@@ -323,7 +323,7 @@ export default function ChatPage() {
             />
           </div>
         </div>
-        <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <p className="mt-3 flex items-center gap-2 text-[13px] text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
           Educational guidance only — not investment advice. Your data never leaves your profile.
         </p>
@@ -344,7 +344,7 @@ function ChatHeader({ onNewChat }: { onNewChat: () => void }) {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl">Ask Papa</h1>
           <p
-            className="mt-0.5 text-lg leading-tight"
+            className="mt-0.5 text-xl font-semibold leading-tight"
             style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}
           >
             Bring your money questions. I&apos;ll bring the answers.
@@ -382,11 +382,11 @@ function ConversationsPanel({
       </Button>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {groups.length === 0 ? (
-          <p className="px-2 py-4 text-xs text-muted-foreground">Your conversations will appear here.</p>
+          <p className="px-2 py-4 text-[13px] text-muted-foreground">Your conversations will appear here.</p>
         ) : null}
         {groups.map((group) => (
           <div key={group.label} className="mb-3">
-            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {group.label}
             </p>
             <ul className="space-y-0.5">
@@ -539,7 +539,7 @@ function ChatBubble({
               <button
                 type="button"
                 onClick={onRegenerate}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
                 aria-label="Regenerate response"
               >
                 <RefreshCw className="h-3 w-3" /> Regenerate
@@ -562,7 +562,7 @@ function CopyButton({ onCopy }: { onCopy: () => void }) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1200);
       }}
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
       aria-label="Copy message"
     >
       {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -620,7 +620,7 @@ function ChatInput({
           onChange={(event) => onChange(event.target.value)}
           placeholder="Ask Papa anything…  (Enter to send, Shift+Enter for a new line)"
           rows={1}
-          className="min-h-12 max-h-[200px] flex-1 resize-none rounded-2xl border-0 bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+          className="min-h-12 max-h-[200px] flex-1 resize-none rounded-2xl border-0 bg-transparent px-2 py-2 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
@@ -669,13 +669,13 @@ function CoachSidebarWidget() {
     <div className="rounded-2xl border border-positive-soft bg-positive-soft/40 p-4 shadow-sm">
       <p className="text-sm font-semibold text-foreground">Papa is listening</p>
       <p
-        className="mt-1 text-[17px] leading-snug"
+        className="mt-1 text-[17px] font-semibold leading-snug"
         style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}
       >
         Ask anything. About money, life, both.
       </p>
       {profile ? (
-        <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs leading-5 text-muted-foreground shadow-sm">
+        <div className="mt-3 rounded-xl bg-white px-3 py-2 text-[13px] leading-relaxed text-muted-foreground shadow-sm">
           <p className="font-semibold text-foreground">Profile loaded</p>
           <p className="mt-0.5">Goals: {profile.goals?.length || 0}</p>
           <p>EMIs: {(profile.emiLoans || []).length}</p>

@@ -138,7 +138,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-4 space-y-3">
                     {healthBullets(data, commitments).map((item) => (
-                      <div key={item.text} className="flex items-center gap-2 text-sm text-foreground/85">
+                      <div key={item.text} className="flex items-center gap-2 text-sm font-medium text-foreground">
                         {item.good ? <CheckCircle2 className="h-4 w-4 text-positive-foreground" /> : <CircleAlert className="h-4 w-4 text-warning-foreground" />}
                         {item.text}
                       </div>
@@ -340,12 +340,12 @@ function NetWorthCard({ value }: { value: string }) {
         <PiggyBank className="h-6 w-6 text-white" />
       </span>
       <div className="relative min-w-0">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-white/90">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
           Net worth
           <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Total</span>
         </p>
         <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white tnum">{value}</p>
-        <p className="mt-0.5 text-sm font-medium text-white/85">Everything you own today</p>
+        <p className="mt-0.5 text-sm font-medium text-white/90">Everything you own today</p>
       </div>
     </div>
   );
@@ -556,7 +556,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
               {summary.legacyEmiOnly > 0 ? (
                 <div className="rounded-xl border border-warning/30 bg-warning-soft/50 p-4 text-sm">
                   <p className="font-semibold text-warning-foreground">EMIs total {inr(summary.legacyEmiOnly)}/mo — not broken down yet</p>
-                  <p className="mt-1 text-foreground/80">Your profile only has a consolidated EMI figure. Add each loan individually to see the per-loan principal, interest, rate and end date here.</p>
+                  <p className="mt-1 text-foreground">Your profile only has a consolidated EMI figure. Add each loan individually to see the per-loan principal, interest, rate and end date here.</p>
                   <Link href="/onboarding?mode=edit" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
                     Add detailed loans <ArrowRight className="h-3.5 w-3.5" />
                   </Link>

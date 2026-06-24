@@ -35,7 +35,7 @@ export function RecommendationCard({ rec, compact = false }: { rec: Recommendati
           </div>
           <Progress value={rec.confidenceScore} />
         </div>
-        <p className="text-sm leading-6 text-foreground/80">{rec.reasoning}</p>
+        <p className="text-sm leading-6 text-foreground">{rec.reasoning}</p>
         {rec.specificFunds && rec.specificFunds.length ? (
           <div className="rounded-md border border-border/60 bg-surface-soft p-3">
             <p className="text-xs font-medium text-foreground/90">Specific funds to consider (Direct plans, ranked by past returns)</p>

@@ -154,7 +154,7 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
             {onTrack ? <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-positive-foreground" /> : <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-negative-foreground" />}
             <div>
               <p className={`text-sm font-bold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Reality check</p>
-              <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-foreground">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
             </div>
           </div>
           <div className="shrink-0 md:text-right">
@@ -202,12 +202,12 @@ function LinkedHoldingsRow({
             {hasLinks ? <Badge tone="primary">{linkedHoldings.length}</Badge> : null}
           </div>
           {hasLinks ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Tracking {inr(linkedValue)}
               {linkedMonthly > 0 ? ` · ${inr(linkedMonthly)}/mo flowing in` : ""}
             </p>
           ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Connect investments from your portfolio so this goal updates automatically.
             </p>
           )}
@@ -257,7 +257,7 @@ function FixPill({ icon: Icon, accent, title, value }: { icon: typeof ArrowUp; a
       <span className={`flex h-7 w-7 items-center justify-center rounded-full ${accentClasses[accent]}`}>
         <Icon className="h-3.5 w-3.5" />
       </span>
-      <span className="text-sm text-foreground">
+      <span className="text-sm font-medium text-foreground">
         {title} <span className="font-bold">{value}</span>
       </span>
     </button>

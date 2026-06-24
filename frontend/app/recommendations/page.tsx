@@ -180,7 +180,7 @@ function SavedByYouSection() {
                   <InvestmentLogo name={item.instrumentName} category={item.category} ticker={item.ticker} size="md" />
                   <div className="min-w-0">
                     <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.instrumentName}</p>
-                    <p className="text-xs text-muted-foreground">{item.category}{item.ticker ? ` · ${item.ticker}` : ""}</p>
+                    <p className="text-[13px] text-muted-foreground">{item.category}{item.ticker ? ` · ${item.ticker}` : ""}</p>
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
@@ -229,7 +229,7 @@ function DoFirstProgress({ done, total }: { done: number; total: number }) {
         <span className="text-sm font-bold text-primary">{done}/{total}</span>
       </div>
       <Progress value={percent} className="mt-2 h-2" />
-      <p className="mt-2 text-xs text-muted-foreground">{message}</p>
+      <p className="mt-2 text-[13px] text-muted-foreground">{message}</p>
     </div>
   );
 }
@@ -246,7 +246,7 @@ function FactorChips({ item }: { item: ActionItem }) {
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {chips.slice(0, 4).map((chip) => (
-        <span key={chip} className="rounded-full bg-surface-soft px-2 py-0.5 text-[11px] text-muted-foreground">{chip}</span>
+        <span key={chip} className="rounded-full bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground">{chip}</span>
       ))}
     </div>
   );
@@ -263,7 +263,7 @@ function CommunityChip({ item }: { item: ActionItem }) {
     <div className="mt-2">
       <span
         title={c.disclaimer || "Community chatter is noisy and can be biased — context, not advice."}
-        className="inline-flex items-center gap-1 rounded-full bg-surface-soft px-2 py-0.5 text-[11px] text-muted-foreground"
+        className="inline-flex items-center gap-1 rounded-full bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground"
       >
         {emoji} Reddit: {label} · {c.mentionCount} mention{c.mentionCount === 1 ? "" : "s"}
         {subs ? ` (${subs})` : ""}
@@ -277,14 +277,14 @@ function MetaChips({ item }: { item: ActionItem }) {
   const fit = item.confidence >= 75 ? "Strong fit" : item.confidence >= 55 ? "Good fit" : "Optional";
   return (
     <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground">
+      <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground">
         🎯 {purposeTag(item)}
       </span>
-      <span className="inline-flex items-center gap-1 rounded-full bg-positive-soft px-2.5 py-1 text-[11px] font-semibold text-positive-foreground">
+      <span className="inline-flex items-center gap-1 rounded-full bg-positive-soft px-2.5 py-1 text-xs font-semibold text-positive-foreground">
         ✅ {fit}
       </span>
       {item.expectedReturn ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-surface-soft px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full bg-surface-soft px-2.5 py-1 text-xs font-medium text-muted-foreground">
           📈 ~{item.expectedReturn}
         </span>
       ) : null}
@@ -299,15 +299,15 @@ function AmountBlock({ item }: { item: ActionItem }) {
     return (
       <div className="md:text-right">
         <p className="text-2xl font-extrabold tracking-tight text-foreground">{inr(item.suggestedMonthlyAmount)}</p>
-        <p className="text-xs font-medium text-muted-foreground">start / month</p>
-        {note ? <p className="mt-0.5 text-[11px] font-medium text-warning-foreground">{note}</p> : null}
+        <p className="text-[13px] font-medium text-muted-foreground">start / month</p>
+        {note ? <p className="mt-0.5 text-xs font-medium text-warning-foreground">{note}</p> : null}
       </div>
     );
   }
   return (
     <div className="md:text-right">
       <p className="text-base font-bold text-foreground">{amountLabel(item)}</p>
-      <p className="text-xs text-muted-foreground">No money needed</p>
+      <p className="text-[13px] text-muted-foreground">No money needed</p>
     </div>
   );
 }
@@ -331,9 +331,9 @@ function PlanConfidenceCard({ confidence, tone }: { confidence: number; tone: "g
           <CheckCircle2 className={cn("h-5 w-5", tone === "good" ? "text-positive-foreground" : tone === "warn" ? "text-warning-foreground" : "text-negative-foreground")} />
         </span>
         <div className="flex-1">
-          <p className="text-xs text-muted-foreground">Plan Confidence</p>
-          <p className="text-xl font-semibold text-foreground">{confidence}%</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="ap-label">Plan Confidence</p>
+          <p className="text-2xl font-extrabold text-foreground tnum">{confidence}%</p>
+          <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -350,11 +350,11 @@ function PlanProgressWidget({ confidence, done, total }: { confidence: number; d
         </span>
         <p className="text-sm font-semibold text-foreground">Keep going!</p>
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
         {done > 0 ? `${done} action${done === 1 ? "" : "s"} done. Small steps add up fast.` : "You're making great progress towards your goals."}
       </p>
       <div className="mt-3">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{done}/{total} actions done</span>
           <span>{confidence}% confidence</span>
         </div>
@@ -376,7 +376,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
           <InvestmentLogo name={item.title} extraHint={item.instrumentName} category={item.category} ticker={item.ticker} size="lg" />
           <div className="min-w-0">
             <p className="text-lg font-bold leading-snug text-foreground">{item.title}</p>
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">Why: {item.reason}</p>
+            <p className="mt-1 line-clamp-2 text-[15px] leading-relaxed text-muted-foreground">Why: {item.reason}</p>
             <MetaChips item={item} />
             <FactorChips item={item} />
             <CommunityChip item={item} />
@@ -435,10 +435,10 @@ function ConsiderRow({ item }: { item: ActionItem }) {
         <InvestmentLogo name={item.title} extraHint={item.instrumentName} category={item.category} ticker={item.ticker} size="md" />
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.title}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Why: {item.reason}</p>
+          <p className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">Why: {item.reason}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">🎯 {purposeTag(item)}</span>
-            <span className="inline-flex items-center rounded-full bg-surface-soft px-2 py-0.5 text-[11px] font-semibold text-foreground">{amountLabel(item)}</span>
+            <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">🎯 {purposeTag(item)}</span>
+            <span className="inline-flex items-center rounded-full bg-surface-soft px-2 py-0.5 text-xs font-semibold text-foreground">{amountLabel(item)}</span>
           </div>
           <CommunityChip item={item} />
         </div>
@@ -452,7 +452,7 @@ function ConsiderRow({ item }: { item: ActionItem }) {
             {item.explanationCards.slice(0, 4).map((card) => (
               <div key={card.title} className="rounded-xl bg-surface-soft p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{friendlyQuestion(card.title)}</p>
-                <p className="mt-1 text-sm text-foreground/85">{card.summary}</p>
+                <p className="mt-1 text-sm text-foreground">{card.summary}</p>
               </div>
             ))}
           </div>
@@ -461,7 +461,7 @@ function ConsiderRow({ item }: { item: ActionItem }) {
               payload={takePayload(item)}
               trigger={<Button variant="outline">{item.ctaLabel}</Button>}
             />
-            {item.expectedReturn ? <p className="text-xs text-muted-foreground">Expected: ~{item.expectedReturn}</p> : null}
+            {item.expectedReturn ? <p className="text-[13px] text-muted-foreground">Expected: ~{item.expectedReturn}</p> : null}
           </div>
         </div>
       ) : null}
@@ -475,7 +475,7 @@ function ExploreRow({ item, divider }: { item: ActionItem; divider: boolean }) {
       <InvestmentLogo name={item.title} extraHint={item.instrumentName} category={item.category} ticker={item.ticker} size="md" />
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.reason}</p>
+        <p className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{item.reason}</p>
       </div>
       {hasMoneyAmount(item) ? (
         <span className="hidden shrink-0 text-xs font-semibold text-muted-foreground sm:inline">{inr(item.suggestedMonthlyAmount)}/mo</span>

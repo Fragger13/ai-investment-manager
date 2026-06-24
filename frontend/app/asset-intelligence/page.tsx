@@ -177,7 +177,7 @@ export default function AssetIntelligencePage() {
           <Button variant="outline" asChild><Link href="/chat">Ask AI Coach <Send className="h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
-      <p className="mt-4 text-xs text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
+      <p className="mt-4 text-[13px] text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
     </AppShell>
   );
 }
@@ -215,10 +215,10 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
             <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="lg" />
             <div className="min-w-0">
               <h3 className="line-clamp-1 text-lg font-bold tracking-tight text-foreground">{idea.name}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
               <ul className="mt-2 space-y-1">
                 {idea.bullets.slice(0, 3).map((bullet) => (
-                  <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground/85">
+                  <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground">
                     <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive-foreground" />
                     <span className="line-clamp-1">{bullet}</span>
                   </li>
@@ -234,18 +234,18 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
               {idea.risk} Risk
             </span>
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Est. return</p>
-              <p className="text-[15px] font-semibold text-foreground">{idea.expectedReturn}</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Est. return</p>
+              <p className="text-[15px] font-bold text-foreground">{idea.expectedReturn}</p>
             </div>
             {idea.livePrice ? (
-              <p className="text-[11px] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
+              <p className="text-[13px] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
             ) : null}
           </div>
 
           {/* Suggested starting SIP — its own column */}
           <div className="text-left lg:text-center">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Start with</p>
-            <p className="mt-0.5 text-[15px] font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Start with</p>
+            <p className="mt-0.5 text-[15px] font-bold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
           </div>
 
           {/* Right: save-to-plan + View Details */}
@@ -301,8 +301,8 @@ function InviteWidget() {
         </span>
         <p className="text-sm font-semibold text-foreground">Invite a friend</p>
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">Help your friends get started with their financial plan.</p>
-      <Link href="/chat" className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">Learn more →</Link>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Help your friends get started with their financial plan.</p>
+      <Link href="/chat" className="mt-3 inline-flex text-[13px] font-semibold text-primary hover:underline">Learn more →</Link>
     </div>
   );
 }

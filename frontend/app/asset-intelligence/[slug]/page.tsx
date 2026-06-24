@@ -109,7 +109,7 @@ export default function InvestmentDetailPage() {
             <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="xl" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{idea.name}</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl">{idea.name}</h1>
               </div>
               <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{idea.category}</span>
@@ -118,7 +118,7 @@ export default function InvestmentDetailPage() {
                   <BadgeCheck className="h-3 w-3" /> High Conviction
                 </span>
               </p>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/85">{idea.summary}</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground">{idea.summary}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {tags.slice(0, 4).map((tag) => (
                   <span key={tag} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground">
@@ -138,7 +138,7 @@ export default function InvestmentDetailPage() {
             </div>
             <ul className="mt-3 space-y-2">
               {matchPoints.slice(0, 3).map((point) => (
-                <li key={point} className="flex items-start gap-2 text-sm leading-6 text-foreground/85">
+                <li key={point} className="flex items-start gap-2 text-sm leading-6 text-foreground">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-positive-foreground" />
                   <span className="min-w-0 break-words">{point}</span>
                 </li>
@@ -171,13 +171,13 @@ export default function InvestmentDetailPage() {
                   }
                 }}
                 title="Rewrite this with AI in plain English"
-                className="rounded-full bg-positive-soft px-2 py-0.5 text-[10px] font-semibold text-positive-foreground transition hover:bg-positive-soft/80 disabled:opacity-60"
+                className="rounded-full bg-positive-soft px-2 py-0.5 text-[11px] font-semibold text-positive-foreground transition hover:bg-positive-soft/80 disabled:opacity-60"
                 disabled={simplifying}
               >
                 {simplifying ? "Simplifying…" : aboutSimplified ? "AI" : "Simplify"}
               </button>
             </div>
-            <p className={`mt-2 text-sm leading-6 text-muted-foreground ${aboutOpen ? "" : "line-clamp-4"}`}>{aboutSimplified || `${idea.summary} ${idea.whyNow}`}</p>
+            <p className={`mt-2 text-[15px] leading-relaxed text-muted-foreground ${aboutOpen ? "" : "line-clamp-4"}`}>{aboutSimplified || `${idea.summary} ${idea.whyNow}`}</p>
             <button onClick={() => setAboutOpen((c) => !c)} className="mt-2 text-sm font-medium text-primary hover:underline">
               {aboutOpen ? <>Read less <ChevronUp className="inline h-4 w-4" /></> : <>Read more <ChevronDown className="inline h-4 w-4" /></>}
             </button>
@@ -187,29 +187,29 @@ export default function InvestmentDetailPage() {
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
               <ShieldCheck className="h-4 w-4" />
-              <p className="text-sm">Risk level</p>
+              <p className="text-sm font-semibold text-foreground">Risk level</p>
             </div>
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">{riskBlurb(idea.risk)}</p>
+            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{riskBlurb(idea.risk)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
               <TrendingUp className="h-4 w-4" />
-              <p className="text-sm">Expected return</p>
+              <p className="text-sm font-semibold text-foreground">Expected return</p>
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{idea.expectedReturn}</p>
-            <p className="mt-2 text-xs text-muted-foreground">Based on historical data</p>
+            <p className="mt-2 text-[13px] text-muted-foreground">Based on historical data</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
               <CalendarDays className="h-4 w-4" />
-              <p className="text-sm">Suggested SIP</p>
+              <p className="text-sm font-semibold text-foreground">Suggested SIP</p>
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / month` : "Review first"}</p>
-            <p className="mt-2 text-xs text-muted-foreground">You can start with as low as ₹500/month</p>
+            <p className="mt-2 text-[13px] text-muted-foreground">You can start with as low as ₹500/month</p>
           </CardContent>
         </Card>
       </div>
@@ -231,7 +231,7 @@ export default function InvestmentDetailPage() {
           <div>
             <div className="flex items-center gap-2 text-info-foreground">
               <BadgeCheck className="h-4 w-4" />
-              <p className="text-base font-semibold text-foreground">Estimated impact on your goals</p>
+              <p className="text-lg font-bold tracking-tight text-foreground">Estimated impact on your goals</p>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">This investment can help you achieve your {profile?.goals?.[0]?.type || "primary"} goal.</p>
             {goalImpactOpen ? (
@@ -247,14 +247,14 @@ export default function InvestmentDetailPage() {
       {/* Keep in mind */}
       <div className="mb-5 rounded-2xl border border-warning/30 bg-warning-soft/60 p-4">
         <p className="text-sm font-semibold text-warning-foreground">Keep in mind</p>
-        <p className="mt-1 text-sm text-foreground/80">Past performance is not a guarantee of future returns. Investments in this category are subject to market risks. Please read all scheme-related documents carefully before investing.</p>
+        <p className="mt-1 text-sm text-foreground">Past performance is not a guarantee of future returns. Investments in this category are subject to market risks. Please read all scheme-related documents carefully before investing.</p>
       </div>
 
       {/* Other details + Ready to invest */}
       <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
         <Card>
           <CardContent className="p-6">
-            <p className="text-base font-semibold text-foreground">Other details</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Other details</p>
             <div className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
               <DetailRow icon={Layers} label="Fund type" value={idea.category} />
               <DetailRow icon={Landmark} label="Fund house" value={fundHouse(idea.name)} />
@@ -268,11 +268,11 @@ export default function InvestmentDetailPage() {
 
         <Card>
           <CardContent className="p-6">
-            <p className="text-base font-semibold text-foreground">Ready to invest?</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Ready to invest?</p>
             <p className="mt-1 text-sm text-muted-foreground">Add this fund to your plan and start your SIP in just a few clicks.</p>
 
             <div className="mt-4 rounded-xl bg-surface-soft p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Suggested monthly amount</p>
+              <p className="text-[13px] uppercase tracking-wide text-muted-foreground">Suggested monthly amount</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
             </div>
 
@@ -311,10 +311,10 @@ export default function InvestmentDetailPage() {
       {idea.risks.length ? (
         <Card className="mt-5">
           <CardContent className="p-6">
-            <p className="text-base font-semibold text-foreground">Risks to be aware of</p>
+            <p className="text-lg font-bold tracking-tight text-foreground">Risks to be aware of</p>
             <ul className="mt-3 space-y-2">
               {idea.risks.slice(0, 4).map((risk) => (
-                <li key={risk} className="flex items-start gap-2 text-sm text-foreground/80">
+                <li key={risk} className="flex items-start gap-2 text-sm text-foreground">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                   {risk}
                 </li>
@@ -328,7 +328,7 @@ export default function InvestmentDetailPage() {
         <DialogContent className="max-h-[88vh] w-[min(820px,96vw)] overflow-y-auto p-0">
           <div className="border-b border-border px-6 py-5 pr-12">
             <DialogTitle className="text-lg font-semibold text-foreground">Compare options</DialogTitle>
-            <p className="mt-1 text-xs text-muted-foreground">Similar {idea.category.toLowerCase()} ideas matched to your profile.</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">Similar {idea.category.toLowerCase()} ideas matched to your profile.</p>
           </div>
           <div className="space-y-3 p-5">
             {/* Current idea row, marked */}
@@ -351,16 +351,16 @@ function CompareRow({ idea, highlight }: { idea: InvestmentIdea; highlight?: boo
         <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="md" />
         <div className="min-w-0">
           <p className="line-clamp-1 text-sm font-semibold text-foreground">{idea.name}{highlight ? <span className="ml-2 text-xs font-normal text-primary">(this idea)</span> : null}</p>
-          <p className="text-xs text-muted-foreground">{idea.category}</p>
+          <p className="text-[13px] text-muted-foreground">{idea.category}</p>
         </div>
       </div>
       <Badge tone={riskTone(idea.risk)}>{idea.risk}</Badge>
       <div>
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Return</p>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Return</p>
         <p className="text-sm font-semibold text-foreground">{idea.expectedReturn}</p>
       </div>
       <div>
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">SIP</p>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">SIP</p>
         <p className="text-sm font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)}/mo` : "—"}</p>
       </div>
       <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="text-sm font-medium text-primary hover:underline justify-self-end">
@@ -374,7 +374,7 @@ function DetailSidebarWidget() {
   return (
     <div className="rounded-2xl border border-border bg-surface-soft p-4">
       <p className="text-sm font-semibold text-foreground">Small steps today</p>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">Big freedom tomorrow. Build your plan one investment at a time.</p>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Big freedom tomorrow. Build your plan one investment at a time.</p>
     </div>
   );
 }
@@ -388,7 +388,7 @@ function Impact({ label, value, tone }: { label: string; value: string; tone: "p
   return (
     <div className="rounded-xl bg-surface p-3 text-center">
       <p className={`text-xl font-semibold ${colors[tone]}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-[13px] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -400,7 +400,7 @@ function DetailRow({ icon: Icon, label, value }: { icon: typeof Layers; label: s
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="truncate font-medium text-foreground">{value}</p>
       </div>
     </div>
@@ -410,9 +410,9 @@ function DetailRow({ icon: Icon, label, value }: { icon: typeof Layers; label: s
 function PriceTile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-xl bg-surface-soft p-4">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[13px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
+      <p className="mt-1 text-[13px] text-muted-foreground">{sub}</p>
     </div>
   );
 }

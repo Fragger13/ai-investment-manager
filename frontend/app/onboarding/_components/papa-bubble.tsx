@@ -54,7 +54,7 @@ export function PapaBubble({ message, size = "md", hideAvatar = false, mood = "w
           className="absolute -left-1.5 top-6 h-3 w-3 rotate-45 border-b border-l border-[#E5E7EB] bg-white"
           aria-hidden
         />
-        <p className={`${textClassName || sizing.text} leading-snug`} style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
+        <p className={`${textClassName || sizing.text} font-medium leading-snug`} style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
           {message}
         </p>
       </div>
