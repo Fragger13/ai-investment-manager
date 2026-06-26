@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { cn, inr } from "@/lib/utils";
 import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, CryptoOpportunity, OnboardingProfile } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, CommunitySentiment, CryptoOpportunity, OnboardingProfile } from "@/types";
 
 export type InvestmentIdea = {
   id: string;
@@ -34,6 +34,8 @@ export type InvestmentIdea = {
   livePrice?: { value: number; unit: string; asOf?: string } | null;
   buyRange?: string;
   sellRange?: string;
+  /** Reddit-derived community sentiment, when the research layer found chatter. */
+  community?: CommunitySentiment | null;
   raw?: AssetIntelligence | AlphaOpportunity | CryptoOpportunity | AdvancedRecommendation;
 };
 
@@ -160,8 +162,8 @@ export default function AssetIntelligencePage() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {visible.map((idea) => <InvestmentCard key={idea.id} idea={idea} />)}
+      <div className="space-y-4">
+        {visible.map((idea, index) => <InvestmentCard key={idea.id} idea={idea} topPick={index === 0} />)}
       </div>
       {!visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
 
@@ -182,7 +184,7 @@ export default function AssetIntelligencePage() {
   );
 }
 
-function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
+function InvestmentCard({ idea, topPick }: { idea: InvestmentIdea; topPick?: boolean }) {
   const inPlan = usePlanActionsStore((state) => state.planItems.some((entry) => entry.key === idea.id));
   const addToPlan = usePlanActionsStore((state) => state.addToPlan);
   const removeFromPlan = usePlanActionsStore((state) => state.removeFromPlan);
@@ -208,7 +210,12 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
 
   return (
     <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="block">
-      <Card className="transition hover:border-primary/40 hover:shadow-md">
+      <Card className={cn("relative transition hover:border-primary/40 hover:shadow-md", topPick && "border-primary/50 shadow-sm")}>
+        {topPick ? (
+          <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-primary-foreground shadow-sm">
+            <Sparkles className="h-3 w-3" /> Papa&apos;s pick
+          </span>
+        ) : null}
         <CardContent className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,.8fr)_auto] lg:items-center">
           {/* Left: logo + name + 3 checkmark bullets */}
           <div className="flex min-w-0 gap-4">
@@ -337,6 +344,7 @@ function mapRecommendation(rec: AdvancedRecommendation, profile: OnboardingProfi
     livePrice: null,
     buyRange: rec.buyRange || "",
     sellRange: rec.sellRange || "",
+    community: (rec.sentimentSignal as { community?: CommunitySentiment } | undefined)?.community || null,
     raw: rec,
   };
 }

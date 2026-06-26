@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Coins, Gauge, Landmark, Layers, Lock, PieChart, ShieldCheck, Share2, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, Coins, Gauge, Landmark, Layers, Lock, MessagesSquare, PieChart, ShieldCheck, Share2, Sparkles, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { InvestmentLogo } from "@/components/investment-logo";
 import { TakeActionDialog } from "@/components/take-action-dialog";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { useAuthStore } from "@/store/auth-store";
-import { api } from "@/lib/api";
 import { inr } from "@/lib/utils";
 import { useEnsureProfile } from "@/lib/use-ensure-profile";
+import type { CommunitySentiment } from "@/types";
 import type { InvestmentIdea } from "../page";
 
 export default function InvestmentDetailPage() {
@@ -25,11 +25,8 @@ export default function InvestmentDetailPage() {
   const profile = useEnsureProfile();
   const [idea, setIdea] = useState<InvestmentIdea | null>(null);
   const [allIdeas, setAllIdeas] = useState<InvestmentIdea[]>([]);
-  const [aboutOpen, setAboutOpen] = useState(false);
   const [goalImpactOpen, setGoalImpactOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
-  const [simplifying, setSimplifying] = useState(false);
-  const [aboutSimplified, setAboutSimplified] = useState<string | null>(null);
   const goalImpactRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -119,6 +116,7 @@ export default function InvestmentDetailPage() {
                 </span>
               </p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground">{idea.summary}</p>
+              {idea.whyNow ? <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">{idea.whyNow}</p> : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 {tags.slice(0, 4).map((tag) => (
                   <span key={tag} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground">
@@ -151,38 +149,8 @@ export default function InvestmentDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 4-card stat row — About (wider) / Risk / Return / SIP */}
-      <div className="mb-5 grid gap-4 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-semibold text-foreground">About this {idea.category.toLowerCase()}</p>
-              <button
-                onClick={async () => {
-                  if (aboutSimplified || simplifying) return;
-                  setSimplifying(true);
-                  try {
-                    const result = await api.summarizeText(`${idea.summary} ${idea.whyNow}`, 35, idea.summary);
-                    setAboutSimplified(result.summary || null);
-                  } catch {
-                    setAboutSimplified(idea.summary);
-                  } finally {
-                    setSimplifying(false);
-                  }
-                }}
-                title="Rewrite this with AI in plain English"
-                className="rounded-full bg-positive-soft px-2 py-0.5 text-[11px] font-semibold text-positive-foreground transition hover:bg-positive-soft/80 disabled:opacity-60"
-                disabled={simplifying}
-              >
-                {simplifying ? "Simplifying…" : aboutSimplified ? "AI" : "Simplify"}
-              </button>
-            </div>
-            <p className={`mt-2 text-[15px] leading-relaxed text-muted-foreground ${aboutOpen ? "" : "line-clamp-4"}`}>{aboutSimplified || `${idea.summary} ${idea.whyNow}`}</p>
-            <button onClick={() => setAboutOpen((c) => !c)} className="mt-2 text-sm font-medium text-primary hover:underline">
-              {aboutOpen ? <>Read less <ChevronUp className="inline h-4 w-4" /></> : <>Read more <ChevronDown className="inline h-4 w-4" /></>}
-            </button>
-          </CardContent>
-        </Card>
+      {/* Key facts — clean 3-up row (Risk / Return / SIP) */}
+      <div className="mb-5 grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -198,7 +166,7 @@ export default function InvestmentDetailPage() {
               <TrendingUp className="h-4 w-4" />
               <p className="text-sm font-semibold text-foreground">Expected return</p>
             </div>
-            <p className="mt-3 text-2xl font-semibold text-foreground">{idea.expectedReturn}</p>
+            <p className="mt-3 text-2xl font-semibold text-positive-foreground">{idea.expectedReturn}</p>
             <p className="mt-2 text-[13px] text-muted-foreground">Based on historical data</p>
           </CardContent>
         </Card>
@@ -209,10 +177,13 @@ export default function InvestmentDetailPage() {
               <p className="text-sm font-semibold text-foreground">Suggested SIP</p>
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / month` : "Review first"}</p>
-            <p className="mt-2 text-[13px] text-muted-foreground">You can start with as low as ₹500/month</p>
+            <p className="mt-2 text-[13px] text-muted-foreground">Start with as low as ₹500/month</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* What people are saying — Reddit-derived community pulse (trust signal) */}
+      <CommunityPulse community={idea.community} />
 
       {/* Live price + buy/sell ranges where we have them */}
       {(idea.livePrice || idea.buyRange || idea.sellRange) ? (
@@ -231,9 +202,9 @@ export default function InvestmentDetailPage() {
           <div>
             <div className="flex items-center gap-2 text-info-foreground">
               <BadgeCheck className="h-4 w-4" />
-              <p className="text-lg font-bold tracking-tight text-foreground">Estimated impact on your goals</p>
+              <p className="text-lg font-bold tracking-tight text-foreground">If you start this SIP today</p>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">This investment can help you achieve your {profile?.goals?.[0]?.type || "primary"} goal.</p>
+            <p className="mt-1 text-sm text-muted-foreground">The projected effect on your {profile?.goals?.[0]?.type || "primary"} goal, based on your current pace.</p>
             {goalImpactOpen ? (
               <Link href="/goals" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
                 Open Goals page <ArrowRight className="h-4 w-4" />
@@ -418,10 +389,41 @@ function PriceTile({ label, value, sub }: { label: string; value: string; sub: s
   );
 }
 
-function riskPillClass(risk: string) {
-  if (risk === "Low") return "bg-positive-soft text-positive-foreground";
-  if (risk === "High") return "bg-negative-soft text-negative-foreground";
-  return "bg-warning-soft text-warning-foreground";
+function CommunityPulse({ community }: { community?: CommunitySentiment | null }) {
+  if (!community || !community.mentionCount) return null;
+  const tone =
+    community.sentiment === "positive" ? { label: "Mostly positive", dot: "bg-positive", text: "text-positive-foreground", soft: "bg-positive-soft" }
+    : community.sentiment === "negative" ? { label: "Mostly negative", dot: "bg-negative", text: "text-negative-foreground", soft: "bg-negative-soft" }
+    : community.sentiment === "mixed" ? { label: "Mixed views", dot: "bg-warning", text: "text-warning-foreground", soft: "bg-warning-soft" }
+    : { label: "Neutral chatter", dot: "bg-info", text: "text-info-foreground", soft: "bg-info-soft" };
+  const subs = (community.subreddits || []).slice(0, 3).map((s) => `r/${s}`).join(", ");
+  const terms = [...(community.bullishTerms || []), ...(community.bearishTerms || [])].slice(0, 5);
+  return (
+    <Card className="mb-5">
+      <CardContent className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <MessagesSquare className="h-4 w-4" />
+            <p className="text-sm font-semibold text-foreground">What people are saying</p>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 rounded-full ${tone.soft} px-3 py-1 text-xs font-semibold ${tone.text}`}>
+            <span className={`h-2 w-2 rounded-full ${tone.dot}`} /> {tone.label}
+          </span>
+        </div>
+        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+          Based on <span className="font-semibold text-foreground">{community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}</span>
+          {subs ? ` across ${subs}` : ""}. Community chatter is noisy and can be biased — treat it as context, not advice.
+        </p>
+        {terms.length ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {terms.map((term) => (
+              <span key={term} className="rounded-full bg-surface-soft px-2.5 py-1 text-xs text-muted-foreground">{term}</span>
+            ))}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 }
 
 function riskBlurb(risk: string) {

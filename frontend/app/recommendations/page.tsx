@@ -349,10 +349,12 @@ function PlanProgressWidget({ confidence, done, total }: { confidence: number; d
 function MustDoRow({ item }: { item: ActionItem }) {
   const actionFor = usePlanActionsStore((state) => state.actionsTaken.find((entry) => entry.key === item.key));
   const taken = Boolean(actionFor);
+  const proof = proofFor(item);
 
   return (
     <Card className={cn("card-pop overflow-hidden transition", taken && "bg-surface-soft opacity-60")}>
-      <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-6 md:p-6">
+      <CardContent className="p-5 md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
         {/* Identity: logo + title + why + meta */}
         <div className="flex min-w-0 flex-1 items-start gap-4">
           <InvestmentLogo name={item.title} extraHint={item.instrumentName} category={item.category} ticker={item.ticker} size="lg" />
@@ -391,9 +393,53 @@ function MustDoRow({ item }: { item: ActionItem }) {
             }
           />
         </div>
+        </div>
+
+        {/* "If you start this" — the projected payoff of acting now */}
+        {!taken && proof ? (
+          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-positive/20 bg-positive-soft/50 p-3.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-positive-soft text-positive-foreground">
+              <CheckCircle2 className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-positive-foreground">If you start this</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-foreground">{proof}</p>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
+}
+
+// "If you start this" projection — an honest, beginner-friendly payoff line.
+function annualRateFromReturn(label?: string): number {
+  if (!label) return 0.08;
+  const nums = (label.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((n) => n > 0 && n < 60);
+  if (!nums.length) return 0.08;
+  const avg = nums.length >= 2 ? (nums[0] + nums[1]) / 2 : nums[0];
+  return Math.min(Math.max(avg / 100, 0.03), 0.16);
+}
+
+function sipFutureValue(monthly: number, annualRate: number, months = 12): number {
+  const i = annualRate / 12;
+  if (i <= 0) return monthly * months;
+  return Math.round(monthly * ((Math.pow(1 + i, months) - 1) / i));
+}
+
+function proofFor(item: ActionItem): string | null {
+  const amt = item.suggestedMonthlyAmount;
+  if (amt <= 0) return null; // behavioural actions have no money projection
+  const cat = `${item.category} ${item.title}`.toLowerCase();
+  if (/emergency|safety|liquid|saving|cash/.test(cat)) {
+    return `Sets aside ${inr(amt)}/mo toward your safety net — about ${inr(amt * 12)} in a year, with near-zero risk.`;
+  }
+  const fv = inr(sipFutureValue(amt, annualRateFromReturn(item.expectedReturn)));
+  const bits = [`${inr(amt)}/mo grows to about ${fv} in a year.`];
+  const fi = item.factorInsights;
+  if (fi?.maxDrawdown3y != null) bits.push(`Worst 3-yr drop: ${fi.maxDrawdown3y}%.`);
+  if (fi?.sortino != null) bits.push(`Sortino ${fi.sortino} — steady.`);
+  return bits.join(" ");
 }
 
 function takePayload(item: ActionItem) {

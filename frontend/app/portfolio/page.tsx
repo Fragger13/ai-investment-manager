@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Info, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -145,22 +145,24 @@ export default function PortfolioPage() {
       <Card className="mb-6 overflow-hidden">
         <CardContent className="p-6">
           <p className="ap-label">Total Net Worth</p>
-          <p className="mt-2 text-5xl font-extrabold tracking-tight text-foreground md:text-6xl tnum">{inr(data.netWorth)}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-            <span className="inline-flex items-center gap-2 text-positive-foreground">
-              <ArrowUpRight className="h-4 w-4" />
-              Projected to grow to {inr(projectedAt12)} in 12 months
-            </span>
-            {plHoldingCount > 0 ? (
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", plRupees >= 0 ? "bg-positive-soft text-positive-foreground" : "bg-negative-soft text-negative-foreground")}>
-                {plRupees >= 0 ? "+" : ""}{inr(plRupees)} ({plPercent >= 0 ? "+" : ""}{plPercent.toFixed(2)}%) overall P&L
-                <span className="text-[11px] font-medium opacity-80">· cost {inr(totalInvested)}</span>
-              </span>
-            ) : null}
-            {actionContributedValue > 0 ? (
-              <Badge tone="primary">+{inr(actionContributedValue)} from actions you&apos;ve taken</Badge>
-            ) : null}
+          <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
+            <p className="text-5xl font-extrabold tracking-tight text-foreground md:text-6xl tnum">{inr(data.netWorth)}</p>
+            <div className="flex flex-wrap items-center gap-2 pb-1.5">
+              {plHoldingCount > 0 ? (
+                <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold", plRupees >= 0 ? "bg-positive-soft text-positive-foreground" : "bg-negative-soft text-negative-foreground")}>
+                  {plRupees >= 0 ? "+" : "−"}{inr(Math.abs(plRupees))} · {plPercent >= 0 ? "+" : "−"}{Math.abs(plPercent).toFixed(2)}% P&L
+                </span>
+              ) : null}
+              {actionContributedValue > 0 ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-positive-soft px-3 py-1.5 text-sm font-bold text-positive-foreground">+{inr(actionContributedValue)} from your actions</span>
+              ) : null}
+            </div>
           </div>
+          <p className="mt-2.5 inline-flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+            <ArrowUpRight className="h-4 w-4 text-positive-foreground" />
+            Projected to grow to <span className="font-semibold text-foreground">{inr(projectedAt12)}</span> in 12 months
+            {plHoldingCount > 0 ? <span className="text-muted-foreground">· on a cost basis of {inr(totalInvested)}</span> : null}
+          </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
             <Pill label="Base assets" value={inr(baseNetWorth)} icon={Wallet} tone="neutral" />
             <Pill label="From plan actions" value={actionContributedValue ? inr(actionContributedValue) : "—"} icon={CheckCircle2} tone="positive" />
@@ -171,10 +173,10 @@ export default function PortfolioPage() {
         </CardContent>
       </Card>
 
-      {/* Insights */}
+      {/* Insights — clean aligned strip (dot + title + body) */}
       {data.insights?.length ? (
-        <div className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {data.insights.slice(0, 4).map((insight, index) => <InsightTile key={index} insight={insight} />)}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {data.insights.slice(0, 3).map((insight, index) => <InsightTile key={index} insight={insight} />)}
         </div>
       ) : null}
 
@@ -457,18 +459,15 @@ function Pill({ label, value, icon: Icon, tone }: { label: string; value: string
 }
 
 function InsightTile({ insight }: { insight: PortfolioSummary["insights"][number] }) {
-  const Icon = insight.tone === "warning" ? CircleAlert : insight.tone === "positive" ? TrendingUp : Info;
-  const tone: "warn" | "good" | "info" = insight.tone === "warning" ? "warn" : insight.tone === "positive" ? "good" : "info";
+  const dot = insight.tone === "warning" ? "bg-warning" : insight.tone === "positive" ? "bg-positive" : "bg-info";
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-2.5">
-          <Badge tone={tone} className="shrink-0"><Icon className="h-3 w-3" /></Badge>
-          <div>
-            <p className="text-sm font-semibold text-foreground">{insight.title}</p>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{insight.body}</p>
-          </div>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2.5">
+          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
+          <p className="text-[15px] font-bold tracking-tight text-foreground">{insight.title}</p>
         </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{insight.body}</p>
       </CardContent>
     </Card>
   );

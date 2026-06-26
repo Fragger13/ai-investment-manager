@@ -209,7 +209,6 @@ export default function DashboardPage() {
                     ? <p className="text-sm text-muted-foreground">All your top steps are done — nice work! 🎉 Open the full plan for what&apos;s next.</p>
                     : <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p>
                 ) : null}
-                {topActions.length ? <DashboardNudge tone="sun" emoji="💡">Start with these and you&apos;ll see the biggest impact.</DashboardNudge> : null}
               </CardContent>
             </Card>
           </div>
