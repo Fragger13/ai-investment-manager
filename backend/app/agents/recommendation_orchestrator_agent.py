@@ -54,6 +54,7 @@ from app.services.research.fund_factor_service import (
     category_percentiles,
     diversification_insight,
     expected_return_from_factors,
+    range_label,
     score_fund,
 )
 from app.services.research.fund_research_service import category_key_for_name
@@ -1203,8 +1204,8 @@ def _expected_return(asset_key: str, asset_type: str, recommendation_type: str, 
     inflation_adjusted = round(base - inflation_assumption, 1)
 
     return {
-        "label": f"{conservative:g}-{aggressive:g}% CAGR",
-        "cagrRange": f"{conservative:g}-{aggressive:g}%",
+        "label": f"{range_label(conservative, aggressive)}% CAGR",
+        "cagrRange": f"{range_label(conservative, aggressive)}%",
         "expectedCagr": base,
         "conservative": conservative,
         "base": base,

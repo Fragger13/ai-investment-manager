@@ -97,11 +97,11 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
   const linkedValue = linkedHoldings.reduce((sum, h) => sum + h.value, 0);
   const linkedMonthly = linkedHoldings.reduce((sum, h) => sum + (h.source === "action" ? (h.monthlyContribution || 0) : 0), 0);
 
-  const effectiveCurrent = Math.max(goal.currentProgress, goal.currentProgress + linkedValue - (profileGoal?.goal.currentAmount || 0));
-  const blendedCurrent = linkedHoldings.length > 0 ? effectiveCurrent : goal.currentProgress;
-  const progress = goal.targetAmount ? Math.min(blendedCurrent / goal.targetAmount * 100, 100) : 0;
-  const remaining = Math.max(goal.targetAmount - blendedCurrent, 0);
-  const onTrack = goal.feasibilityScore >= 70 || (goal.targetAmount > 0 && blendedCurrent / goal.targetAmount >= 0.85);
+  // Linked-holding funding is credited into goal.currentProgress by the backend
+  // (single source of truth), so read it directly — no separate frontend blend.
+  const progress = goal.targetAmount ? Math.min(goal.currentProgress / goal.targetAmount * 100, 100) : 0;
+  const remaining = Math.max(goal.targetAmount - goal.currentProgress, 0);
+  const onTrack = goal.feasibilityScore >= 70 || (goal.targetAmount > 0 && goal.currentProgress / goal.targetAmount >= 0.85);
   const icon = goalIconSpec(goal.name);
 
   return (
@@ -129,7 +129,7 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
 
         <div className="mt-6 grid grid-cols-2 gap-y-5 md:grid-cols-4">
           <Stat label="Target" value={inr(goal.targetAmount)} />
-          <Stat label="Current" value={inr(blendedCurrent)} />
+          <Stat label="Current" value={inr(goal.currentProgress)} />
           <Stat label="Remaining" value={inr(remaining)} />
           <Stat label="Time Left" value={goal.timelineProjection || "Update date"} />
         </div>

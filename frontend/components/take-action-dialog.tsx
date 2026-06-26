@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { InvestmentLogo } from "@/components/investment-logo";
 import { Badge } from "@/components/ui/badge";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { useAuthStore } from "@/store/auth-store";
+import { api } from "@/lib/api";
 import { inr } from "@/lib/utils";
 
 export type ActionKind =
@@ -37,7 +39,25 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const recordAction = usePlanActionsStore((state) => state.recordAction);
   const removeAction = usePlanActionsStore((state) => state.removeAction);
   const existing = usePlanActionsStore((state) => state.actionFor(payload.key));
+  const profile = useAuthStore((state) => state.profile);
+  const token = useAuthStore((state) => state.token);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
   const kind: ActionKind = payload.kind || inferKind(payload);
+
+  // The saved goal this recommendation funds (if any) — drives the opt-out
+  // "Add to my {goal} goal" checkbox and the auto-link on submit.
+  const linkGoal = useMemo(() => {
+    if (!payload.goalName || !profile?.goals?.length) return null;
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const target = norm(payload.goalName);
+    if (!target) return null;
+    const index = profile.goals.findIndex((g) => {
+      const name = norm((g.type === "Other" ? g.customName : g.type) || "");
+      return Boolean(name) && (name === target || name.includes(target) || target.includes(name));
+    });
+    return index >= 0 ? { index, name: payload.goalName } : null;
+  }, [payload.goalName, profile]);
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(existing?.amount || payload.suggestedMonthlyAmount || 0);
@@ -45,6 +65,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const [endDate, setEndDate] = useState(existing?.endDate || "");
   const [notes, setNotes] = useState(existing?.notes || "");
   const [commit, setCommit] = useState<string[]>([]);
+  const [linkToGoal, setLinkToGoal] = useState(true);
   const [submitted, setSubmitted] = useState(false);
 
   const fields = useMemo(() => fieldsFor(kind), [kind]);
@@ -60,6 +81,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       setEndDate(existing?.endDate || "");
       setNotes(existing?.notes || "");
       setCommit([]);
+      setLinkToGoal(true);
       setSubmitted(false);
     }
     onOpenChange?.(open);
@@ -82,7 +104,22 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       endDate: fields.showEnd ? endDate : "",
       actionType: payload.actionLabel.toLowerCase().includes("watch") ? "watching" : "took_action",
       notes: composedNotes,
+      goalName: payload.goalName,
     });
+    // Auto-link the resulting holding to its goal (unless the user opted out).
+    // Holding id mirrors the backend's synthesized `action-{key}` so it resolves
+    // in the goal's linked holdings + the backend goal credit.
+    if (linkGoal && linkToGoal && fields.showAmount && amount > 0 && profile) {
+      const holdingId = `action-${payload.key}`;
+      const goals = [...(profile.goals || [])];
+      const target = goals[linkGoal.index];
+      if (target && !(target.linkedHoldingIds || []).includes(holdingId)) {
+        goals[linkGoal.index] = { ...target, linkedHoldingIds: [...(target.linkedHoldingIds || []), holdingId] };
+        const next = { ...profile, goals };
+        saveProfile(next, onboardingComplete);
+        api.saveOnboarding(next, token, { partial: true }).catch(() => null);
+      }
+    }
     setSubmitted(true);
   }
 
@@ -193,6 +230,21 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                     </div>
                   ) : null}
                 </div>
+              ) : null}
+
+              {linkGoal && fields.showAmount ? (
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-surface-soft p-3">
+                  <input
+                    type="checkbox"
+                    checked={linkToGoal}
+                    onChange={(event) => setLinkToGoal(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-foreground">Add to my {linkGoal.name} goal</span>
+                    <span className="mt-0.5 block text-[13px] text-muted-foreground">Counts this investment toward {linkGoal.name}. Untick to leave it unlinked — you can link it to another goal later from that goal&apos;s &ldquo;Manage links&rdquo;.</span>
+                  </span>
+                </label>
               ) : null}
 
               {kind === "habit" || kind === "debt" ? (

@@ -223,6 +223,16 @@ def _fund_entry(fund: dict, score: int | None = None) -> dict:
     }
 
 
+# The chosen fund's own factor inputs that drive its forward return estimate
+# (read by ``fund_factor_service.expected_return_from_factors``). Persisted with the
+# Discover card so the per-fund estimate can be recomputed at read time.
+_RETURN_FACTOR_KEYS = ("cagr5y", "cagr3y", "cagrSinceInception", "volatility", "historyYears")
+
+
+def _return_factors(fund: dict) -> dict:
+    return {key: fund[key] for key in _RETURN_FACTOR_KEYS if fund.get(key) is not None}
+
+
 def _fetch_text(url: str, timeout: int = 10) -> tuple[str, str]:
     result = fetch_text(url, timeout=timeout, retries=2, cache_ttl_seconds=24 * 3600)
     return result.text, result.mode
@@ -270,11 +280,13 @@ def parse_amfi_nav(text: str, source_url: str, data_mode: str) -> list[dict]:
         picker_key = _PICKER_KEYS.get(category["category_name"])
         candidates = category_candidates(picker_key, amfi_text=text) if picker_key else []
         ranked: list[dict] = []
+        return_factors: dict = {}
         if candidates:
             pcts = category_percentiles(candidates)
             scored = [(score_fund(c, pcts.get(c["schemeCode"], {}))["score"], c) for c in candidates]
             scored.sort(key=lambda item: item[0], reverse=True)
             ranked = [_fund_entry(c, score=s) for s, c in scored[:3]]
+            return_factors = _return_factors(scored[0][1]) if scored else {}
 
         if ranked:
             top = ranked[0]
@@ -330,6 +342,7 @@ def parse_amfi_nav(text: str, source_url: str, data_mode: str) -> list[dict]:
                 "confidenceScore": confidence,
                 "retrievedAt": timestamp,
                 "specificFunds": ranked,
+                "returnFactors": return_factors,
             }
         )
     return assets

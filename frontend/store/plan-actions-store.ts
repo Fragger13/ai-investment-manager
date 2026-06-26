@@ -25,6 +25,9 @@ export type ActionTaken = {
   actionType: string;
   notes: string;
   takenAt: string;
+  /** The goal this action funds, when started from a goal-linked recommendation.
+   *  Persisted so the backend can credit the contribution to that goal. */
+  goalName?: string;
 };
 
 type PlanActionsState = {
@@ -74,6 +77,8 @@ export const usePlanActionsStore = create<PlanActionsState>()(
           startDate: action.startDate,
           endDate: action.endDate,
           notes: action.notes,
+          category: action.category,
+          goalName: action.goalName,
         }).catch(() => null);
       },
       removeAction: (key) => {

@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import { PapaBubble, type PapaMood } from "@/app/onboarding/_components/papa-bubble";
 import { availableToInvest, currentBudgetMonth, emptyDashboard, isOnboardingComplete, monthlyCommitments, profileCompletionPercent } from "@/lib/profile";
 import { ActionItem, amountLabel, buildPlan, mergeIntoActionItems, purposeTag } from "@/lib/plan";
-import { cn, inr } from "@/lib/utils";
+import { cn, inr, inrShort } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { AdvancedRecommendation, DashboardData, OnboardingProfile } from "@/types";
@@ -59,7 +59,8 @@ export default function DashboardPage() {
   // invest this month — shared helpers so the dashboard, Plan and Portfolio all
   // agree on the same "available this month" figure.
   const commitments = monthlyCommitments(profile);
-  const available = availableToInvest(profile, data.summary.monthlyIncome);
+  const committedMonthly = useMemo(() => actionsTaken.reduce((sum, a) => sum + (a.amount || 0), 0), [actionsTaken]);
+  const available = availableToInvest(profile, data.summary.monthlyIncome, committedMonthly);
   const userHasGoals = (profile?.goals?.length || 0) > 0;
   const topGoals = userHasGoals ? data.goals.slice(0, 3) : [];
   // Same merge + ranking + budget calibration the Plan page runs, so the home
@@ -113,10 +114,10 @@ export default function DashboardPage() {
                       <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
                       <EditAvailableDialog />
                     </div>
-                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inr(available)}</p>
+                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inrShort(available)}</p>
                     <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
                   </div>
-                  <MoneyJar className="-mt-1 hidden shrink-0 sm:block" />
+                  <MoneyJar className="-mt-1 hidden shrink-0 -translate-x-[2cm] sm:block" />
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button asChild className="rounded-full"><Link href="/chat">What should I do with it? <Sparkles className="h-4 w-4" /></Link></Button>
@@ -159,9 +160,9 @@ export default function DashboardPage() {
           <section>
             <h2 className="ap-section mb-3">Money snapshot</h2>
             <div className="grid gap-4 md:grid-cols-3">
-              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly income" value={inr(data.summary.monthlyIncome)} detail="Coming in monthly" />
+              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly income" value={inrShort(data.summary.monthlyIncome)} detail="Coming in monthly" />
               <CommitmentsCard total={commitments} profile={profile} />
-              <NetWorthCard value={inr(data.summary.netWorth)} />
+              <NetWorthCard value={inrShort(data.summary.netWorth)} />
             </div>
           </section>
 
@@ -368,7 +369,7 @@ function GoalPreview({ goal }: { goal: DashboardData["goals"][number] }) {
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-foreground">{goal.name}</p>
-          <p className="text-sm text-muted-foreground">{inr(goal.currentProgress)} / {inr(goal.targetAmount)}</p>
+          <p className="text-sm text-muted-foreground">{inrShort(goal.currentProgress)} / {inrShort(goal.targetAmount)}</p>
         </div>
         <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On Track" : "Off Track"}</Badge>
       </div>
@@ -376,7 +377,7 @@ function GoalPreview({ goal }: { goal: DashboardData["goals"][number] }) {
         <Progress value={progress} className="flex-1" />
         <span className="text-sm font-medium text-foreground">{Math.round(progress)}%</span>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">{onTrack ? "On track to achieve this goal." : `Need ${inr(goal.requiredMonthlyInvestment)}/month.`}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{onTrack ? "On track to achieve this goal." : `Need ${inrShort(goal.requiredMonthlyInvestment)}/month.`}</p>
     </div>
   );
 }
@@ -427,7 +428,7 @@ function healthBullets(data: DashboardData, commitments: number) {
 
 function monthlyInsight(data: DashboardData, commitments: number) {
   if (commitments > data.summary.monthlyIncome * 0.35) {
-    return `You spend ${inr(commitments)} on fixed commitments. Reducing this can quickly increase what you can save or invest.`;
+    return `You spend ${inrShort(commitments)} on fixed commitments. Reducing this can quickly increase what you can save or invest.`;
   }
   if (data.health.emergencyFundMonths < 3) {
     return "Your emergency savings need attention. Building this first can make every other investment decision safer.";
@@ -471,7 +472,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
       <ColorfulIcon icon={CreditCard} accent="violet" label="Monthly Commitments" size="lg" />
       <div className="min-w-0 flex-1">
         <p className="ap-label">Monthly commitments</p>
-        <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tnum">{inr(total)}</p>
+        <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tnum">{inrShort(total)}</p>
         <p className="ap-help mt-1">Rent, EMIs, monthly expenses</p>
       </div>
       {canOpen ? (

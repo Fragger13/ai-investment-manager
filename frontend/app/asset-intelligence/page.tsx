@@ -114,7 +114,7 @@ export default function AssetIntelligencePage() {
   const visible = ideas
     .filter((idea) => idea.tab === activeTab || (activeTab === "Recommended For You" && scoreIdea(idea) >= 60))
     .filter((idea) => !query || `${idea.name} ${idea.ticker} ${idea.category}`.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 12);
+    .slice(0, 5);
 
   // Store ideas in sessionStorage so the detail page can read them
   useEffect(() => {
@@ -376,7 +376,7 @@ function mapAsset(asset: AssetIntelligence, profile: OnboardingProfile | null): 
     tab: tabFor(category, risk, evidence, asset.alpha?.bucket),
     risk,
     action: friendlyAction(asset.alpha?.suggestedAction || asset.crypto?.recommendedAction || "Consider"),
-    expectedReturn: expectedReturn(category, risk),
+    expectedReturn: returnFromObject(asset.expectedReturn) || expectedReturn(category, risk),
     suggestedAmount: suggestedAmount(profile, risk, category),
     bullets: bulletsForAsset(asset).slice(0, 3),
     summary: concise(asset.summary || asset.why_this_matters || "This idea is being reviewed using available investment data."),
@@ -428,7 +428,7 @@ function mapAlpha(alpha: AlphaOpportunity, profile: OnboardingProfile | null): I
     tab: alpha.bucket === "underdog" || alpha.bucket === "contrarian" ? "Under The Radar" : "Trending",
     risk,
     action: friendlyAction(alpha.suggestedAction),
-    expectedReturn: risk === "High" ? "Wide range" : "Estimate pending",
+    expectedReturn: returnFromObject(alpha.expectedReturn) || (risk === "High" ? "Wide range" : "Estimate pending"),
     suggestedAmount: suggestedAmount(profile, risk, alpha.assetType),
     bullets: [alpha.nonObviousReason, alpha.keySignal, alpha.supportingSignals[0]].filter(Boolean).map((value) => brief(value)),
     summary: concise(alpha.nonObviousReason),
@@ -462,12 +462,22 @@ function mapCrypto(crypto: CryptoOpportunity, profile: OnboardingProfile | null)
   };
 }
 
+/** Real, data-derived return estimate (recommendations + Discover funds share this
+ *  shape) → display string; null when the backend didn't supply one. */
+function returnFromObject(er?: { label?: string; cagrRange?: string; expectedCagr?: number } | null): string | null {
+  if (!er) return null;
+  if (er.label) return er.label.replace(/CAGR/gi, "p.a.");
+  if (er.cagrRange) return `${er.cagrRange} p.a.`;
+  if (typeof er.expectedCagr === "number") return `${er.expectedCagr}% p.a.`;
+  return null;
+}
+
 function recommendationReturn(rec: AdvancedRecommendation) {
-  if (rec.expectedReturn?.label) return rec.expectedReturn.label.replace(/CAGR/gi, "p.a.");
-  if (rec.expectedReturn?.cagrRange) return `${rec.expectedReturn.cagrRange} p.a.`;
-  if (typeof rec.expectedReturn?.expectedCagr === "number") return `${rec.expectedReturn.expectedCagr}% p.a.`;
-  if (rec.expectedReturnRange) return rec.expectedReturnRange;
-  return expectedReturn(friendlyCategory(rec.assetType || rec.assetClass || ""), rec.riskLevel);
+  return (
+    returnFromObject(rec.expectedReturn) ||
+    rec.expectedReturnRange ||
+    expectedReturn(friendlyCategory(rec.assetType || rec.assetClass || ""), rec.riskLevel)
+  );
 }
 
 function tabFor(category: string, risk: string, evidence: number, bucket?: string): InvestmentIdea["tab"] {

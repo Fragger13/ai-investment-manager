@@ -15,6 +15,10 @@ class AssetResearch(Base):
     suitability_notes: Mapped[str] = mapped_column(String, default="")
     risk_notes: Mapped[str] = mapped_column(String, default="")
     evidence_json: Mapped[str] = mapped_column(String, default="[]")
+    # The chosen fund's own factor inputs (cagr/volatility from real NAV history) so
+    # the expected return can be recomputed per-fund at read time — same model the
+    # recommendation engine uses. Empty for non-fund assets / unresolved picks.
+    return_factors_json: Mapped[str] = mapped_column(String, default="{}")
     data_mode: Mapped[str] = mapped_column(String(40), default="fallback")
     confidence_score: Mapped[int] = mapped_column(Integer, default=50)
     retrieved_at: Mapped[str] = mapped_column(String(80))

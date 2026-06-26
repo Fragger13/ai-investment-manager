@@ -116,6 +116,7 @@ def save_assets(db: Session, assets: list[dict]) -> list[AssetResearch]:
             existing.suitability_notes = asset["suitabilityNotes"]
             existing.risk_notes = asset["riskNotes"]
             existing.evidence_json = json.dumps(asset.get("evidence", []))
+            existing.return_factors_json = json.dumps(asset.get("returnFactors", {}))
             existing.data_mode = asset.get("dataMode", "fallback")
             existing.confidence_score = asset.get("confidenceScore", 50)
             existing.retrieved_at = asset.get("retrievedAt", now_iso())
@@ -129,6 +130,7 @@ def save_assets(db: Session, assets: list[dict]) -> list[AssetResearch]:
             suitability_notes=asset["suitabilityNotes"],
             risk_notes=asset["riskNotes"],
             evidence_json=json.dumps(asset.get("evidence", [])),
+            return_factors_json=json.dumps(asset.get("returnFactors", {})),
             data_mode=asset.get("dataMode", "fallback"),
             confidence_score=asset.get("confidenceScore", 50),
             retrieved_at=asset.get("retrievedAt", now_iso()),

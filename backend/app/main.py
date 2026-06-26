@@ -13,6 +13,30 @@ from app import models  # noqa: F401
 
 Base.metadata.create_all(bind=engine)
 
+
+def _ensure_sqlite_columns() -> None:
+    """Additive column migration for SQLite (this project has no Alembic).
+    ``create_all`` makes new tables but never alters existing ones, so columns
+    added after a table's first creation are applied here, idempotently."""
+    if not settings.database_url.startswith("sqlite"):
+        return
+    from sqlalchemy import inspect, text
+
+    additions = {"asset_research": [("return_factors_json", "TEXT DEFAULT '{}'")]}
+    inspector = inspect(engine)
+    for table, columns in additions.items():
+        try:
+            existing = {col["name"] for col in inspector.get_columns(table)}
+        except Exception:  # noqa: BLE001 — table may not exist yet; create_all handles it
+            continue
+        for name, ddl in columns:
+            if name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
+_ensure_sqlite_columns()
+
 app = FastAPI(title="AI Investment Manager API", version="0.1.0")
 logger = logging.getLogger("uvicorn.error")
 

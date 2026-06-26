@@ -52,18 +52,36 @@ export type ActionItem = {
 // ---------- Merge logic: fund recommendations + non-investment actions ----------
 
 export function mergeIntoActionItems(recs: AdvancedRecommendation[], dashboard: DashboardData): ActionItem[] {
-  const items: ActionItem[] = [];
-
   // 1) Non-investment / behavioral actions derived from the dashboard
   const synthesized = synthesizeActions(dashboard);
-  items.push(...synthesized);
-
   // 2) Fund recommendations from the advanced engine
-  recs.forEach((rec) => {
-    items.push(recToItem(rec));
+  const recItems = recs.map(recToItem);
+
+  // A goal-linked fund should surface the goal's real monthly need (what the
+  // Goals tab shows), not the fund's own "fully fund it" figure — otherwise the
+  // same goal displays two different numbers across tabs.
+  const goalNeed = new Map<string, number>();
+  dashboard.goals.forEach((goal) => {
+    if (goal.name) goalNeed.set(goal.name.toLowerCase(), goal.requiredMonthlyInvestment || 0);
+  });
+  recItems.forEach((item) => {
+    const need = item.goalName ? goalNeed.get(item.goalName.toLowerCase()) : undefined;
+    if (need && need > 0) item.suggestedMonthlyAmount = need;
   });
 
+  // Drop the abstract "Catch up on {goal}" nudge when a concrete recommendation
+  // already funds that goal — the fund IS the catch-up action, so showing both
+  // is redundant and double-counts the goal in the budget. Keep the nudge only
+  // as a fallback when no recommendation targets that off-track goal.
+  const recGoalNames = new Set(
+    recItems.filter((item) => item.goalName).map((item) => item.goalName!.toLowerCase()),
+  );
+  const dedupedSynth = synthesized.filter(
+    (item) => !(item.key.startsWith("action-goal-") && item.goalName && recGoalNames.has(item.goalName.toLowerCase())),
+  );
+
   // Deduplicate by category-y key (e.g., emergency fund coming both from recs and synth)
+  const items = [...dedupedSynth, ...recItems];
   const seen = new Set<string>();
   return items.filter((item) => {
     const dedup = dedupKey(item);
@@ -291,15 +309,21 @@ function calibrateToBudget(ranked: ActionItem[], available: number): ActionItem[
   return out;
 }
 
-export function buildPlan(items: ActionItem[], takenKeys: Set<string>, available = 0): Record<TabName, ActionItem[]> {
+export function buildPlan(items: ActionItem[], takenKeys: Set<string>, available = 0, keepTaken = false): Record<TabName, ActionItem[]> {
+  // Pending items drive the order and budget sizing; the top MUST_DO_LIMIT are active.
   const ranked = items
     .filter((item) => !takenKeys.has(item.key))
     .sort((a, b) => priorityScore(b) - priorityScore(a));
   const calibrated = calibrateToBudget(ranked, available);
   const mustDo = calibrated.slice(0, MUST_DO_LIMIT);
   const overflow = calibrated.slice(MUST_DO_LIMIT);
+  // keepTaken: completed items sink to the bottom as struck-off "wins" (and the next
+  // pending item promotes into the active list) instead of being dropped entirely.
+  const done = keepTaken
+    ? items.filter((item) => takenKeys.has(item.key)).sort((a, b) => priorityScore(b) - priorityScore(a))
+    : [];
   return {
-    "Must Do": mustDo,
+    "Must Do": [...mustDo, ...done],
     Consider: overflow.slice(0, CONSIDER_LIMIT),
     Explore: overflow.slice(CONSIDER_LIMIT, CONSIDER_LIMIT + EXPLORE_LIMIT),
   };

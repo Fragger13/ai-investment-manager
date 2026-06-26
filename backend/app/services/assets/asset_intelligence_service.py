@@ -141,24 +141,38 @@ def asset_research(db: Session) -> list[dict]:
     if not rows:
         refresh_asset_intelligence(db)
         rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).limit(120).all()
+    regime = latest_market_regime(db)
     seen = set()
     output = []
     for row in rows:
         if row.instrument_name in seen:
             continue
         seen.add(row.instrument_name)
-        output.append(validate_asset_insight(_research_row(db, row), llm_enhance=False))
+        output.append(validate_asset_insight(_research_row(db, row, regime), llm_enhance=False))
     return output
 
 
 def asset_detail(db: Session, symbol: str) -> dict | None:
     symbol_lower = symbol.lower()
     rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).all()
+    regime = latest_market_regime(db)
     for row in rows:
         ticker = _ticker_for_name(row.instrument_name)
         if symbol_lower in {row.instrument_name.lower(), ticker.lower(), ticker.replace(".NS", "").lower()}:
-            return validate_asset_insight(_research_row(db, row), llm_enhance=False)
+            return validate_asset_insight(_research_row(db, row, regime), llm_enhance=False)
     return None
+
+
+def _alpha_expected_return(asset_type: str | None, regime: dict | None) -> dict | None:
+    """Category-level estimate for an alpha/underdog pick (equity / ETF / gold) so the
+    card shows a real range instead of 'Estimate pending'. These are signal-surfaced
+    names without per-fund NAV history, so a category anchor — not a per-fund figure —
+    is the honest source."""
+    from app.services.research.fund_factor_service import category_expected_return
+
+    text = (asset_type or "").lower()
+    key = "gold" if ("gold" in text or "silver" in text) else "crypto" if "crypto" in text else "equity_stock"
+    return category_expected_return(key, regime)
 
 
 def alpha_opportunities(db: Session) -> list[dict]:
@@ -166,11 +180,13 @@ def alpha_opportunities(db: Session) -> list[dict]:
     if not rows:
         refresh_asset_intelligence(db)
         rows = db.query(AlphaOpportunity).order_by(AlphaOpportunity.risk_adjusted_score.desc()).limit(40).all()
+    regime = latest_market_regime(db)
     return [
         validate_alpha_insight({
             "assetName": row.asset_name,
             "ticker": row.ticker,
             "assetType": row.asset_type,
+            "expectedReturn": _alpha_expected_return(row.asset_type, regime),
             "bucket": row.bucket,
             "nonObviousReason": row.non_obvious_reason,
             "keySignal": row.key_signal,
@@ -276,7 +292,26 @@ def _asset_research_payload(asset: dict, technical: dict, fundamental: dict, liq
     }, llm_enhance=False)
 
 
-def _research_row(db: Session, row: AssetResearch) -> dict:
+def _asset_expected_return(category: str | None, regime: dict | None, return_factors: dict | None = None) -> dict | None:
+    """Forward return estimate for a Discover card. Prefers the chosen fund's OWN
+    factor history (cagr/volatility from real NAV) run through the same model the
+    recommendation engine uses, so the estimate is genuinely per-fund — not a UI
+    constant. Falls back to a category-level estimate only when those factors aren't
+    on hand (non-fund assets, or picks saved before factors were persisted)."""
+    from app.services.research.fund_factor_service import category_expected_return, expected_return_from_factors
+    from app.services.research.fund_research_service import category_key_for_name
+
+    key = category_key_for_name(category or "")
+    if not key:
+        return None
+    if return_factors:
+        per_fund = expected_return_from_factors(return_factors, key, regime)
+        if per_fund:
+            return per_fund
+    return category_expected_return(key, regime)
+
+
+def _research_row(db: Session, row: AssetResearch, regime: dict | None = None) -> dict:
     ticker = _ticker_for_name(row.instrument_name)
     technical = db.query(TechnicalIndicator).filter(TechnicalIndicator.asset_name == row.instrument_name).order_by(TechnicalIndicator.id.desc()).first()
     fundamental = db.query(FundamentalMetric).filter(FundamentalMetric.asset_name == row.instrument_name).order_by(FundamentalMetric.id.desc()).first()
@@ -289,6 +324,7 @@ def _research_row(db: Session, row: AssetResearch) -> dict:
         "ticker": ticker,
         "assetType": row.asset_type,
         "category": row.category,
+        "expectedReturn": _asset_expected_return(row.category, regime, _loads_dict(row.return_factors_json)),
         "summary": row.summary,
         "suitabilityNotes": row.suitability_notes,
         "riskNotes": row.risk_notes,
@@ -640,3 +676,11 @@ def _loads(value: str) -> list:
         return json.loads(value or "[]")
     except json.JSONDecodeError:
         return []
+
+
+def _loads_dict(value: str | None) -> dict:
+    try:
+        parsed = json.loads(value or "{}")
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}

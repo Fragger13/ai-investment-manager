@@ -94,6 +94,17 @@ _CATEGORY_ANCHOR = {
     "arbitrage": 6.5, "gold": 7.5, "equity_stock": 13.0, "crypto": 12.0,
 }
 
+# Half-width of the category-level estimate band, by category. Near-cash debt is
+# near-certain (tight band); small-caps are wide. Used only when per-fund factors
+# aren't available (see ``category_expected_return``); the per-fund path scales the
+# band by the fund's own measured volatility instead.
+_CATEGORY_SPREAD = {
+    "overnight": 1.0, "liquid": 1.2, "arbitrage": 1.5, "short_duration": 1.5,
+    "corporate_bond": 1.8, "banking_psu": 1.8, "gilt": 2.0, "gold": 2.0,
+    "hybrid": 2.5, "large_cap_index": 3.0, "flexi_cap": 3.0, "elss": 3.0,
+    "equity_stock": 3.5, "mid_cap": 3.5, "small_cap": 4.0, "crypto": 8.0,
+}
+
 
 # ---------------------------------------------------------------------------
 # Shared low-level helpers (also imported by fund_picker_service)
@@ -813,6 +824,14 @@ def score_fund(factors: dict, percentiles: dict[str, float], context=None, goal:
 # ---------------------------------------------------------------------------
 
 
+def range_label(low: float, high: float) -> str:
+    """Range string that stays readable when the low end is negative: ``7.3-13.8``
+    but ``-2.5 to 8`` — a bare ``-2.5-8`` reads as two minus signs (the source of
+    confusing ``-10-12%`` labels)."""
+    separator = " to " if low < 0 else "-"
+    return f"{low:g}{separator}{high:g}"
+
+
 def expected_return_from_factors(factors: dict, category_key: str, regime: dict | None = None) -> dict | None:
     """Conservative forward return estimate from the fund's history.
 
@@ -836,8 +855,8 @@ def expected_return_from_factors(factors: dict, category_key: str, regime: dict 
     conservative = round(base - spread, 1)
     aggressive = round(base + spread, 1)
     return {
-        "label": f"{conservative:g}-{aggressive:g}% CAGR",
-        "cagrRange": f"{conservative:g}-{aggressive:g}%",
+        "label": f"{range_label(conservative, aggressive)}% CAGR",
+        "cagrRange": f"{range_label(conservative, aggressive)}%",
         "expectedCagr": base,
         "conservative": conservative,
         "base": base,
@@ -848,6 +867,39 @@ def expected_return_from_factors(factors: dict, category_key: str, regime: dict 
             f"Estimated from this fund's own {factors.get('historyYears', '?')}-year NAV history "
             f"(long-run CAGR mean-reverted toward the category norm and haircut for {regime_name} "
             "conditions and the fund's volatility)."
+        ),
+        "disclaimer": "Expected return is an assumption range, not a promise of future results.",
+    }
+
+
+def category_expected_return(category_key: str, regime: dict | None = None) -> dict | None:
+    """Category-level forward estimate for when per-fund NAV factors aren't on hand
+    (e.g. the Discover cards, which only carry the fund's category). Anchors to the
+    category's long-run norm and haircuts for the regime — the same model
+    ``expected_return_from_factors`` mean-reverts toward, minus the per-fund signal.
+    Honest that it's a category norm, not a per-fund projection."""
+    anchor = _CATEGORY_ANCHOR.get(category_key)
+    if anchor is None:
+        return None
+    regime_name = (regime or {}).get("regime", "limited-data")
+    base = round(anchor + {"risk-on": 0.5, "risk-off": -1.5, "limited-data": -0.5}.get(regime_name, 0.0), 1)
+    # Band width scales with the category's typical volatility: near-cash debt stays
+    # tight, small-caps spread wide (mirrors the per-fund volatility-scaled spread).
+    spread = _CATEGORY_SPREAD.get(category_key, 2.5)
+    conservative = round(base - spread, 1)
+    aggressive = round(base + spread, 1)
+    return {
+        "label": f"{range_label(conservative, aggressive)}% CAGR",
+        "cagrRange": f"{range_label(conservative, aggressive)}%",
+        "expectedCagr": base,
+        "conservative": conservative,
+        "base": base,
+        "aggressive": aggressive,
+        "inflationAdjustedBase": round(base - 6.0, 1),
+        "inflationAssumption": 6.0,
+        "assumptions": (
+            "Category-level estimate from long-run norms for this fund category and "
+            f"current {regime_name} market conditions — not a per-fund projection."
         ),
         "disclaimer": "Expected return is an assumption range, not a promise of future results.",
     }

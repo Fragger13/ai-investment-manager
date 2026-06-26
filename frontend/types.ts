@@ -550,6 +550,16 @@ export type AssetIntelligence = {
   confidenceScore: number;
   dataMode: DataMode;
   retrievedAt: string;
+  expectedReturn?: {
+    label?: string;
+    cagrRange?: string;
+    expectedCagr?: number;
+    conservative?: number;
+    base?: number;
+    aggressive?: number;
+    assumptions?: string;
+    disclaimer?: string;
+  } | null;
   technical?: {
     latestPrice?: number | null;
     movingAverage20?: number | null;
@@ -635,6 +645,11 @@ export type AlphaOpportunity = {
   assetName: string;
   ticker: string;
   assetType: string;
+  expectedReturn?: {
+    label?: string;
+    cagrRange?: string;
+    expectedCagr?: number;
+  } | null;
   bucket: string;
   nonObviousReason: string;
   keySignal: string;
@@ -1266,6 +1281,7 @@ export type PortfolioHolding = {
   id: string;
   name: string;
   category: string;
+  allocationCategory?: string;
   value: number;
   valueAtCost?: number;
   source: "profile" | "action";

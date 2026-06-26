@@ -17,12 +17,18 @@ export function monthlyCommitments(profile?: OnboardingProfile | null): number {
 // the current IST budget month; otherwise falls back to income − commitments.
 // Used by the dashboard hero, the Plan (to size every action to this budget),
 // and the Portfolio "available to invest" — so all three always agree.
-export function availableToInvest(profile?: OnboardingProfile | null, monthlyIncome?: number): number {
+export function availableToInvest(profile?: OnboardingProfile | null, monthlyIncome?: number, committedMonthly = 0): number {
   if (!profile) return 0;
   const overrideActive = Number(profile.investableThisMonth || 0) > 0 && profile.investableThisMonthMonth === currentBudgetMonth();
-  if (overrideActive) return Number(profile.investableThisMonth || 0);
-  const income = monthlyIncome ?? (Number(profile.monthlyCashInflow || 0) || Number(profile.monthlySalary || 0) + Number(profile.otherIncome || 0));
-  return Math.max(income - monthlyCommitments(profile), 0);
+  const base = overrideActive
+    ? Number(profile.investableThisMonth || 0)
+    : Math.max(
+        (monthlyIncome ?? (Number(profile.monthlyCashInflow || 0) || Number(profile.monthlySalary || 0) + Number(profile.otherIncome || 0)))
+          - monthlyCommitments(profile),
+        0,
+      );
+  // Money already committed to taken actions is no longer "available" this month.
+  return Math.max(base - Math.max(committedMonthly, 0), 0);
 }
 
 export const blankProfile: OnboardingProfile = {

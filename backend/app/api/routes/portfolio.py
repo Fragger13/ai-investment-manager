@@ -125,7 +125,10 @@ def portfolio_summary(payload: OnboardingProfile | None = None, db: Session = De
         parsed_actions.append(action_record)
         if row.action_type == "took_action" and amount > 0:
             committed_monthly += amount
-            key = (row.entity_name or row.entity_type or f"action-{row.id}").lower()
+            # Key by the recommendation key (entity_id) so the synthesized
+            # holding's id is stable and matches what the UI links to a goal
+            # (action-{key}); fall back to the name only when no key was recorded.
+            key = row.entity_id or (row.entity_name or row.entity_type or f"action-{row.id}").lower()
             existing = actions_by_key.get(key)
             months = _months_running(payload_json.get("startDate", ""), now)
             simulated_value = int(round(amount * max(months, 1)))
@@ -203,9 +206,10 @@ def _action_holdings(actions_by_key: dict[str, dict]) -> list[dict]:
     for key, entry in actions_by_key.items():
         out.append(
             {
-                "id": f"action-{key.replace(' ', '-')[:32]}",
+                "id": f"action-{key}",
                 "name": entry["name"],
                 "category": entry["category"],
+                "allocationCategory": entry["category"],
                 "value": int(entry["valueEstimate"]),
                 "monthlyContribution": int(entry["monthlyAmount"]),
                 "since": entry["since"],
@@ -253,6 +257,35 @@ _HOLDING_CATEGORY = {
     "other": "Other",
 }
 
+# Granular label per holding that matches the pie/allocation slice names, so the
+# "view all holdings" sections line up 1:1 with the Holdings-mix chart legend.
+_HOLDING_ALLOC_CATEGORY = {
+    "stock": "Direct stocks",
+    "etf": "Mutual funds",
+    "mutualFund": "Mutual funds",
+    "crypto": "Crypto",
+    "gold": "Gold",
+    "silver": "Silver",
+    "realEstate": "Real estate",
+    "bond": "Bonds",
+    "nps": "NPS",
+    "fd": "Fixed deposits",
+    "cash": "Cash",
+    "epfPpf": "EPF/PPF",
+    "other": "Other",
+}
+
+# Same mapping keyed by the non-itemized base-path keys.
+_BASE_KEY_ALLOC_CATEGORY = {
+    "stocks": "Direct stocks",
+    "mutual-funds": "Mutual funds",
+    "crypto": "Crypto",
+    "gold": "Gold",
+    "epf-ppf": "EPF/PPF",
+    "real-estate": "Real estate",
+    "cash": "Cash",
+}
+
 
 def _holdings(profile: OnboardingProfile) -> list[dict]:
     items: list[dict] = []
@@ -265,6 +298,7 @@ def _holdings(profile: OnboardingProfile) -> list[dict]:
                     "id": h.id or f"holding-{len(items)}",
                     "name": h.name or "Investment",
                     "category": _HOLDING_CATEGORY.get(h.assetClass, "Other"),
+                    "allocationCategory": _HOLDING_ALLOC_CATEGORY.get(h.assetClass, "Other"),
                     "value": int(h.currentValue),
                     "valueAtCost": int(h.valueAtCost or 0),
                     "source": "profile",
@@ -273,9 +307,9 @@ def _holdings(profile: OnboardingProfile) -> list[dict]:
             )
         # cash + EPF still come from the scalar fields (not itemized)
         if profile.cashBalance > 0:
-            items.append({"id": "cash", "name": "Cash & liquid", "category": "Cash", "value": int(profile.cashBalance), "source": "profile"})
+            items.append({"id": "cash", "name": "Cash & liquid", "category": "Cash", "allocationCategory": "Cash", "value": int(profile.cashBalance), "source": "profile"})
         if profile.epfPpfValue > 0:
-            items.append({"id": "epf-ppf", "name": "EPF / PPF", "category": "Debt", "value": int(profile.epfPpfValue), "source": "profile"})
+            items.append({"id": "epf-ppf", "name": "EPF / PPF", "category": "Debt", "allocationCategory": "EPF/PPF", "value": int(profile.epfPpfValue), "source": "profile"})
         return sorted(items, key=lambda item: item["value"], reverse=True)
 
     base = [
@@ -295,6 +329,7 @@ def _holdings(profile: OnboardingProfile) -> list[dict]:
                 "id": key,
                 "name": name,
                 "category": asset_class.replace("_", " ").title(),
+                "allocationCategory": _BASE_KEY_ALLOC_CATEGORY.get(key, name),
                 "value": int(value),
                 "source": "profile",
             }
@@ -307,6 +342,7 @@ def _holdings(profile: OnboardingProfile) -> list[dict]:
                 "id": f"additional-{index}",
                 "name": additional.type or "Other investment",
                 "category": "Other",
+                "allocationCategory": additional.type or "Other investment",
                 "value": int(additional.value),
                 "source": "profile",
             }

@@ -88,7 +88,7 @@ export default function PortfolioPage() {
   const totalCommitments = Math.max(data.committedMonthly, localCommitments);
   // Same "available this month" the dashboard + plan use (respects the per-month
   // override), so the Portfolio figure no longer contradicts them.
-  const available = availableToInvest(profile, data.monthlyIncome);
+  const available = availableToInvest(profile, data.monthlyIncome, localCommitments);
   const startedActions = actionsTaken.length;
   const watchlistedItems = planItems.length;
 
@@ -288,16 +288,16 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
           <HoldingsDetailDialog data={data} />
         </div>
 
-        <div className="mt-4 grid gap-5 sm:grid-cols-[190px_1fr] sm:items-center">
-          <div className="relative mx-auto h-[190px] w-[190px]">
+        <div className="mt-4 grid gap-4 sm:grid-cols-[240px_1fr] sm:items-center">
+          <div className="relative mx-auto h-[240px] w-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={allocation}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={62}
-                  outerRadius={86}
+                  innerRadius={82}
+                  outerRadius={116}
                   paddingAngle={2}
                   stroke="none"
                   onMouseEnter={(_, index) => setActive(index)}
@@ -329,12 +329,12 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
                   key={slice.name}
                   onMouseEnter={() => setActive(index)}
                   onMouseLeave={() => setActive(null)}
-                  className={cn("flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition", active === index && "bg-surface-soft")}
+                  className={cn("flex items-center gap-2 rounded-lg px-2 py-1.5 transition", active === index && "bg-surface-soft")}
                 >
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{slice.name}</span>
-                  <span className="text-sm font-bold text-foreground">{pct}%</span>
-                  <span className="w-20 shrink-0 text-right text-[13px] font-semibold text-muted-foreground tnum">{inr(slice.value)}</span>
+                  <span className="min-w-0 truncate text-sm font-medium text-foreground">{slice.name}</span>
+                  <span className="shrink-0 text-sm font-bold text-foreground">{pct}%</span>
+                  <span className="ml-auto shrink-0 text-[13px] font-semibold text-muted-foreground tnum">{inr(slice.value)}</span>
                 </li>
               );
             })}
@@ -345,7 +345,22 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
   );
 }
 
+function groupHoldingsByClass(holdings: PortfolioHolding[]): [string, PortfolioHolding[]][] {
+  const map = new Map<string, PortfolioHolding[]>();
+  for (const holding of holdings) {
+    // Group by the same granular label the pie/legend uses, so sections match the chart.
+    const key = holding.allocationCategory || holding.category || "Other";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(holding);
+  }
+  // Sections ordered by total value so the biggest asset class leads.
+  return Array.from(map.entries()).sort(
+    (a, b) => b[1].reduce((s, h) => s + h.value, 0) - a[1].reduce((s, h) => s + h.value, 0)
+  );
+}
+
 function HoldingsDetailDialog({ data }: { data: PortfolioSummary }) {
+  const groups = useMemo(() => groupHoldingsByClass(data.holdings), [data.holdings]);
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -355,12 +370,26 @@ function HoldingsDetailDialog({ data }: { data: PortfolioSummary }) {
         <div className="border-b border-border px-6 py-5 pr-12">
           <DialogTitle className="text-lg font-semibold text-foreground">Your holdings</DialogTitle>
           <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">
-            All {data.holdings.length} holdings — including value built up from plan actions. Cost &amp; returns shown where available.
+            All {data.holdings.length} holdings, grouped by asset class — including value built up from plan actions. Cost &amp; returns shown where available.
           </DialogDescription>
         </div>
-        <div className="space-y-2 p-6">
-          {data.holdings.map((holding) => <HoldingRow key={holding.id} holding={holding} netWorth={data.netWorth} />)}
-          <Link href="/onboarding?mode=edit" className="mt-2 inline-flex text-xs font-semibold text-primary hover:underline">Edit holdings in profile →</Link>
+        <div className="space-y-6 p-6">
+          {groups.map(([assetClass, holdings]) => {
+            const subtotal = holdings.reduce((sum, holding) => sum + holding.value, 0);
+            const pct = data.netWorth > 0 ? Math.round((subtotal / data.netWorth) * 100) : 0;
+            return (
+              <div key={assetClass}>
+                <div className="mb-2 flex items-baseline justify-between gap-3">
+                  <h3 className="text-sm font-bold tracking-tight text-foreground">{assetClass} <span className="ml-1 text-[13px] font-medium text-muted-foreground">({holdings.length})</span></h3>
+                  <span className="text-[13px] font-semibold text-muted-foreground tnum">{inr(subtotal)} · {pct}%</span>
+                </div>
+                <div className="space-y-2">
+                  {holdings.map((holding) => <HoldingRow key={holding.id} holding={holding} netWorth={data.netWorth} />)}
+                </div>
+              </div>
+            );
+          })}
+          <Link href="/onboarding?mode=edit" className="inline-flex text-xs font-semibold text-primary hover:underline">Edit holdings in profile →</Link>
         </div>
       </DialogContent>
     </Dialog>

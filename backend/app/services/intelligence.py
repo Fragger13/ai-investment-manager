@@ -417,7 +417,28 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     return recommendations
 
 
-def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dict]:
+def _linked_credit(goal, current: int, required: int, surplus: int, holdings_by_id: dict | None) -> tuple[int, int, int]:
+    """Credit the holdings linked to this goal toward it: raise progress to the
+    linked total and shrink the remaining monthly need by the linked SIPs, then
+    recompute feasibility. ``holdings_by_id`` (manual holdings incl. cash/EPF +
+    virtual action holdings) and ``linkedHoldingIds`` are the single source of
+    truth, so linking at take-action time and linking later behave identically.
+    Returns (current, required, feasibility)."""
+    linked_ids = set(goal.linkedHoldingIds or [])
+    hmap = holdings_by_id or {}
+    if not linked_ids or not hmap:
+        feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 75
+        return current, required, feasibility
+    linked = [hmap[i] for i in linked_ids if i in hmap]
+    linked_value = sum(int(v.get("value") or 0) for v in linked)
+    linked_monthly = sum(int(v.get("monthly") or 0) for v in linked)
+    current = max(current, linked_value)
+    required = max(required - linked_monthly, 0)
+    feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 95
+    return current, required, feasibility
+
+
+def goal_agent(profile: OnboardingProfile, worth: int, surplus: int, holdings_by_id: dict | None = None) -> list[dict]:
     if profile.goals:
         income = monthly_income(profile)
         planned_goals = []
@@ -431,7 +452,7 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
             warning = ""
             if estimated_goal_emi and income and ((total_emi_payments(profile) + estimated_goal_emi) / income) > 0.35:
                 warning = "This EMI may take too much of your monthly income and reduce your ability to save for other goals."
-            feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 75
+            current, required, feasibility = _linked_credit(goal, current, required, surplus, holdings_by_id)
             slug = goal_display_name(goal).lower().replace("/", "-").replace(" ", "-")
             planned_goals.append(
                 {
@@ -533,11 +554,16 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
 
 def allocation(profile: OnboardingProfile) -> list[dict]:
     colors = ["#2ac8b0", "#5fb0ff", "#f6c85f", "#f28b82", "#9b8cff", "#71d083", "#c7d2fe", "#f59e0b", "#34d399", "#a78bfa"]
+    # goldValue lumps gold + silver (see profile aggregation), so split silver back
+    # out for display — a silver holding must not be charted as gold.
+    silver_value = sum(int(h.currentValue or 0) for h in (profile.holdings or []) if getattr(h, "assetClass", "") == "silver")
+    gold_value = max(int(profile.goldValue) - silver_value, 0)
     items = [
         ("Direct stocks", profile.stocksValue),
         ("Mutual funds", profile.mutualFundsValue),
         ("Crypto", profile.cryptoValue),
-        ("Gold", profile.goldValue),
+        ("Gold", gold_value),
+        ("Silver", silver_value),
         ("EPF/PPF", profile.epfPpfValue),
         ("Real estate", profile.realEstateValue),
         ("Cash", profile.cashBalance),
@@ -546,7 +572,7 @@ def allocation(profile: OnboardingProfile) -> list[dict]:
     return [{"name": name, "value": value, "color": colors[index % len(colors)]} for index, (name, value) in enumerate(items) if value > 0]
 
 
-def build_dashboard(profile: OnboardingProfile) -> dict:
+def build_dashboard(profile: OnboardingProfile, holdings_by_id: dict | None = None) -> dict:
     profile.age = calculate_age(profile.dateOfBirth, profile.age)
     income = monthly_income(profile)
     profile.monthlyCashInflow = income
@@ -557,7 +583,7 @@ def build_dashboard(profile: OnboardingProfile) -> dict:
     risk_profile = "Higher growth comfort" if profile.volatilityComfort == "High" else "More stability preferred" if profile.volatilityComfort == "Low" else "Balanced growth"
     health = health_agent(profile)
     recommendations = recommendation_agent(profile)
-    goals = goal_agent(profile, worth, surplus)
+    goals = goal_agent(profile, worth, surplus, holdings_by_id)
     market = research_agent(profile)
     behavior = behavior_agent(profile)
 
