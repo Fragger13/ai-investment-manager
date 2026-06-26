@@ -59,7 +59,12 @@ export default function DashboardPage() {
   // invest this month — shared helpers so the dashboard, Plan and Portfolio all
   // agree on the same "available this month" figure.
   const commitments = monthlyCommitments(profile);
-  const committedMonthly = useMemo(() => actionsTaken.reduce((sum, a) => sum + (a.amount || 0), 0), [actionsTaken]);
+  // Only recurring (SIP) commitments reduce what's available *each month*; a
+  // one-time lump sum is paid once and doesn't shrink the monthly surplus.
+  const committedMonthly = useMemo(
+    () => actionsTaken.filter((a) => a.cadence !== "one_time").reduce((sum, a) => sum + (a.amount || 0), 0),
+    [actionsTaken]
+  );
   const available = availableToInvest(profile, data.summary.monthlyIncome, committedMonthly);
   const userHasGoals = (profile?.goals?.length || 0) > 0;
   const topGoals = userHasGoals ? data.goals.slice(0, 3) : [];
@@ -67,10 +72,15 @@ export default function DashboardPage() {
   // "next moves" are identical to the plan's "Do first" tab — same items AND the
   // same budget-sized amounts.
   const takenKeys = useMemo(() => new Set(actionsTaken.map((entry) => entry.key)), [actionsTaken]);
-  const topActions = useMemo(
-    () => buildPlan(mergeIntoActionItems(advRecs, data), takenKeys, available)["Must Do"],
+  // Use the SAME stable-membership plan the Plan page renders (keepTaken=true) so
+  // the home "Do this first" preview matches it exactly: completing one item does
+  // NOT pull a 4th into view. We show only the still-pending members here.
+  const planMustDo = useMemo(
+    () => buildPlan(mergeIntoActionItems(advRecs, data), takenKeys, available, true)["Must Do"],
     [advRecs, data, takenKeys, available]
   );
+  const topActions = useMemo(() => planMustDo.filter((item) => !takenKeys.has(item.key)), [planMustDo, takenKeys]);
+  const planDoneCount = useMemo(() => planMustDo.filter((item) => takenKeys.has(item.key)).length, [planMustDo, takenKeys]);
   const status = healthStatus(data.health.score);
   const insight = monthlyInsight(data, commitments);
   const completionPercent = profileCompletionPercent(profile);
@@ -117,7 +127,7 @@ export default function DashboardPage() {
                     <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inrShort(available)}</p>
                     <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
                   </div>
-                  <MoneyJar className="-mt-1 hidden shrink-0 -translate-x-[2cm] sm:block" />
+                  <MoneyJar className="-mt-1 hidden shrink-0 -translate-x-[1.5cm] sm:block" />
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button asChild className="rounded-full"><Link href="/chat">What should I do with it? <Sparkles className="h-4 w-4" /></Link></Button>
@@ -194,7 +204,11 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {topActions.map((action) => <DashboardActionRow key={action.key} action={action} />)}
-                {!topActions.length ? <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p> : null}
+                {!topActions.length ? (
+                  planDoneCount > 0
+                    ? <p className="text-sm text-muted-foreground">All your top steps are done — nice work! 🎉 Open the full plan for what&apos;s next.</p>
+                    : <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p>
+                ) : null}
                 {topActions.length ? <DashboardNudge tone="sun" emoji="💡">Start with these and you&apos;ll see the biggest impact.</DashboardNudge> : null}
               </CardContent>
             </Card>
@@ -259,7 +273,7 @@ function MoneyJar({ className }: { className?: string }) {
       alt="Savings jar with coins and a sprout"
       width={220}
       height={417}
-      className={cn("h-28 w-auto select-none", className)}
+      className={cn("h-[8.4rem] w-auto select-none", className)}
       priority
     />
   );

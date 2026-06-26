@@ -124,22 +124,27 @@ def portfolio_summary(payload: OnboardingProfile | None = None, db: Session = De
         }
         parsed_actions.append(action_record)
         if row.action_type == "took_action" and amount > 0:
-            committed_monthly += amount
+            # A one-time lump sum is paid once: it contributes its face value to
+            # holdings but is NOT a recurring monthly commitment (so it neither
+            # reduces the monthly budget nor accrues amount * months_running).
+            one_time = payload_json.get("cadence") == "one_time"
+            monthly_contrib = 0.0 if one_time else amount
+            committed_monthly += monthly_contrib
             # Key by the recommendation key (entity_id) so the synthesized
             # holding's id is stable and matches what the UI links to a goal
             # (action-{key}); fall back to the name only when no key was recorded.
             key = row.entity_id or (row.entity_name or row.entity_type or f"action-{row.id}").lower()
             existing = actions_by_key.get(key)
             months = _months_running(payload_json.get("startDate", ""), now)
-            simulated_value = int(round(amount * max(months, 1)))
+            simulated_value = int(round(amount if one_time else amount * max(months, 1)))
             if existing:
-                existing["monthlyAmount"] += amount
+                existing["monthlyAmount"] += monthly_contrib
                 existing["valueEstimate"] += simulated_value
             else:
                 actions_by_key[key] = {
                     "name": row.entity_name or "Action contribution",
                     "category": _category_for_action(row.entity_name or "", payload_json.get("category", "")),
-                    "monthlyAmount": amount,
+                    "monthlyAmount": monthly_contrib,
                     "valueEstimate": simulated_value,
                     "since": payload_json.get("startDate", ""),
                 }

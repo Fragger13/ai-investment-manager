@@ -60,9 +60,12 @@ def _holdings_by_id(db: Session, profile: OnboardingProfile) -> dict[str, dict]:
             continue
         hid = f"action-{key}"
         months = _months_running(str(payload.get("startDate") or ""), now)
+        # A one-time lump sum credits its face value once and adds no recurring
+        # monthly contribution (so it doesn't reduce a goal's required SIP).
+        one_time = payload.get("cadence") == "one_time"
         entry = out.setdefault(hid, {"value": 0, "monthly": 0})
-        entry["monthly"] = int(entry["monthly"]) + int(round(amount))
-        entry["value"] = int(entry["value"]) + int(round(amount * max(months, 1)))
+        entry["monthly"] = int(entry["monthly"]) + (0 if one_time else int(round(amount)))
+        entry["value"] = int(entry["value"]) + int(round(amount if one_time else amount * max(months, 1)))
     return out
 
 

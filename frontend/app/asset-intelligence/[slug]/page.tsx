@@ -269,11 +269,12 @@ export default function InvestmentDetailPage() {
         <Card>
           <CardContent className="p-6">
             <p className="text-lg font-bold tracking-tight text-foreground">Ready to invest?</p>
-            <p className="mt-1 text-sm text-muted-foreground">Add this fund to your plan and start your SIP in just a few clicks.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Add this fund to your plan, then choose a monthly SIP or a one-time lump sum when you take action.</p>
 
             <div className="mt-4 rounded-xl bg-surface-soft p-4">
-              <p className="text-[13px] uppercase tracking-wide text-muted-foreground">Suggested monthly amount</p>
+              <p className="text-[13px] uppercase tracking-wide text-muted-foreground">Suggested SIP to start</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">Or invest a lump sum — pick in the next step.</p>
             </div>
 
             <div className="mt-4 space-y-2.5">

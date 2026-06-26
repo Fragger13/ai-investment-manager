@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { useAuthStore } from "@/store/auth-store";
 import { api } from "@/lib/api";
-import { inr } from "@/lib/utils";
+import { cn, inr } from "@/lib/utils";
 
 export type ActionKind =
   | "fund"            // start/boost an SIP — amount + start + (optional end)
@@ -43,7 +43,9 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const token = useAuthStore((state) => state.token);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
-  const kind: ActionKind = payload.kind || inferKind(payload);
+  // An investment can be started either way; the SIP/lump-sum toggle picks which.
+  const baseKind: ActionKind = payload.kind || inferKind(payload);
+  const investable = baseKind === "fund" || baseKind === "lump_sum";
 
   // The saved goal this recommendation funds (if any) — drives the opt-out
   // "Add to my {goal} goal" checkbox and the auto-link on submit.
@@ -66,8 +68,12 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const [notes, setNotes] = useState(existing?.notes || "");
   const [commit, setCommit] = useState<string[]>([]);
   const [linkToGoal, setLinkToGoal] = useState(true);
+  const [mode, setMode] = useState<"sip" | "lumpsum">(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
   const [submitted, setSubmitted] = useState(false);
 
+  // Effective kind: a chosen lump sum behaves like a one-time contribution, a
+  // chosen SIP like a recurring fund. Non-investment actions keep their kind.
+  const kind: ActionKind = investable ? (mode === "lumpsum" ? "lump_sum" : "fund") : baseKind;
   const fields = useMemo(() => fieldsFor(kind), [kind]);
 
   useEffect(() => {
@@ -82,6 +88,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       setNotes(existing?.notes || "");
       setCommit([]);
       setLinkToGoal(true);
+      setMode(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
       setSubmitted(false);
     }
     onOpenChange?.(open);
@@ -104,6 +111,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       endDate: fields.showEnd ? endDate : "",
       actionType: payload.actionLabel.toLowerCase().includes("watch") ? "watching" : "took_action",
       notes: composedNotes,
+      cadence: kind === "lump_sum" ? "one_time" : "monthly",
       goalName: payload.goalName,
     });
     // Auto-link the resulting holding to its goal (unless the user opted out).
@@ -152,10 +160,10 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <p className="mt-1 text-sm text-muted-foreground">We&apos;ll track this in your plan and let you know if anything changes that affects this decision.</p>
             </div>
             {fields.showAmount ? (
-              <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                <Summary label={amountLabel(kind, true)} value={inr(amount)} />
-                <Summary label={fields.showStart ? "Start" : "Date"} value={formatDate(startDate)} />
-                <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} />
+              <div className={cn("mt-4 grid gap-3 text-sm", kind === "lump_sum" ? "grid-cols-2" : "grid-cols-3")}>
+                <Summary label={kind === "lump_sum" ? "Amount (one-time)" : amountLabel(kind, true)} value={inr(amount)} />
+                <Summary label={kind === "lump_sum" ? "Date" : "Start"} value={formatDate(startDate)} />
+                {kind !== "lump_sum" ? <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} /> : null}
               </div>
             ) : kind === "habit" ? (
               <div className="mt-4 rounded-xl bg-surface-soft p-3 text-sm">
@@ -188,6 +196,33 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
             ) : null}
 
             <div className="mt-5 space-y-4">
+              {investable ? (
+                <div>
+                  <Label className="text-sm font-medium text-foreground">How do you want to invest?</Label>
+                  <div className="mt-1.5 flex gap-1 rounded-lg border border-input bg-surface-soft p-1">
+                    <button
+                      type="button"
+                      onClick={() => setMode("sip")}
+                      aria-pressed={mode === "sip"}
+                      className={cn("flex-1 rounded-md px-3 py-2 text-sm font-semibold transition", mode === "sip" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      Monthly SIP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("lumpsum")}
+                      aria-pressed={mode === "lumpsum"}
+                      className={cn("flex-1 rounded-md px-3 py-2 text-sm font-semibold transition", mode === "lumpsum" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      One-time lump sum
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {mode === "lumpsum" ? "A single one-time investment — it won't reduce your monthly budget." : "A fixed amount invested automatically every month."}
+                  </p>
+                </div>
+              ) : null}
+
               {fields.showAmount ? (
                 <div>
                   <Label htmlFor="ta-amount" className="text-sm font-medium text-foreground">{amountLabel(kind)}</Label>

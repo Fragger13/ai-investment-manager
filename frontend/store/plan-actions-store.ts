@@ -25,6 +25,10 @@ export type ActionTaken = {
   actionType: string;
   notes: string;
   takenAt: string;
+  /** Recurring monthly SIP vs a single one-time lump sum. Drives whether the
+   *  amount reduces the monthly budget and how the backend values the holding.
+   *  Legacy actions (no cadence) are treated as "monthly". */
+  cadence?: "monthly" | "one_time";
   /** The goal this action funds, when started from a goal-linked recommendation.
    *  Persisted so the backend can credit the contribution to that goal. */
   goalName?: string;
@@ -78,6 +82,7 @@ export const usePlanActionsStore = create<PlanActionsState>()(
           endDate: action.endDate,
           notes: action.notes,
           category: action.category,
+          cadence: action.cadence,
           goalName: action.goalName,
         }).catch(() => null);
       },

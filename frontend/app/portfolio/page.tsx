@@ -84,7 +84,8 @@ export default function PortfolioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
-  const localCommitments = useMemo(() => actionsTaken.reduce((sum, action) => sum + (action.amount || 0), 0), [actionsTaken]);
+  // Recurring SIPs only — one-time lump sums don't reduce the monthly budget.
+  const localCommitments = useMemo(() => actionsTaken.filter((action) => action.cadence !== "one_time").reduce((sum, action) => sum + (action.amount || 0), 0), [actionsTaken]);
   const totalCommitments = Math.max(data.committedMonthly, localCommitments);
   // Same "available this month" the dashboard + plan use (respects the per-month
   // override), so the Portfolio figure no longer contradicts them.

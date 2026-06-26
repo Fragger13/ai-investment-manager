@@ -68,7 +68,8 @@ export default function RecommendationsPage() {
   const items = useMemo(() => mergeIntoActionItems(data.recommendations, dashboard), [data.recommendations, dashboard]);
   // The budget every suggested amount is sized to. Recomputes (and the plan
   // re-sizes itself) whenever the profile's "available this month" changes.
-  const committedMonthly = useMemo(() => actionsTaken.reduce((sum, a) => sum + (a.amount || 0), 0), [actionsTaken]);
+  // One-time lump sums don't recur, so they don't reduce the monthly budget.
+  const committedMonthly = useMemo(() => actionsTaken.filter((a) => a.cadence !== "one_time").reduce((sum, a) => sum + (a.amount || 0), 0), [actionsTaken]);
   const available = useMemo(() => availableToInvest(profile, dashboard.summary.monthlyIncome, committedMonthly), [profile, dashboard.summary.monthlyIncome, committedMonthly]);
   const grouped = useMemo(() => buildPlan(items, takenKeys, available, true), [items, takenKeys, available]);
   const visible = grouped["Must Do"];
@@ -260,7 +261,7 @@ function MetaChips({ item }: { item: ActionItem }) {
 }
 
 /** The "how much" block — the number a beginner cares about most. */
-function AmountBlock({ item, committedAmount }: { item: ActionItem; committedAmount?: number }) {
+function AmountBlock({ item, committedAmount, committedCadence }: { item: ActionItem; committedAmount?: number; committedCadence?: "monthly" | "one_time" }) {
   // Once an action is taken, show what the user actually committed (not the
   // budget-calibrated suggestion or the goal's full need) so the figure on the
   // Completed card matches what they set up and never jumps after ticking off.
@@ -268,7 +269,7 @@ function AmountBlock({ item, committedAmount }: { item: ActionItem; committedAmo
     return (
       <div className="md:text-right">
         <p className="text-2xl font-extrabold tracking-tight text-foreground">{inr(committedAmount)}</p>
-        <p className="text-[13px] font-medium text-muted-foreground">committed / month</p>
+        <p className="text-[13px] font-medium text-muted-foreground">{committedCadence === "one_time" ? "committed · one-time" : "committed / month"}</p>
       </div>
     );
   }
@@ -374,7 +375,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
 
         {/* Money + action */}
         <div className="flex shrink-0 items-end justify-between gap-4 border-t border-border pt-4 md:flex-col md:items-end md:justify-center md:gap-3 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-          <AmountBlock item={item} committedAmount={taken ? actionFor?.amount : undefined} />
+          <AmountBlock item={item} committedAmount={taken ? actionFor?.amount : undefined} committedCadence={actionFor?.cadence} />
           <TakeActionDialog
             payload={takePayload(item)}
             trigger={
