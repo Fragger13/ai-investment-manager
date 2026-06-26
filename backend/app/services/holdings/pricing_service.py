@@ -142,6 +142,29 @@ def _price_metal(metal: str) -> float | None:
     return None
 
 
+def quote_unit_price(symbol: str, asset_class: str) -> float | None:
+    """Best-effort live price for ONE unit of an instrument, used when recording
+    an action (the default purchase price). Dispatches to the same sources as
+    refresh_prices. Returns None when the instrument can't be priced (e.g. a
+    fund identified only by name, or an unknown ticker)."""
+    ac = (asset_class or "").lower()
+    sym = (symbol or "").strip()
+    if not sym and ac not in ("gold", "silver"):
+        return None
+    if ac in ("stock", "etf", "equity", "share"):
+        return _price_stock(sym)
+    if ac in ("mutualfund", "mutual_fund", "fund", "mf", "index"):
+        # AMFI NAV is keyed by numeric scheme code; only resolves when the
+        # symbol is that code (otherwise the caller falls back to a passed price).
+        return _amfi_nav_map().get(sym)
+    if ac == "crypto":
+        return _price_crypto(sym)
+    if ac in ("gold", "silver"):
+        return _price_metal(ac)
+    # Unknown class: try a stock ticker, then crypto.
+    return _price_stock(sym) or _price_crypto(sym)
+
+
 def refresh_prices(holdings: Iterable[Holding]) -> list[Holding]:
     """Return a new list with currentValue + lastPricedAt updated where possible."""
     nav_map: dict[str, float] | None = None

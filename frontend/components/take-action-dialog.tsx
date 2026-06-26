@@ -30,6 +30,9 @@ export type TakeActionPayload = {
   reason?: string;
   expectedReturn?: string;
   risk?: string;
+  /** Known live unit price (e.g. a Discover idea's NAV/LTP). The dialog still
+   *  tries a fresh quote by ticker, falling back to this. */
+  livePrice?: number;
   // Hints
   kind?: ActionKind;
   goalName?: string;
@@ -70,6 +73,12 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const [linkToGoal, setLinkToGoal] = useState(true);
   const [mode, setMode] = useState<"sip" | "lumpsum">(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
   const [submitted, setSubmitted] = useState(false);
+  // Live unit price → default purchase price (editable). priceTouched stops us
+  // from overwriting a price the user has typed.
+  const [livePrice, setLivePrice] = useState<number | null>(payload.livePrice ?? null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [purchasePrice, setPurchasePrice] = useState<number>(existing?.purchasePrice ?? payload.livePrice ?? 0);
+  const [priceTouched, setPriceTouched] = useState(false);
 
   // Effective kind: a chosen lump sum behaves like a one-time contribution, a
   // chosen SIP like a recurring fund. Non-investment actions keep their kind.
@@ -90,9 +99,29 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       setLinkToGoal(true);
       setMode(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
       setSubmitted(false);
+      setLivePrice(payload.livePrice ?? null);
+      setPurchasePrice(existing?.purchasePrice ?? payload.livePrice ?? 0);
+      setPriceTouched(false);
     }
     onOpenChange?.(open);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch a fresh live unit price when the dialog opens for an investment.
+  useEffect(() => {
+    if (!open || !investable || !payload.ticker) return;
+    let active = true;
+    setPriceLoading(true);
+    api.quoteUnitPrice(payload.ticker, assetClassFromCategory(payload.category))
+      .then((res) => { if (active && res.price != null) setLivePrice(res.price); })
+      .catch(() => { /* keep any passed-in price */ })
+      .finally(() => { if (active) setPriceLoading(false); });
+    return () => { active = false; };
+  }, [open, investable, payload.ticker, payload.category]);
+
+  // Default the purchase price to the live price until the user edits it.
+  useEffect(() => {
+    if (livePrice != null && !priceTouched && !purchasePrice) setPurchasePrice(livePrice);
+  }, [livePrice, priceTouched, purchasePrice]);
 
   function toggleCommit(value: string) {
     setCommit((current) => current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]);
@@ -112,6 +141,8 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       actionType: payload.actionLabel.toLowerCase().includes("watch") ? "watching" : "took_action",
       notes: composedNotes,
       cadence: kind === "lump_sum" ? "one_time" : "monthly",
+      purchasePrice: fields.showAmount && purchasePrice > 0 ? purchasePrice : undefined,
+      livePrice: livePrice ?? undefined,
       goalName: payload.goalName,
     });
     // Auto-link the resulting holding to its goal (unless the user opted out).
@@ -160,11 +191,16 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <p className="mt-1 text-sm text-muted-foreground">We&apos;ll track this in your plan and let you know if anything changes that affects this decision.</p>
             </div>
             {fields.showAmount ? (
-              <div className={cn("mt-4 grid gap-3 text-sm", kind === "lump_sum" ? "grid-cols-2" : "grid-cols-3")}>
-                <Summary label={kind === "lump_sum" ? "Amount (one-time)" : amountLabel(kind, true)} value={inr(amount)} />
-                <Summary label={kind === "lump_sum" ? "Date" : "Start"} value={formatDate(startDate)} />
-                {kind !== "lump_sum" ? <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} /> : null}
-              </div>
+              <>
+                <div className={cn("mt-4 grid gap-3 text-sm", kind === "lump_sum" ? "grid-cols-2" : "grid-cols-3")}>
+                  <Summary label={kind === "lump_sum" ? "Amount (one-time)" : amountLabel(kind, true)} value={inr(amount)} />
+                  <Summary label={kind === "lump_sum" ? "Date" : "Start"} value={formatDate(startDate)} />
+                  {kind !== "lump_sum" ? <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} /> : null}
+                </div>
+                {purchasePrice > 0 ? (
+                  <p className="mt-3 text-center text-[13px] text-muted-foreground">Recorded buy price <span className="font-semibold text-foreground">{formatUnitPrice(purchasePrice)}</span> / unit</p>
+                ) : null}
+              </>
             ) : kind === "habit" ? (
               <div className="mt-4 rounded-xl bg-surface-soft p-3 text-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Committed to</p>
@@ -241,6 +277,31 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                   {payload.suggestedMonthlyAmount ? (
                     <p className="mt-1 text-xs text-muted-foreground">Suggested: {inr(payload.suggestedMonthlyAmount)}{kind === "lump_sum" ? " one-time" : "/month"}</p>
                   ) : null}
+                </div>
+              ) : null}
+
+              {fields.showAmount ? (
+                <div>
+                  <Label htmlFor="ta-price" className="text-sm font-medium text-foreground">Purchase price (per unit)</Label>
+                  <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-input bg-surface px-3">
+                    <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="ta-price"
+                      type="number"
+                      value={purchasePrice || ""}
+                      placeholder={livePrice != null ? String(livePrice) : "Market price"}
+                      onChange={(event) => { setPriceTouched(true); setPurchasePrice(Number(event.target.value || 0)); }}
+                      className="border-0 px-0 focus-visible:ring-0"
+                    />
+                    <span className="text-xs text-muted-foreground">/ unit</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {priceLoading
+                      ? "Fetching today's market price…"
+                      : livePrice != null
+                        ? <>Live price <span className="font-semibold text-foreground">{formatUnitPrice(livePrice)}</span> — pre-filled. Edit if your buy price differs.</>
+                        : "Live price unavailable — enter your purchase price if you know it."}
+                  </p>
                 </div>
               ) : null}
 
@@ -446,6 +507,23 @@ function inferKind(payload: TakeActionPayload): ActionKind {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Map a card's friendly category to the pricing service's asset-class hint.
+function assetClassFromCategory(category: string): string {
+  const t = (category || "").toLowerCase();
+  if (t.includes("etf")) return "etf";
+  if (t.includes("crypto")) return "crypto";
+  if (t.includes("gold")) return "gold";
+  if (t.includes("silver")) return "silver";
+  if (t.includes("stock") || t.includes("equity") || t.includes("share")) return "stock";
+  if (t.includes("fund") || t.includes("mutual") || t.includes("index") || t.includes("sip")) return "mutualFund";
+  return "";
+}
+
+// Unit prices (NAV/LTP) can be fractional, so keep up to 2 decimals.
+function formatUnitPrice(value: number): string {
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value: string) {

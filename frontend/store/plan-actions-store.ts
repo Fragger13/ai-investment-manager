@@ -29,6 +29,11 @@ export type ActionTaken = {
    *  amount reduces the monthly budget and how the backend values the holding.
    *  Legacy actions (no cadence) are treated as "monthly". */
   cadence?: "monthly" | "one_time";
+  /** Per-unit purchase price recorded for this buy. Defaults to the live market
+   *  price at the time of taking action; the user can override it. `livePrice`
+   *  keeps the market reference shown in the dialog. */
+  purchasePrice?: number;
+  livePrice?: number;
   /** The goal this action funds, when started from a goal-linked recommendation.
    *  Persisted so the backend can credit the contribution to that goal. */
   goalName?: string;
@@ -83,6 +88,8 @@ export const usePlanActionsStore = create<PlanActionsState>()(
           notes: action.notes,
           category: action.category,
           cadence: action.cadence,
+          purchasePrice: action.purchasePrice,
+          livePrice: action.livePrice,
           goalName: action.goalName,
         }).catch(() => null);
       },

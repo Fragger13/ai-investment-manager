@@ -274,6 +274,7 @@ export default function InvestmentDetailPage() {
                   reason: idea.summary,
                   expectedReturn: idea.expectedReturn,
                   risk: idea.risk,
+                  livePrice: idea.livePrice?.value,
                   kind: "fund",
                 }}
                 trigger={<Button variant="outline" className="w-full">Take Action Now <TrendingUp className="h-4 w-4" /></Button>}
