@@ -1,4 +1,4 @@
-import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, AssetResearch, CryptoOpportunity, DashboardData, DocumentAnalysis, DriftAlert, DriftResponse, FinancialCopilotBrief, Holding, MarketRegime, MarketSignal, MemoryTimeline, OnboardingProfile, PortfolioOptimization, PortfolioRebalancingSuggestion, PortfolioRiskMetric, PortfolioSummary, PortfolioTargetAllocation, PortfolioValidation, RecommendationReassessment, RecommendationVersion, ResearchSource, ResearchStatus, SignalImpactMap, SignalReliability, StrategyBacktest, ValidationRefresh } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, AssetResearch, CommunitySentiment, CryptoOpportunity, DashboardData, DocumentAnalysis, DriftAlert, DriftResponse, FinancialCopilotBrief, Holding, MarketRegime, MarketSignal, MemoryTimeline, OnboardingProfile, PortfolioOptimization, PortfolioRebalancingSuggestion, PortfolioRiskMetric, PortfolioSummary, PortfolioTargetAllocation, PortfolioValidation, RecommendationReassessment, RecommendationVersion, ResearchSource, ResearchStatus, SignalImpactMap, SignalReliability, StrategyBacktest, ValidationRefresh } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
@@ -200,6 +200,9 @@ export const api = {
   },
   async quoteUnitPrice(symbol: string, assetClass: string, name = ""): Promise<{ symbol: string; assetClass: string; price: number | null; asOf: string }> {
     return request(`/holdings/quote?symbol=${encodeURIComponent(symbol)}&assetClass=${encodeURIComponent(assetClass)}&name=${encodeURIComponent(name)}`);
+  },
+  async communitySentiment(name: string, assetClass: string): Promise<CommunitySentiment> {
+    return request(`/assets/community-sentiment?name=${encodeURIComponent(name)}&assetClass=${encodeURIComponent(assetClass)}`);
   },
   async analyzeDocument(fileName: string): Promise<DocumentAnalysis> {
     return request<DocumentAnalysis>("/documents/analyze", {

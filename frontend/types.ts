@@ -726,6 +726,9 @@ export type FundFactorInsights = {
 
 export type CommunitySentiment = {
   source?: string;
+  /** "asset" = chatter about this specific instrument; "category" = overall
+   *  forum mood (the robust fallback when the asset isn't being discussed). */
+  scope?: "asset" | "category";
   mentionCount: number;
   sentiment: "positive" | "negative" | "mixed" | "neutral";
   sentimentScore?: number;

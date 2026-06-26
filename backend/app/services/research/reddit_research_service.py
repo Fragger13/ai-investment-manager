@@ -32,8 +32,8 @@ from app.services.research.http_client import fetch_text
 # Curated, well-known per-class communities. These are *sources*, not assets, so
 # they do not violate the "no hardcoded assets" rule. Easy to extend.
 CURATED_SUBREDDITS: dict[str, list[str]] = {
-    "fund": ["mutualfunds", "IndiaInvestments"],
-    "equity": ["IndianStreetBets", "IndiaInvestments"],
+    "fund": ["mutualfunds", "IndiaInvestments", "personalfinanceindia"],
+    "equity": ["IndianStreetBets", "IndiaInvestments", "IndianStockMarket"],
     "crypto": ["CryptoCurrency", "CryptoIndia"],
 }
 
@@ -41,7 +41,7 @@ _FEED_URL = "https://www.reddit.com/r/{sub}/hot/.rss"
 _CACHE_TTL = 24 * 3600       # per-feed disk cache (http_client)
 _CORPUS_TTL = 6 * 3600       # in-memory assembled-corpus cache
 _REQUEST_GAP = 2.0           # seconds between the (few) live fetches in one build
-_MAX_LIVE_PER_BUILD = 2      # Reddit anon RSS is burst-limited per IP — stay gentle
+_MAX_LIVE_PER_BUILD = 3      # Reddit anon RSS is burst-limited per IP — stay gentle
 _MIN_MENTIONS_FOR_NUDGE = 3  # below this, sentiment is display-only (see priority engine)
 
 # Generic fund words that carry no matching signal — stripped when building aliases.
@@ -293,6 +293,89 @@ def community_sentiment_for(name: str, asset_class: str = "") -> dict:
         "disclaimer": "Community chatter is noisy and can be biased or manipulated — it is context, not advice.",
         "asOf": now_iso(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Public: robust sentiment — asset-specific when discussed, else category mood
+# ---------------------------------------------------------------------------
+
+
+def _class_key(asset_class: str) -> str:
+    """Map any incoming class label (e.g. "Mutual Fund", "Debt Fund", "ETF",
+    "Stock", "Crypto", "Gold") to one of the curated community keys."""
+    a = (asset_class or "").lower()
+    if "crypto" in a:
+        return "crypto"
+    if "equity" in a or "stock" in a or "share" in a:
+        return "equity"
+    return "fund"
+
+
+def _aggregate_sentiment(posts: list[dict]) -> dict | None:
+    if not posts:
+        return None
+    scores: list[int] = []
+    counts = {"bullish": 0, "bearish": 0, "mixed": 0, "neutral": 0}
+    bullish_terms: set[str] = set()
+    bearish_terms: set[str] = set()
+    for post in posts:
+        s = analyze_sentiment(post["text"])
+        scores.append(int(s.get("sentimentScore", 50)))
+        label = s.get("sentiment", "neutral")
+        counts[label] = counts.get(label, 0) + 1
+        bullish_terms.update(s.get("bullishTerms", []))
+        bearish_terms.update(s.get("bearishTerms", []))
+    mean_score = round(sum(scores) / len(scores))
+    if mean_score >= 58 and counts["bullish"] >= counts["bearish"]:
+        overall = "positive"
+    elif mean_score <= 42 and counts["bearish"] > counts["bullish"]:
+        overall = "negative"
+    elif counts["bullish"] and counts["bearish"]:
+        overall = "mixed"
+    else:
+        overall = "neutral"
+    return {
+        "sentiment": overall,
+        "sentimentScore": mean_score,
+        "bullishTerms": sorted(bullish_terms)[:6],
+        "bearishTerms": sorted(bearish_terms)[:6],
+        "subreddits": sorted({p["subreddit"] for p in posts}),
+    }
+
+
+def category_sentiment_for(asset_class: str = "") -> dict:
+    """Overall community mood across the relevant forums — the robust fallback
+    when a specific asset isn't being discussed. Tagged scope='category' so the
+    UI can phrase it as forum mood rather than asset-specific chatter."""
+    corpus = fetch_subreddit_corpus()
+    if not corpus:
+        return {}
+    key = _class_key(asset_class)
+    subs = set(CURATED_SUBREDDITS.get(key, []))
+    posts = [p for p in corpus if p["subreddit"] in subs] or corpus
+    agg = _aggregate_sentiment(posts[:150])
+    if not agg:
+        return {}
+    return {
+        "source": "reddit",
+        "scope": "category",
+        "mentionCount": min(len(posts), 150),
+        "disclaimer": "Overall mood in these forums right now — context, not advice, and not specific to this instrument.",
+        "asOf": now_iso(),
+        **agg,
+    }
+
+
+def sentiment_for(name: str, asset_class: str = "") -> dict:
+    """Asset-specific Reddit sentiment when the asset is genuinely being discussed,
+    otherwise the category-level community mood. Returns ``{}`` only when Reddit
+    is unreachable and nothing is cached — so the empty fallback stays rare."""
+    key = _class_key(asset_class)
+    specific = community_sentiment_for(name, key)
+    if specific and specific.get("mentionCount", 0) >= 1:
+        specific["scope"] = "asset"
+        return specific
+    return category_sentiment_for(key)
 
 
 # ---------------------------------------------------------------------------

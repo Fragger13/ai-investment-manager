@@ -13,6 +13,7 @@ import { InvestmentLogo } from "@/components/investment-logo";
 import { TakeActionDialog } from "@/components/take-action-dialog";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
 import { useAuthStore } from "@/store/auth-store";
+import { api } from "@/lib/api";
 import { inr } from "@/lib/utils";
 import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import type { CommunitySentiment } from "@/types";
@@ -25,6 +26,7 @@ export default function InvestmentDetailPage() {
   const profile = useEnsureProfile();
   const [idea, setIdea] = useState<InvestmentIdea | null>(null);
   const [allIdeas, setAllIdeas] = useState<InvestmentIdea[]>([]);
+  const [sentiment, setSentiment] = useState<CommunitySentiment | null>(null);
   const [goalImpactOpen, setGoalImpactOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const goalImpactRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,17 @@ export default function InvestmentDetailPage() {
       setIdea(null);
     }
   }, [slug]);
+
+  // Fetch live Reddit sentiment for this idea on demand — asset-specific when
+  // it's being discussed, else the forum's overall mood (robust fallback).
+  useEffect(() => {
+    if (!idea) { setSentiment(null); return; }
+    let active = true;
+    api.communitySentiment(idea.name, idea.category)
+      .then((res) => { if (active) setSentiment(res && res.mentionCount ? res : null); })
+      .catch(() => { if (active) setSentiment(null); });
+    return () => { active = false; };
+  }, [idea]);
 
   const addToPlan = usePlanActionsStore((state) => state.addToPlan);
   const removeFromPlan = usePlanActionsStore((state) => state.removeFromPlan);
@@ -151,7 +164,7 @@ export default function InvestmentDetailPage() {
 
       {/* Key facts — community pulse + return + SIP */}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <CommunityPulse community={idea.community} />
+        <CommunityPulse community={sentiment ?? idea.community} />
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -408,7 +421,9 @@ function CommunityPulse({ community }: { community?: CommunitySentiment | null }
               <span className={`h-2 w-2 rounded-full ${tone.dot}`} /> {tone.label}
             </span>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              {community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}{subs ? ` · ${subs}` : ""}. Context from Reddit — not advice.
+              {community.scope === "category"
+                ? <>Overall mood across {subs || "investing forums"} ({community.mentionCount} recent posts) — not specific to this one.</>
+                : <>{community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}{subs ? ` · ${subs}` : ""}. Context from Reddit — not advice.</>}
             </p>
           </>
         ) : (
