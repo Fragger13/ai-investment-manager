@@ -310,20 +310,37 @@ function calibrateToBudget(ranked: ActionItem[], available: number): ActionItem[
 }
 
 export function buildPlan(items: ActionItem[], takenKeys: Set<string>, available = 0, keepTaken = false): Record<TabName, ActionItem[]> {
-  // Pending items drive the order and budget sizing; the top MUST_DO_LIMIT are active.
+  if (keepTaken) {
+    // Plan page: the active set is the top MUST_DO_LIMIT by priority across ALL
+    // items (taken or not), so the plan's membership is stable. Ticking one off
+    // moves it to "Completed" WITHOUT promoting a 4th — the active list only
+    // changes when priorities or the budget change, not when you make progress.
+    const rankedAll = items.slice().sort((a, b) => priorityScore(b) - priorityScore(a));
+    const planSet = rankedAll.slice(0, MUST_DO_LIMIT);
+    const pending = planSet.filter((item) => !takenKeys.has(item.key));
+    // Only the still-pending members share this month's (already committed-
+    // reduced) budget; taken members show their committed amount in the UI.
+    const sizedPending = calibrateToBudget(pending, available);
+    const done = items
+      .filter((item) => takenKeys.has(item.key))
+      .sort((a, b) => priorityScore(b) - priorityScore(a));
+    const overflow = rankedAll.slice(MUST_DO_LIMIT).filter((item) => !takenKeys.has(item.key));
+    return {
+      "Must Do": [...sizedPending, ...done],
+      Consider: overflow.slice(0, CONSIDER_LIMIT),
+      Explore: overflow.slice(CONSIDER_LIMIT, CONSIDER_LIMIT + EXPLORE_LIMIT),
+    };
+  }
+  // Dashboard / default: rank pending-only and show the top MUST_DO_LIMIT, so a
+  // completed item drops out and the next pending item promotes into the window.
   const ranked = items
     .filter((item) => !takenKeys.has(item.key))
     .sort((a, b) => priorityScore(b) - priorityScore(a));
   const calibrated = calibrateToBudget(ranked, available);
   const mustDo = calibrated.slice(0, MUST_DO_LIMIT);
   const overflow = calibrated.slice(MUST_DO_LIMIT);
-  // keepTaken: completed items sink to the bottom as struck-off "wins" (and the next
-  // pending item promotes into the active list) instead of being dropped entirely.
-  const done = keepTaken
-    ? items.filter((item) => takenKeys.has(item.key)).sort((a, b) => priorityScore(b) - priorityScore(a))
-    : [];
   return {
-    "Must Do": [...mustDo, ...done],
+    "Must Do": mustDo,
     Consider: overflow.slice(0, CONSIDER_LIMIT),
     Explore: overflow.slice(CONSIDER_LIMIT, CONSIDER_LIMIT + EXPLORE_LIMIT),
   };

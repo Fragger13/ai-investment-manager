@@ -93,16 +93,15 @@ export default function RecommendationsPage() {
 
       <SavedByYouSection />
 
-      <div className="mb-5 flex items-center justify-end">
-        <Button variant="outline" onClick={() => load(true)} disabled={loading}>
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh plan"}
-        </Button>
-      </div>
-
       <Section
         subtitle={available > 0
-          ? `Your top 3, sized to the ${inr(available)} you have to invest this month. Tick one off — it drops to Completed and the next moves up.`
+          ? `Your top 3, sized to the ${inr(available)} you have to invest this month. Tick one off — it drops to Completed below.`
           : "Your top 3 things worth doing now. Tick one off and it drops to Completed below."}
+        action={
+          <Button variant="outline" onClick={() => load(true)} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh plan"}
+          </Button>
+        }
       >
         {visible.length > 0 ? <DoFirstProgress done={doneVisible.length} total={visible.length} /> : null}
         <div className="space-y-3">
@@ -261,7 +260,18 @@ function MetaChips({ item }: { item: ActionItem }) {
 }
 
 /** The "how much" block — the number a beginner cares about most. */
-function AmountBlock({ item }: { item: ActionItem }) {
+function AmountBlock({ item, committedAmount }: { item: ActionItem; committedAmount?: number }) {
+  // Once an action is taken, show what the user actually committed (not the
+  // budget-calibrated suggestion or the goal's full need) so the figure on the
+  // Completed card matches what they set up and never jumps after ticking off.
+  if (committedAmount && committedAmount > 0) {
+    return (
+      <div className="md:text-right">
+        <p className="text-2xl font-extrabold tracking-tight text-foreground">{inr(committedAmount)}</p>
+        <p className="text-[13px] font-medium text-muted-foreground">committed / month</p>
+      </div>
+    );
+  }
   if (hasMoneyAmount(item)) {
     const note = idealNote(item);
     return (
@@ -280,11 +290,14 @@ function AmountBlock({ item }: { item: ActionItem }) {
   );
 }
 
-function Section({ heading, subtitle, children }: { heading?: string; subtitle: string; children: React.ReactNode }) {
+function Section({ heading, subtitle, action, children }: { heading?: string; subtitle: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mb-6">
       {heading ? <h2 className="ap-section">{heading}</h2> : null}
-      <p className={cn("text-[15px] leading-relaxed text-muted-foreground", heading && "mt-1")}>{subtitle}</p>
+      <div className="flex items-start justify-between gap-4">
+        <p className={cn("text-[15px] leading-relaxed text-muted-foreground", heading && "mt-1")}>{subtitle}</p>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
       <div className="mt-4">{children}</div>
     </div>
   );
@@ -361,7 +374,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
 
         {/* Money + action */}
         <div className="flex shrink-0 items-end justify-between gap-4 border-t border-border pt-4 md:flex-col md:items-end md:justify-center md:gap-3 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-          <AmountBlock item={item} />
+          <AmountBlock item={item} committedAmount={taken ? actionFor?.amount : undefined} />
           <TakeActionDialog
             payload={takePayload(item)}
             trigger={
