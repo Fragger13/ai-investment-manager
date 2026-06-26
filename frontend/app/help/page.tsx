@@ -49,10 +49,10 @@ export default function HelpPage() {
     <AppShell>
       <div className="mb-7">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Help &amp; Contact 🛟</h1>
-        <p className="mt-2 text-base text-muted-foreground">Got a question, hit a bug, or have an idea? Tell Papa — it goes straight to the team.</p>
+        <p className="mt-2 text-base text-muted-foreground">Got a question, hit a bug, or have an idea? Tell Papa — it goes straight to him.</p>
       </div>
 
-      <Card className="max-w-2xl">
+      <Card className="max-w-4xl">
         <CardContent className="p-6">
           {sent ? (
             <div className="py-8 text-center">
@@ -84,7 +84,7 @@ export default function HelpPage() {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="Tell us what's on your mind…"
-                  className="mt-1.5 min-h-[140px]"
+                  className="mt-1.5 min-h-[240px]"
                 />
               </div>
 
