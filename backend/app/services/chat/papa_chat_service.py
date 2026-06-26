@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.agents.chat_context_assembler_agent import assemble_chat_context
 from app.schemas.financial import ChatCard, ChatResponse, OnboardingProfile
 from app.services.chat.context_builder_service import build_chat_context
-from app.services.intelligence import build_dashboard
+from app.services.intelligence import build_dashboard, current_ist_month, total_emi_payments
 from app.services.llm.model_router import generate_chat_answer
 
 
@@ -56,7 +56,11 @@ def papa_chat_answer(
         "maritalStatus": profile.maritalStatus,
         "monthlyIncome": summary.get("monthlyIncome"),
         "monthlyExpenses": summary.get("monthlyExpenses"),
-        "monthlySurplus": summary.get("investableSurplus"),
+        # Same figures the cards + the rest of the app show, so the LLM's spoken
+        # numbers stay consistent with what the user sees elsewhere.
+        "monthlyCommitments": round(_monthly_commitments(profile)),
+        "monthlySurplus": round(_available_this_month(profile, dashboard)),
+        "availableToInvest": round(_available_this_month(profile, dashboard)),
         "rent": profile.rent,
         "subscriptions": profile.subscriptions,
         "emi": profile.emi,
@@ -198,12 +202,24 @@ def _months_from_message(message: str, default: int = 6) -> int:
     return default
 
 
+def _monthly_commitments(profile: OnboardingProfile) -> float:
+    """Mirror the frontend's monthlyCommitments exactly (rent + monthly expenses
+    + EMIs) so the chat's numbers match the Dashboard, Plan and Portfolio."""
+    return float(profile.rent or 0) + float(profile.monthlyExpenses or 0) + float(total_emi_payments(profile))
+
+
+def _available_this_month(profile: OnboardingProfile, dashboard: dict) -> float:
+    """The same 'available to invest this month' shown everywhere else: the
+    per-month override when set for the current month, else income − commitments.
+    Income − commitments == available, so the chat's three numbers reconcile."""
+    income = float(dashboard.get("summary", {}).get("monthlyIncome") or 0)
+    if (profile.investableThisMonth or 0) > 0 and profile.investableThisMonthMonth == current_ist_month():
+        return float(profile.investableThisMonth)
+    return max(income - _monthly_commitments(profile), 0.0)
+
+
 def _surplus(profile: OnboardingProfile, dashboard: dict) -> float:
-    s = dashboard.get("summary", {})
-    income = float(s.get("monthlyIncome") or 0)
-    expenses = float(s.get("monthlyExpenses") or 0)
-    commitments = float(profile.rent or 0) + float(profile.subscriptions or 0) + float(profile.emi or 0)
-    return max(income - expenses - commitments, float(s.get("investableSurplus") or 0), 0)
+    return _available_this_month(profile, dashboard)
 
 
 # ---------------------------------------------------------------------------
@@ -477,8 +493,8 @@ def _build_cards(intent: str, profile: OnboardingProfile, dashboard: dict, messa
     s = dashboard.get("summary", {})
     income = float(s.get("monthlyIncome") or 0)
     expenses = float(s.get("monthlyExpenses") or 0)
-    commitments = float(profile.rent or 0) + float(profile.subscriptions or 0) + float(profile.emi or 0)
-    available = _surplus(profile, dashboard)
+    commitments = _monthly_commitments(profile)
+    available = _available_this_month(profile, dashboard)
 
     snapshot_intents = {
         "afford_purchase",

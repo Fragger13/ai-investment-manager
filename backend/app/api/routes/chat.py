@@ -17,19 +17,35 @@ def _latest_profile(db: Session) -> OnboardingProfile:
 
 @router.post("", response_model=ChatResponse)
 def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
-    profile = resolve_profile(db, payload.profile)
     history = [{"role": turn.role, "content": turn.content} for turn in (payload.history or [])]
-    response = papa_chat_answer(db, payload.message, profile, history=history)
-    if "recommendation" in payload.message.lower() or "portfolio" in payload.message.lower() or "drift" in payload.message.lower():
-        record_user_action(
-            db,
-            {
-                "actionType": "asked_ai",
-                "entityType": "ai_chat",
-                "entityId": "chat",
-                "entityName": "AI financial assistant",
-                "message": payload.message,
-            },
+    try:
+        profile = resolve_profile(db, payload.profile)
+        response = papa_chat_answer(db, payload.message, profile, history=history)
+    except Exception:  # noqa: BLE001 — the chat must never hard-fail (LLM hiccup, load, bad state)
+        response = ChatResponse(
+            reply=(
+                "Beta, I lost my train of thought for a second there. Ask me that once more — "
+                "or rephrase it slightly — and I'll work through it with you properly."
+            ),
+            cards=[],
+            suggestions=["Am I saving enough?", "Can I afford a car?", "What should I do today?"],
+            mood="warm",
         )
-    save_chat_message(db, payload.message, response.reply)
+    # Side effects must never break the reply that has already been formed.
+    try:
+        message_lower = (payload.message or "").lower()
+        if "recommendation" in message_lower or "portfolio" in message_lower or "drift" in message_lower:
+            record_user_action(
+                db,
+                {
+                    "actionType": "asked_ai",
+                    "entityType": "ai_chat",
+                    "entityId": "chat",
+                    "entityName": "AI financial assistant",
+                    "message": payload.message,
+                },
+            )
+        save_chat_message(db, payload.message, response.reply)
+    except Exception:  # noqa: BLE001
+        pass
     return response
