@@ -42,14 +42,16 @@ class Settings(BaseSettings):
     app_url: str = "http://localhost:3000"
     llm_provider: str = "ollama"
     llm_enabled: bool = True
-    llm_model: str = "llama3.1:8b"
+    llm_model: str = "qwen3:8b"
     ollama_base_url: str = "http://localhost:11434"
-    # llama3.1:8b — Meta's instruct model, strong general chat for M-series Macs.
-    # Falls back gracefully to qwen2.5:7b if you pull it; both fit on 16GB.
-    llm_model_reasoning: str = "llama3.1:8b"
-    llm_model_fast: str = "qwen2.5:7b"
-    llm_model_extraction: str = "qwen2.5:7b"
-    llm_model_summarize: str = "qwen2.5:7b"
+    # Defaults target qwen3:8b (commonly pulled here). The runtime resolves any
+    # configured model that isn't actually installed to one that is (see
+    # model_router._resolve_model), so a config/.env drift degrades to a working
+    # model instead of always falling back to the deterministic baseline.
+    llm_model_reasoning: str = "qwen3:8b"
+    llm_model_fast: str = "qwen3:8b"
+    llm_model_extraction: str = "qwen3:8b"
+    llm_model_summarize: str = "qwen3:8b"
     llm_timeout_seconds: int = 25
     llm_timeout_chat_seconds: int = 25
     llm_timeout_enhancement_seconds: int = 30

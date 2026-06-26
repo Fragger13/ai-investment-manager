@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -215,14 +216,55 @@ def _enabled() -> bool:
     return bool(settings.llm_enabled) and settings.llm_provider.lower() == "ollama"
 
 
+_MODEL_CACHE: dict[str, Any] = {"ts": 0.0, "models": set()}
+
+
+def _available_models() -> set[str]:
+    """Installed Ollama model names (lowercased), cached for 5 minutes."""
+    now = time.time()
+    cached = _MODEL_CACHE.get("models")
+    if cached and now - float(_MODEL_CACHE.get("ts", 0.0)) < 300:
+        return cached  # type: ignore[return-value]
+    try:
+        payload = OllamaClient()._get_json("/api/tags", timeout_seconds=2)  # noqa: SLF001
+        models = {
+            str(entry.get("name") or entry.get("model") or "").strip().lower()
+            for entry in payload.get("models", [])
+            if isinstance(entry, dict)
+        }
+    except Exception:  # noqa: BLE001 — never let availability checks break a call
+        models = set()
+    if models:
+        _MODEL_CACHE.update(ts=now, models=models)
+    return _MODEL_CACHE.get("models") or set()  # type: ignore[return-value]
+
+
+def _resolve_model(model: str) -> str:
+    """Return ``model`` if Ollama has it installed; otherwise substitute a
+    configured model that IS installed. This keeps the LLM working when a config
+    or .env points at a model that was never pulled (e.g. summarize → qwen2.5:7b),
+    instead of silently failing to the deterministic baseline every time."""
+    available = _available_models()
+    if not available:  # can't verify (offline / unreachable) — trust the config
+        return model
+    if model.strip().lower() in available:
+        return model
+    for candidate in (settings.llm_model_reasoning, settings.llm_model_fast, settings.llm_model):
+        if candidate and candidate.strip().lower() in available:
+            return candidate
+    return sorted(available)[0]
+
+
 def _model_for_task(task: LLMTask) -> str:
     if task in {"chat", "recommendation_explanation", "market_explanation"}:
-        return settings.llm_model_reasoning or settings.llm_model or "llama3.1:8b"
-    if task in {"asset_explanation", "market_signal_copy"}:
-        return settings.llm_model_fast or settings.llm_model or "qwen2.5:7b"
-    if task == "summarize":
-        return settings.llm_model_summarize or settings.llm_model_fast or settings.llm_model or "qwen2.5:7b"
-    return settings.llm_model_extraction or settings.llm_model or "qwen2.5:7b"
+        configured = settings.llm_model_reasoning or settings.llm_model or "qwen3:8b"
+    elif task in {"asset_explanation", "market_signal_copy"}:
+        configured = settings.llm_model_fast or settings.llm_model or "qwen3:8b"
+    elif task == "summarize":
+        configured = settings.llm_model_summarize or settings.llm_model_fast or settings.llm_model or "qwen3:8b"
+    else:
+        configured = settings.llm_model_extraction or settings.llm_model or "qwen3:8b"
+    return _resolve_model(configured)
 
 
 def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
