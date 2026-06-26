@@ -261,47 +261,57 @@ export default function InvestmentDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-lg font-bold tracking-tight text-foreground">Ready to invest?</p>
-            <p className="mt-1 text-sm text-muted-foreground">Add this fund to your plan, then choose a monthly SIP or a one-time lump sum when you take action.</p>
+        {/* Ready to invest — green-gradient card matching the AskPapa design */}
+        <div className="flex flex-col overflow-hidden rounded-3xl bg-[linear-gradient(160deg,#0E7A4A,#0A5C39)] p-6 text-white shadow-pop">
+          <h3 className="text-lg font-bold tracking-tight text-white">Ready to invest?</h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-[#BFE4CD]">Add this fund to your plan, then choose a monthly SIP or a one-time lump sum when you take action.</p>
 
-            <div className="mt-4 rounded-xl bg-surface-soft p-4">
-              <p className="text-[13px] uppercase tracking-wide text-muted-foreground">Suggested SIP to start</p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
-              <p className="mt-1 text-[13px] text-muted-foreground">Or invest a lump sum — pick in the next step.</p>
-            </div>
+          <div className="mt-4 rounded-2xl bg-white/[0.12] p-4">
+            <p className="text-xs uppercase tracking-wide text-[#BFE4CD]">Suggested SIP to start</p>
+            <p className="mt-1 text-[28px] font-extrabold leading-none tracking-tight text-white">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
+            <p className="mt-2 text-[13px] text-[#BFE4CD]">Or invest a lump sum — pick in the next step.</p>
+          </div>
 
-            <div className="mt-4 space-y-2.5">
-              <Button className="w-full" onClick={togglePlan}>
-                {inPlan ? (<><CheckCircle2 className="h-4 w-4" /> Added to Plan</>) : (<>Add to Plan <ArrowRight className="h-4 w-4" /></>)}
-              </Button>
-              <TakeActionDialog
-                payload={{
-                  key: idea.id,
-                  instrumentName: idea.name,
-                  category: idea.category,
-                  ticker: idea.ticker,
-                  suggestedMonthlyAmount: idea.suggestedAmount,
-                  actionLabel: idea.action,
-                  reason: idea.summary,
-                  expectedReturn: idea.expectedReturn,
-                  risk: idea.risk,
-                  livePrice: idea.livePrice?.value,
-                  kind: "fund",
-                }}
-                trigger={<Button variant="outline" className="w-full">Take Action Now <TrendingUp className="h-4 w-4" /></Button>}
-              />
-              <button
-                onClick={() => setCompareOpen(true)}
-                disabled={!similarIdeas.length}
-                className="block w-full rounded-md border border-border bg-surface px-4 py-2 text-center text-sm font-medium text-foreground transition hover:bg-surface-hover disabled:opacity-50"
-              >
-                Compare with other funds
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="mt-4 space-y-2.5">
+            <button
+              type="button"
+              onClick={togglePlan}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#0A5C39] transition hover:bg-white/90"
+            >
+              {inPlan ? (<><CheckCircle2 className="h-4 w-4" /> Added to Plan</>) : (<>Add to Plan <ArrowRight className="h-4 w-4" /></>)}
+            </button>
+            <TakeActionDialog
+              payload={{
+                key: idea.id,
+                instrumentName: idea.name,
+                category: idea.category,
+                ticker: idea.ticker,
+                suggestedMonthlyAmount: idea.suggestedAmount,
+                actionLabel: idea.action,
+                reason: idea.summary,
+                expectedReturn: idea.expectedReturn,
+                risk: idea.risk,
+                livePrice: idea.livePrice?.value,
+                kind: "fund",
+              }}
+              trigger={
+                <button type="button" className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/[0.14] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20">
+                  Take Action Now <TrendingUp className="h-4 w-4" />
+                </button>
+              }
+            />
+            <button
+              type="button"
+              onClick={() => setCompareOpen(true)}
+              disabled={!similarIdeas.length}
+              className="w-full rounded-xl bg-white/[0.14] px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
+            >
+              Compare with other funds
+            </button>
+          </div>
+
+          <p className="mt-4 text-[11.5px] leading-relaxed text-[#9CC8AE]">Past performance doesn&apos;t guarantee future returns. Read scheme-related documents carefully before investing.</p>
+        </div>
       </div>
 
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
