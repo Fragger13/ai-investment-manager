@@ -89,10 +89,11 @@ class QuoteResponse(BaseModel):
 
 
 @router.get("/quote", response_model=QuoteResponse)
-def quote(symbol: str = "", assetClass: str = "") -> QuoteResponse:
+def quote(symbol: str = "", assetClass: str = "", name: str = "") -> QuoteResponse:
     """Live per-unit price for one instrument — backs the Take Action popup's
-    default purchase price. Returns price=null (not an error) when unavailable."""
+    default purchase price. `name` lets funds resolve by fuzzy AMFI match when no
+    scheme code/ticker is known. Returns price=null (not an error) when unavailable."""
     from app.services.intelligence import now_iso
 
-    price = quote_unit_price(symbol, assetClass)
+    price = quote_unit_price(symbol, assetClass, name)
     return QuoteResponse(symbol=symbol, assetClass=assetClass, price=price, asOf=now_iso() if price else "")

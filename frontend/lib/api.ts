@@ -198,8 +198,8 @@ export const api = {
       body: JSON.stringify({ holdings })
     });
   },
-  async quoteUnitPrice(symbol: string, assetClass: string): Promise<{ symbol: string; assetClass: string; price: number | null; asOf: string }> {
-    return request(`/holdings/quote?symbol=${encodeURIComponent(symbol)}&assetClass=${encodeURIComponent(assetClass)}`);
+  async quoteUnitPrice(symbol: string, assetClass: string, name = ""): Promise<{ symbol: string; assetClass: string; price: number | null; asOf: string }> {
+    return request(`/holdings/quote?symbol=${encodeURIComponent(symbol)}&assetClass=${encodeURIComponent(assetClass)}&name=${encodeURIComponent(name)}`);
   },
   async analyzeDocument(fileName: string): Promise<DocumentAnalysis> {
     return request<DocumentAnalysis>("/documents/analyze", {

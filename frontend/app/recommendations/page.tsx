@@ -440,6 +440,7 @@ function takePayload(item: ActionItem) {
   return {
     key: item.key,
     instrumentName: item.title,
+    quoteName: item.instrumentName,
     category: item.category,
     ticker: item.ticker,
     suggestedMonthlyAmount: item.suggestedMonthlyAmount,

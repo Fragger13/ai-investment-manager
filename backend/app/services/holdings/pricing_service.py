@@ -14,6 +14,7 @@ with source='manual' and currentValue unchanged.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Iterable
 from urllib.parse import quote
@@ -142,27 +143,97 @@ def _price_metal(metal: str) -> float | None:
     return None
 
 
-def quote_unit_price(symbol: str, asset_class: str) -> float | None:
-    """Best-effort live price for ONE unit of an instrument, used when recording
-    an action (the default purchase price). Dispatches to the same sources as
-    refresh_prices. Returns None when the instrument can't be priced (e.g. a
-    fund identified only by name, or an unknown ticker)."""
+# Noise tokens to strip before matching a fund name to AMFI — friendly-title
+# verbs ("Add ..."/"Increase ... SIP") plus generic scheme words.
+_FUND_STOP = {
+    "fund", "plan", "scheme", "the", "of", "and", "a", "an",
+    "add", "increase", "boost", "start", "review", "avoid", "buy", "sip", "new", "your",
+}
+_NAME_INDEX_CACHE: dict[str, tuple[float, list[tuple[frozenset, float, str]]]] = {}
+
+
+def _fund_tokens(name: str) -> frozenset:
+    toks = re.findall(r"[a-z0-9]+", (name or "").lower())
+    return frozenset(t for t in toks if t not in _FUND_STOP and len(t) > 1)
+
+
+def _amfi_name_index() -> list[tuple[frozenset, float, str]]:
+    """Cached [(name_tokens, nav, scheme_name)] over the AMFI NAV file, so a fund
+    can be priced from its NAME when no scheme code is available."""
+    cached = _NAME_INDEX_CACHE.get("idx")
+    now = time.time()
+    if cached and now - cached[0] < _AMFI_TTL:
+        return cached[1]
+    text, _, _ = fetch_amfi_nav_text()
+    idx: list[tuple[frozenset, float, str]] = []
+    if text:
+        for line in text.splitlines():
+            parts = line.split(";")
+            if len(parts) >= 5:
+                name = parts[3].strip()
+                if not name:
+                    continue
+                try:
+                    nav = float(parts[4].strip())
+                except ValueError:
+                    continue
+                if nav > 0:
+                    idx.append((_fund_tokens(name), nav, name))
+    _NAME_INDEX_CACHE["idx"] = (now, idx)
+    return idx
+
+
+def _match_fund_nav(name: str) -> float | None:
+    """Best fuzzy match of a fund name to its latest NAV, preferring the
+    Direct-Growth variant. Returns None if nothing matches confidently."""
+    q = _fund_tokens(name)
+    if len(q) < 2:
+        return None
+    best_nav: float | None = None
+    best_score = 0.0
+    for cand_tokens, nav, cand_name in _amfi_name_index():
+        overlap = len(q & cand_tokens)
+        if overlap < 2:
+            continue
+        coverage = overlap / len(q)
+        if coverage < 0.7:
+            continue
+        lname = cand_name.lower()
+        score = coverage
+        score += 0.15 if "direct" in lname else 0.0
+        score += 0.10 if "growth" in lname else 0.0
+        score -= 0.02 * len(cand_tokens - q)  # penalise longer, divergent names
+        if score > best_score:
+            best_score = score
+            best_nav = nav
+    return best_nav if best_score >= 0.7 else None
+
+
+def quote_unit_price(symbol: str, asset_class: str, name: str = "") -> float | None:
+    """Best-effort live price for ONE unit of an instrument, used as the default
+    purchase price when recording an action. Funds resolve by AMFI scheme code
+    when known, otherwise by fuzzy name match — so most recommendations price
+    even without a ticker. Returns None only when nothing resolves."""
     ac = (asset_class or "").lower()
     sym = (symbol or "").strip()
-    if not sym and ac not in ("gold", "silver"):
-        return None
+    price: float | None = None
+
     if ac in ("stock", "etf", "equity", "share"):
-        return _price_stock(sym)
-    if ac in ("mutualfund", "mutual_fund", "fund", "mf", "index"):
-        # AMFI NAV is keyed by numeric scheme code; only resolves when the
-        # symbol is that code (otherwise the caller falls back to a passed price).
-        return _amfi_nav_map().get(sym)
-    if ac == "crypto":
-        return _price_crypto(sym)
-    if ac in ("gold", "silver"):
-        return _price_metal(ac)
-    # Unknown class: try a stock ticker, then crypto.
-    return _price_stock(sym) or _price_crypto(sym)
+        price = _price_stock(sym)
+    elif ac in ("mutualfund", "mutual_fund", "fund", "mf", "index", "debt", "hybrid", "elss"):
+        price = _amfi_nav_map().get(sym) or _match_fund_nav(name or sym)
+    elif ac == "crypto":
+        price = _price_crypto(sym)
+    elif ac in ("gold", "silver"):
+        price = _price_metal(ac)
+    else:
+        price = _price_stock(sym) or _price_crypto(sym)
+
+    # General safety net: most recommendations are mutual funds, so try a fund
+    # name match for anything still unpriced (covers mislabeled/tickerless recs).
+    if price is None:
+        price = _match_fund_nav(name or sym)
+    return price
 
 
 def refresh_prices(holdings: Iterable[Holding]) -> list[Holding]:

@@ -31,8 +31,11 @@ export type TakeActionPayload = {
   expectedReturn?: string;
   risk?: string;
   /** Known live unit price (e.g. a Discover idea's NAV/LTP). The dialog still
-   *  tries a fresh quote by ticker, falling back to this. */
+   *  tries a fresh quote, falling back to this. */
   livePrice?: number;
+  /** Raw instrument name for pricing (when the display name is a friendly title
+   *  like "Increase ... SIP"). Used to resolve a fund's NAV by name. */
+  quoteName?: string;
   // Hints
   kind?: ActionKind;
   goalName?: string;
@@ -106,17 +109,18 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
     onOpenChange?.(open);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch a fresh live unit price when the dialog opens for an investment.
+  // Fetch a fresh live unit price when the dialog opens for an investment. Funds
+  // resolve by name when there's no ticker, so this runs even without one.
   useEffect(() => {
-    if (!open || !investable || !payload.ticker) return;
+    if (!open || !investable) return;
     let active = true;
     setPriceLoading(true);
-    api.quoteUnitPrice(payload.ticker, assetClassFromCategory(payload.category))
+    api.quoteUnitPrice(payload.ticker || "", assetClassFromCategory(payload.category), payload.quoteName || payload.instrumentName)
       .then((res) => { if (active && res.price != null) setLivePrice(res.price); })
       .catch(() => { /* keep any passed-in price */ })
       .finally(() => { if (active) setPriceLoading(false); });
     return () => { active = false; };
-  }, [open, investable, payload.ticker, payload.category]);
+  }, [open, investable, payload.ticker, payload.category, payload.quoteName, payload.instrumentName]);
 
   // Default the purchase price to the live price until the user edits it.
   useEffect(() => {
