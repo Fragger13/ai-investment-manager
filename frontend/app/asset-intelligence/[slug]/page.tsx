@@ -149,17 +149,9 @@ export default function InvestmentDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Key facts — clean 3-up row (Risk / Return / SIP) */}
+      {/* Key facts — community pulse + return + SIP */}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <ShieldCheck className="h-4 w-4" />
-              <p className="text-sm font-semibold text-foreground">Risk level</p>
-            </div>
-            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{riskBlurb(idea.risk)}</p>
-          </CardContent>
-        </Card>
+        <CommunityPulse community={idea.community} />
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -181,9 +173,6 @@ export default function InvestmentDetailPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* What people are saying — Reddit-derived community pulse (trust signal) */}
-      <CommunityPulse community={idea.community} />
 
       {/* Live price + buy/sell ranges where we have them */}
       {(idea.livePrice || idea.buyRange || idea.sellRange) ? (
@@ -234,6 +223,28 @@ export default function InvestmentDetailPage() {
               <DetailRow icon={PieChart} label="Expense ratio" value="0.15% (Very Low)" />
               <DetailRow icon={Lock} label="Lock-in period" value="No Lock-in" />
             </div>
+
+            {/* Risk level + risks — relocated here to keep the top of the page clean */}
+            <div className="mt-5 border-t border-border pt-5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">Risk level — {idea.risk}</p>
+              </div>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{riskBlurb(idea.risk)}</p>
+              {idea.risks.length ? (
+                <>
+                  <p className="mt-4 text-sm font-semibold text-foreground">Risks to be aware of</p>
+                  <ul className="mt-2 space-y-2">
+                    {idea.risks.slice(0, 4).map((risk) => (
+                      <li key={risk} className="flex items-start gap-2 text-[13px] text-foreground">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
+                        {risk}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
@@ -278,23 +289,6 @@ export default function InvestmentDetailPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Risks list — kept compact below */}
-      {idea.risks.length ? (
-        <Card className="mt-5">
-          <CardContent className="p-6">
-            <p className="text-lg font-bold tracking-tight text-foreground">Risks to be aware of</p>
-            <ul className="mt-3 space-y-2">
-              {idea.risks.slice(0, 4).map((risk) => (
-                <li key={risk} className="flex items-start gap-2 text-sm text-foreground">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
-                  {risk}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <DialogContent className="max-h-[88vh] w-[min(820px,96vw)] overflow-y-auto p-0">
@@ -389,38 +383,36 @@ function PriceTile({ label, value, sub }: { label: string; value: string; sub: s
   );
 }
 
+// Compact "What people are saying" card — sits in the key-facts row in place of
+// the old Risk card. Always renders (with a graceful empty state) so the trust
+// signal is a consistent fixture. Fed by the Reddit research layer.
 function CommunityPulse({ community }: { community?: CommunitySentiment | null }) {
-  if (!community || !community.mentionCount) return null;
+  const has = Boolean(community && community.mentionCount);
   const tone =
-    community.sentiment === "positive" ? { label: "Mostly positive", dot: "bg-positive", text: "text-positive-foreground", soft: "bg-positive-soft" }
-    : community.sentiment === "negative" ? { label: "Mostly negative", dot: "bg-negative", text: "text-negative-foreground", soft: "bg-negative-soft" }
-    : community.sentiment === "mixed" ? { label: "Mixed views", dot: "bg-warning", text: "text-warning-foreground", soft: "bg-warning-soft" }
-    : { label: "Neutral chatter", dot: "bg-info", text: "text-info-foreground", soft: "bg-info-soft" };
-  const subs = (community.subreddits || []).slice(0, 3).map((s) => `r/${s}`).join(", ");
-  const terms = [...(community.bullishTerms || []), ...(community.bearishTerms || [])].slice(0, 5);
+    community?.sentiment === "positive" ? { label: "Mostly positive", dot: "bg-positive", text: "text-positive-foreground", soft: "bg-positive-soft" }
+    : community?.sentiment === "negative" ? { label: "Mostly negative", dot: "bg-negative", text: "text-negative-foreground", soft: "bg-negative-soft" }
+    : community?.sentiment === "mixed" ? { label: "Mixed views", dot: "bg-warning", text: "text-warning-foreground", soft: "bg-warning-soft" }
+    : { label: "Neutral", dot: "bg-info", text: "text-info-foreground", soft: "bg-info-soft" };
+  const subs = (community?.subreddits || []).slice(0, 2).map((s) => `r/${s}`).join(", ");
   return (
-    <Card className="mb-5">
+    <Card>
       <CardContent className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MessagesSquare className="h-4 w-4" />
-            <p className="text-sm font-semibold text-foreground">What people are saying</p>
-          </div>
-          <span className={`inline-flex items-center gap-1.5 rounded-full ${tone.soft} px-3 py-1 text-xs font-semibold ${tone.text}`}>
-            <span className={`h-2 w-2 rounded-full ${tone.dot}`} /> {tone.label}
-          </span>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <MessagesSquare className="h-4 w-4" />
+          <p className="text-sm font-semibold text-foreground">What people are saying</p>
         </div>
-        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-          Based on <span className="font-semibold text-foreground">{community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}</span>
-          {subs ? ` across ${subs}` : ""}. Community chatter is noisy and can be biased — treat it as context, not advice.
-        </p>
-        {terms.length ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {terms.map((term) => (
-              <span key={term} className="rounded-full bg-surface-soft px-2.5 py-1 text-xs text-muted-foreground">{term}</span>
-            ))}
-          </div>
-        ) : null}
+        {has && community ? (
+          <>
+            <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full ${tone.soft} px-2.5 py-1 text-xs font-semibold ${tone.text}`}>
+              <span className={`h-2 w-2 rounded-full ${tone.dot}`} /> {tone.label}
+            </span>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              {community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}{subs ? ` · ${subs}` : ""}. Context from Reddit — not advice.
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">No notable community chatter on this one yet. We&apos;ll surface Reddit sentiment here when it appears.</p>
+        )}
       </CardContent>
     </Card>
   );

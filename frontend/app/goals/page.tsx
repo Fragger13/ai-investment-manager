@@ -16,10 +16,12 @@ import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { goalIconSpec } from "@/lib/icon-maps";
 import { emptyDashboard } from "@/lib/profile";
+import { ActionItem, mergeIntoActionItems } from "@/lib/plan";
 import { cn, inr } from "@/lib/utils";
 import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { useAuthStore } from "@/store/auth-store";
-import { DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
+import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { AdvancedRecommendation, DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
 
 export default function GoalsPage() {
   // Recover the profile from the backend if the store is empty (deep load /
@@ -27,15 +29,20 @@ export default function GoalsPage() {
   const profile = useEnsureProfile();
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
+  const [rawRecs, setRawRecs] = useState<AdvancedRecommendation[]>([]);
 
   useEffect(() => {
     if (profile) {
       api.dashboard(profile).then(setData);
       api.portfolioSummary(profile).then(setPortfolio).catch(() => setPortfolio(null));
+      // Pull the same plan recommendations so each goal's "Save more" fix can
+      // offer the user's goal-linked picks to act on (amount pre-filled).
+      api.generateAdvancedRecommendations(profile, false).then((res) => setRawRecs(res.recommendations || [])).catch(() => setRawRecs([]));
     }
   }, [profile]);
 
   const holdings = portfolio?.holdings ?? [];
+  const recItems = useMemo(() => mergeIntoActionItems(rawRecs, data), [rawRecs, data]);
 
   // Build a quick index from goal display name → original ProfileGoal so we can edit
   function findProfileGoal(dashboardGoalName: string): { goal: ProfileGoal; index: number } | null {
@@ -67,7 +74,7 @@ export default function GoalsPage() {
       <div className="space-y-5">
         {data.goals.map((goal) => {
           const match = findProfileGoal(goal.name);
-          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} />;
+          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} recItems={recItems} />;
         })}
       </div>
 
@@ -90,7 +97,7 @@ export default function GoalsPage() {
   );
 }
 
-function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[] }) {
+function GoalCard({ goal, profileGoal, holdings, recItems }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; recItems: ActionItem[] }) {
   const linkedIds = profileGoal?.goal.linkedHoldingIds || [];
   const linkedHoldings = useMemo(
     () => holdings.filter((h) => linkedIds.includes(h.id)),
@@ -165,7 +172,7 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
           </div>
         </div>
 
-        {!onTrack ? <PickAFix goal={goal} profileGoal={profileGoal} /> : null}
+        {!onTrack ? <PickAFix goal={goal} profileGoal={profileGoal} recItems={recItems} /> : null}
       </CardContent>
     </Card>
   );
@@ -243,15 +250,30 @@ function Stat({ label, value }: { label: string; value: string }) {
 // goal. The recommended one is highlighted; clicking any reveals the actual
 // action (start an SIP / take a moderate-risk fund / push the deadline) so the
 // user can act on it right there.
-function PickAFix({ goal, profileGoal }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null }) {
+function PickAFix({ goal, profileGoal, recItems }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; recItems: ActionItem[] }) {
   const profile = useAuthStore((state) => state.profile);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const token = useAuthStore((state) => state.token);
   const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
   const [selected, setSelected] = useState<"save" | "extend" | "risk" | null>(null);
   const [extended, setExtended] = useState(false);
 
   const saveMore = Math.max(Math.round((goal.requiredMonthlyInvestment || 0) / 500) * 500, 500);
+  // Plan picks (pending or already-started) that fund THIS goal — the user picks
+  // one and acts with the "save more" amount pre-filled.
+  const goalKey = normKey(goal.name);
+  const linkedOptions = useMemo(() => {
+    const takenByKey = new Map(actionsTaken.map((a) => [a.key, a]));
+    const fromRecs = recItems
+      .filter((it) => it.goalName && normKey(it.goalName) === goalKey)
+      .map((it) => ({ key: it.key, name: it.title, category: it.category, ticker: it.ticker, expectedReturn: it.expectedReturn, risk: it.risk, completed: takenByKey.has(it.key) }));
+    const recKeys = new Set(fromRecs.map((o) => o.key));
+    const fromCompleted = actionsTaken
+      .filter((a) => a.goalName && normKey(a.goalName) === goalKey && !recKeys.has(a.key))
+      .map((a) => ({ key: a.key, name: a.instrumentName, category: a.category, ticker: a.ticker, expectedReturn: undefined as string | undefined, risk: undefined as string | undefined, completed: true }));
+    return [...fromRecs, ...fromCompleted];
+  }, [recItems, actionsTaken, goalKey]);
   const extendMonths = goal.feasibilityScore >= 45 ? 4 : 8;
   const newTargetDate = useMemo(() => {
     const base = profileGoal?.goal.targetDate ? new Date(profileGoal.goal.targetDate) : new Date();
@@ -329,19 +351,39 @@ function PickAFix({ goal, profileGoal }: { goal: DashboardData["goals"][number];
         ))}
       </div>
 
-      {selected === "save" || selected === "risk" ? (
+      {selected === "save" ? (
+        <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm font-bold text-foreground">Put {inr(saveMore)}/mo toward {goal.name}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {linkedOptions.length ? "Pick one of your plan picks linked to this goal — the amount is pre-filled when you take action." : "Start a fresh contribution toward this goal."}
+          </p>
+          <div className="mt-3 space-y-2">
+            {linkedOptions.length ? linkedOptions.map((opt) => (
+              <div key={opt.key} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
+                <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
+                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.completed ? " · already started" : ""}</p>
+                </div>
+                <TakeActionDialog
+                  payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: opt.completed ? "Top up" : "Start SIP", expectedReturn: opt.expectedReturn, risk: opt.risk, kind: "fund" as const, goalName: goal.name }}
+                  trigger={<Button size="sm" variant={opt.completed ? "outline" : "default"} className="shrink-0">{opt.completed ? "Top up" : "Take action"}</Button>}
+                />
+              </div>
+            )) : (
+              <TakeActionDialog payload={savePayload} trigger={<Button className="w-full sm:w-auto">Start a contribution</Button>} />
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {selected === "risk" ? (
         <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-foreground">
-              {selected === "save" ? `Set up ${inr(saveMore)}/mo toward ${goal.name}` : `Start a moderate-risk SIP for ${goal.name}`}
-            </p>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
-              {selected === "save"
-                ? "Records the contribution and links it to this goal, so progress updates automatically."
-                : "Balanced Advantage Fund · ~10–12% p.a. · medium risk. You confirm the amount next."}
-            </p>
+            <p className="text-sm font-bold text-foreground">Start a moderate-risk SIP for {goal.name}</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">Balanced Advantage Fund · ~10–12% p.a. · medium risk. You confirm the amount next.</p>
           </div>
-          <TakeActionDialog payload={selected === "save" ? savePayload : riskPayload} trigger={<Button className="shrink-0">Take action</Button>} />
+          <TakeActionDialog payload={riskPayload} trigger={<Button className="shrink-0">Take action</Button>} />
         </div>
       ) : null}
 
@@ -368,6 +410,10 @@ function PickAFix({ goal, profileGoal }: { goal: DashboardData["goals"][number];
 
 function formatMonthYear(date: Date) {
   return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
+function normKey(value: string) {
+  return (value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function EmptyState({ text, href, cta, useDialog }: { text: string; href?: string; cta: string; useDialog: boolean }) {

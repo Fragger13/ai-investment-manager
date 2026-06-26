@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, CheckCircle2, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Pencil, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { AppShell } from "@/components/app-shell";
+import { PortfolioBuckets } from "@/app/onboarding/_screens/assets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +18,7 @@ import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { cn, inr } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { PortfolioHolding, PortfolioSummary } from "@/types";
+import { OnboardingProfile, PortfolioHolding, PortfolioSummary } from "@/types";
 
 const empty: PortfolioSummary = {
   netWorth: 0,
@@ -99,6 +101,19 @@ export default function PortfolioPage() {
   const actionContributedValue = data.actionContributedValue || 0;
   const baseNetWorth = data.baseNetWorth ?? Math.max(0, data.netWorth - actionContributedValue);
 
+  // Keep the "Room to invest more" insight in lockstep with the hero's
+  // "Available this month" figure (which respects the per-month override and
+  // already-committed actions) — the backend insight uses raw surplus and drifts.
+  const syncedInsights = useMemo(
+    () => (data.insights || []).map((insight) => {
+      if (!/room to invest/i.test(insight.title)) return insight;
+      return available > 0
+        ? { ...insight, body: `About ${inr(available)}/mo is available this month. Adding plan actions routes this surplus to your goals.` }
+        : { ...insight, tone: "warning" as typeof insight.tone, title: "Fully allocated this month", body: "Your available-to-invest is committed for now. Free up budget or wait for next month to add more." };
+    }),
+    [data.insights, available],
+  );
+
   // P&L is the sum of (currentValue - valueAtCost) across holdings that have a cost basis.
   const { totalInvested, plRupees, plPercent, plHoldingCount } = useMemo(() => {
     let invested = 0;
@@ -144,7 +159,10 @@ export default function PortfolioPage() {
       {/* Hero — Net Worth */}
       <Card className="mb-6 overflow-hidden">
         <CardContent className="p-6">
-          <p className="ap-label">Total Net Worth</p>
+          <div className="flex items-center gap-1.5">
+            <p className="ap-label">Total Net Worth</p>
+            <EditInvestmentsDialog onSaved={load} />
+          </div>
           <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
             <p className="text-5xl font-extrabold tracking-tight text-foreground md:text-6xl tnum">{inr(data.netWorth)}</p>
             <div className="flex flex-wrap items-center gap-2 pb-1.5">
@@ -174,9 +192,9 @@ export default function PortfolioPage() {
       </Card>
 
       {/* Insights — clean aligned strip (dot + title + body) */}
-      {data.insights?.length ? (
+      {syncedInsights.length ? (
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.insights.slice(0, 3).map((insight, index) => <InsightTile key={index} insight={insight} />)}
+          {syncedInsights.slice(0, 3).map((insight, index) => <InsightTile key={index} insight={insight} />)}
         </div>
       ) : null}
 
@@ -455,6 +473,64 @@ function Pill({ label, value, icon: Icon, tone }: { label: string; value: string
       </div>
       <p className="mt-1.5 text-lg font-bold tracking-tight text-foreground">{value}</p>
     </div>
+  );
+}
+
+// Edit investments straight from the net-worth card — reuses the onboarding
+// "PortfolioBuckets" UI on a react-hook-form seeded from the live profile, then
+// persists to the store + backend (partial save) so every tab stays in sync.
+function EditInvestmentsDialog({ onSaved }: { onSaved: () => void }) {
+  const profile = useAuthStore((state) => state.profile);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const token = useAuthStore((state) => state.token);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const form = useForm<OnboardingProfile>({ defaultValues: profile || undefined });
+  const values = form.watch();
+
+  useEffect(() => {
+    if (open && profile) form.reset(profile);
+  }, [open, profile, form]);
+
+  if (!profile) return null;
+
+  async function handleSave() {
+    if (!profile) return;
+    setSaving(true);
+    const next = { ...profile, ...form.getValues() };
+    saveProfile(next, onboardingComplete);
+    try {
+      await api.saveOnboarding(next, token, { partial: true });
+    } catch {
+      /* local update applied; ignore network error */
+    }
+    setSaving(false);
+    setOpen(false);
+    onSaved();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" aria-label="Edit your investments" className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-primary">
+          <Pencil className="h-4 w-4" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] w-[min(720px,95vw)] overflow-y-auto">
+        <DialogTitle className="text-lg font-semibold text-foreground">Update your investments</DialogTitle>
+        <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">
+          Add, edit or remove holdings — the same buckets as onboarding. Changes save to your profile and sync across every tab.
+        </DialogDescription>
+        <div className="mt-4">
+          <PortfolioBuckets form={form} values={values} />
+        </div>
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

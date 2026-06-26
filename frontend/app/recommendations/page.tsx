@@ -206,8 +206,6 @@ function FactorChips({ item }: { item: ActionItem }) {
   const fi = item.factorInsights;
   if (!item.isFundPick || !fi) return null;
   const chips: string[] = [];
-  if (fi.sortino != null) chips.push(`Sortino ${fi.sortino}`);
-  if (fi.maxDrawdown3y != null) chips.push(`Worst 3y drop ${fi.maxDrawdown3y}%`);
   if (fi.downCapture != null) chips.push(`Down-capture ${fi.downCapture}`);
   if (fi.alpha != null) chips.push(`Alpha ${fi.alpha}%`);
   if (!chips.length) return null;
@@ -435,11 +433,7 @@ function proofFor(item: ActionItem): string | null {
     return `Sets aside ${inr(amt)}/mo toward your safety net — about ${inr(amt * 12)} in a year, with near-zero risk.`;
   }
   const fv = inr(sipFutureValue(amt, annualRateFromReturn(item.expectedReturn)));
-  const bits = [`${inr(amt)}/mo grows to about ${fv} in a year.`];
-  const fi = item.factorInsights;
-  if (fi?.maxDrawdown3y != null) bits.push(`Worst 3-yr drop: ${fi.maxDrawdown3y}%.`);
-  if (fi?.sortino != null) bits.push(`Sortino ${fi.sortino} — steady.`);
-  return bits.join(" ");
+  return `${inr(amt)}/mo grows to about ${fv} in a year, invested steadily.`;
 }
 
 function takePayload(item: ActionItem) {
