@@ -157,12 +157,12 @@ export default function PortfolioPage() {
       ) : null}
 
       {/* Hero — Net Worth */}
-      <Card className="mb-6 overflow-hidden">
+      <Card className="relative mb-6 overflow-hidden">
         <CardContent className="p-6">
-          <div className="flex items-center gap-1.5">
-            <p className="ap-label">Total Net Worth</p>
+          <div className="absolute right-4 top-4 z-10">
             <EditInvestmentsDialog onSaved={load} />
           </div>
+          <p className="ap-label">Total Net Worth</p>
           <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
             <p className="text-5xl font-extrabold tracking-tight text-foreground md:text-6xl tnum">{inr(data.netWorth)}</p>
             <div className="flex flex-wrap items-center gap-2 pb-1.5">
@@ -513,7 +513,7 @@ function EditInvestmentsDialog({ onSaved }: { onSaved: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" aria-label="Edit your investments" className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-primary">
+        <button type="button" aria-label="Edit your investments" title="Edit your investments" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover hover:text-primary">
           <Pencil className="h-4 w-4" />
         </button>
       </DialogTrigger>

@@ -15,13 +15,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { goalIconSpec } from "@/lib/icon-maps";
-import { emptyDashboard } from "@/lib/profile";
-import { ActionItem, mergeIntoActionItems } from "@/lib/plan";
+import { availableToInvest, emptyDashboard } from "@/lib/profile";
+import { ActionItem, buildPlan, mergeIntoActionItems } from "@/lib/plan";
 import { cn, inr } from "@/lib/utils";
 import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { useAuthStore } from "@/store/auth-store";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { AdvancedRecommendation, DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
+import { AdvancedRecommendation, AssetIntelligence, DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
 
 export default function GoalsPage() {
   // Recover the profile from the backend if the store is empty (deep load /
@@ -30,6 +30,7 @@ export default function GoalsPage() {
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [rawRecs, setRawRecs] = useState<AdvancedRecommendation[]>([]);
+  const [assets, setAssets] = useState<AssetIntelligence[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -38,11 +39,37 @@ export default function GoalsPage() {
       // Pull the same plan recommendations so each goal's "Save more" fix can
       // offer the user's goal-linked picks to act on (amount pre-filled).
       api.generateAdvancedRecommendations(profile, false).then((res) => setRawRecs(res.recommendations || [])).catch(() => setRawRecs([]));
+      // Real fund universe — used to offer genuine moderate-risk picks (with
+      // their own return estimate) for the "Accept moderate risk" fix.
+      api.assetIntelligence().then(setAssets).catch(() => setAssets([]));
     }
   }, [profile]);
 
   const holdings = portfolio?.holdings ?? [];
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
   const recItems = useMemo(() => mergeIntoActionItems(rawRecs, data), [rawRecs, data]);
+  // The exact list the money plan is showing right now (top-3 pending + completed),
+  // so each goal's "Save more" fix only offers items that are actually in the plan.
+  const takenKeys = useMemo(() => new Set(actionsTaken.map((a) => a.key)), [actionsTaken]);
+  const committedMonthly = useMemo(() => actionsTaken.filter((a) => a.cadence !== "one_time").reduce((s, a) => s + (a.amount || 0), 0), [actionsTaken]);
+  const available = availableToInvest(profile, data.summary.monthlyIncome, committedMonthly);
+  const planVisible = useMemo(() => buildPlan(recItems, takenKeys, available, true)["Must Do"], [recItems, takenKeys, available]);
+  // Genuine moderate-risk funds (real name + real return), for the "Accept
+  // moderate risk" fix — no fabricated instruments.
+  const moderateFunds = useMemo<ModerateFund[]>(
+    () => assets
+      .map((a) => ({
+        key: `asset-${a.assetName}-${a.ticker}`,
+        name: a.assetName,
+        category: a.normalizedAssetClass || a.assetType || a.category || "Fund",
+        ticker: a.ticker || "",
+        risk: normRisk(a.risk?.riskCategory || a.assetType || ""),
+        expectedReturn: returnString(a.expectedReturn),
+      }))
+      .filter((o) => o.risk === "Medium" && Boolean(o.expectedReturn))
+      .slice(0, 4),
+    [assets],
+  );
 
   // Build a quick index from goal display name → original ProfileGoal so we can edit
   function findProfileGoal(dashboardGoalName: string): { goal: ProfileGoal; index: number } | null {
@@ -74,7 +101,7 @@ export default function GoalsPage() {
       <div className="space-y-5">
         {data.goals.map((goal) => {
           const match = findProfileGoal(goal.name);
-          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} recItems={recItems} />;
+          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} planItems={planVisible} moderateFunds={moderateFunds} />;
         })}
       </div>
 
@@ -97,7 +124,7 @@ export default function GoalsPage() {
   );
 }
 
-function GoalCard({ goal, profileGoal, holdings, recItems }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; recItems: ActionItem[] }) {
+function GoalCard({ goal, profileGoal, holdings, planItems, moderateFunds }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; planItems: ActionItem[]; moderateFunds: ModerateFund[] }) {
   const linkedIds = profileGoal?.goal.linkedHoldingIds || [];
   const linkedHoldings = useMemo(
     () => holdings.filter((h) => linkedIds.includes(h.id)),
@@ -127,7 +154,7 @@ function GoalCard({ goal, profileGoal, holdings, recItems }: { goal: DashboardDa
               <GoalEditDialog
                 mode={{ kind: "edit", index: profileGoal.index, goal: profileGoal.goal }}
                 trigger={
-                  <button aria-label="Edit goal" className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground">
+                  <button aria-label="Edit goal" title="Edit goal" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover hover:text-primary">
                     <Pencil className="h-4 w-4" />
                   </button>
                 }
@@ -172,7 +199,7 @@ function GoalCard({ goal, profileGoal, holdings, recItems }: { goal: DashboardDa
           </div>
         </div>
 
-        {!onTrack ? <PickAFix goal={goal} profileGoal={profileGoal} recItems={recItems} /> : null}
+        {!onTrack ? <PickAFix goal={goal} profileGoal={profileGoal} planItems={planItems} moderateFunds={moderateFunds} /> : null}
       </CardContent>
     </Card>
   );
@@ -250,7 +277,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // goal. The recommended one is highlighted; clicking any reveals the actual
 // action (start an SIP / take a moderate-risk fund / push the deadline) so the
 // user can act on it right there.
-function PickAFix({ goal, profileGoal, recItems }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; recItems: ActionItem[] }) {
+function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; planItems: ActionItem[]; moderateFunds: ModerateFund[] }) {
   const profile = useAuthStore((state) => state.profile);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const token = useAuthStore((state) => state.token);
@@ -263,17 +290,14 @@ function PickAFix({ goal, profileGoal, recItems }: { goal: DashboardData["goals"
   // Plan picks (pending or already-started) that fund THIS goal — the user picks
   // one and acts with the "save more" amount pre-filled.
   const goalKey = normKey(goal.name);
-  const linkedOptions = useMemo(() => {
-    const takenByKey = new Map(actionsTaken.map((a) => [a.key, a]));
-    const fromRecs = recItems
+  // Only what the money plan is currently showing for THIS goal (pending or
+  // already-started) — not every recommendation in the catalogue.
+  const linkedOptions = useMemo(
+    () => planItems
       .filter((it) => it.goalName && normKey(it.goalName) === goalKey)
-      .map((it) => ({ key: it.key, name: it.title, category: it.category, ticker: it.ticker, expectedReturn: it.expectedReturn, risk: it.risk, completed: takenByKey.has(it.key) }));
-    const recKeys = new Set(fromRecs.map((o) => o.key));
-    const fromCompleted = actionsTaken
-      .filter((a) => a.goalName && normKey(a.goalName) === goalKey && !recKeys.has(a.key))
-      .map((a) => ({ key: a.key, name: a.instrumentName, category: a.category, ticker: a.ticker, expectedReturn: undefined as string | undefined, risk: undefined as string | undefined, completed: true }));
-    return [...fromRecs, ...fromCompleted];
-  }, [recItems, actionsTaken, goalKey]);
+      .map((it) => ({ key: it.key, name: it.title, category: it.category, ticker: it.ticker, expectedReturn: it.expectedReturn, risk: it.risk, completed: actionsTaken.some((a) => a.key === it.key) })),
+    [planItems, actionsTaken, goalKey],
+  );
   const extendMonths = goal.feasibilityScore >= 45 ? 4 : 8;
   const newTargetDate = useMemo(() => {
     const base = profileGoal?.goal.targetDate ? new Date(profileGoal.goal.targetDate) : new Date();
@@ -306,19 +330,6 @@ function PickAFix({ goal, profileGoal, recItems }: { goal: DashboardData["goals"
     suggestedMonthlyAmount: saveMore,
     actionLabel: "Start SIP",
     reason: `Adds ${inr(saveMore)}/mo so ${goal.name} reaches its target on time.`,
-    kind: "fund" as const,
-    goalName: goal.name,
-  };
-  const riskPayload = {
-    key: `goal-fix-moderate-${goal.id}`,
-    instrumentName: "Balanced Advantage Fund",
-    category: "Hybrid Fund",
-    ticker: "",
-    suggestedMonthlyAmount: saveMore,
-    actionLabel: "Start SIP",
-    reason: `A moderate-risk fund to grow your ${goal.name} savings a bit faster.`,
-    expectedReturn: "~10–12% p.a.",
-    risk: "Medium",
     kind: "fund" as const,
     goalName: goal.name,
   };
@@ -378,12 +389,28 @@ function PickAFix({ goal, profileGoal, recItems }: { goal: DashboardData["goals"
       ) : null}
 
       {selected === "risk" ? (
-        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-foreground">Start a moderate-risk SIP for {goal.name}</p>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">Balanced Advantage Fund · ~10–12% p.a. · medium risk. You confirm the amount next.</p>
+        <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm font-bold text-foreground">Grow {goal.name} with a moderate-risk fund</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {moderateFunds.length ? "Real moderate-risk funds, each with its own return estimate — the amount is pre-filled when you take action." : "No moderate-risk funds available right now."}
+          </p>
+          <div className="mt-3 space-y-2">
+            {moderateFunds.length ? moderateFunds.map((opt) => (
+              <div key={opt.key} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
+                <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
+                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.expectedReturn ? ` · ~${opt.expectedReturn}` : ""}</p>
+                </div>
+                <TakeActionDialog
+                  payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: "Start SIP", expectedReturn: opt.expectedReturn, risk: "Medium", kind: "fund" as const, goalName: goal.name }}
+                  trigger={<Button size="sm" className="shrink-0">Take action</Button>}
+                />
+              </div>
+            )) : (
+              <Link href="/asset-intelligence" className="inline-flex text-sm font-semibold text-primary hover:underline">Browse moderate-risk options in Discover →</Link>
+            )}
           </div>
-          <TakeActionDialog payload={riskPayload} trigger={<Button className="shrink-0">Take action</Button>} />
         </div>
       ) : null}
 
@@ -414,6 +441,23 @@ function formatMonthYear(date: Date) {
 
 function normKey(value: string) {
   return (value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+type ModerateFund = { key: string; name: string; category: string; ticker: string; risk: string; expectedReturn: string };
+
+function normRisk(value: string) {
+  const t = (value || "").toLowerCase();
+  if (t.includes("low")) return "Low";
+  if (t.includes("high") || t.includes("extreme") || t.includes("very")) return "High";
+  return "Medium";
+}
+
+function returnString(er?: { label?: string; cagrRange?: string; expectedCagr?: number } | null): string {
+  if (!er) return "";
+  if (er.label) return er.label.replace(/CAGR/gi, "p.a.");
+  if (er.cagrRange) return `${er.cagrRange} p.a.`;
+  if (typeof er.expectedCagr === "number") return `${er.expectedCagr}% p.a.`;
+  return "";
 }
 
 function EmptyState({ text, href, cta, useDialog }: { text: string; href?: string; cta: string; useDialog: boolean }) {

@@ -116,14 +116,14 @@ export default function DashboardPage() {
       {!needsProfile ? (
         <div className="space-y-6">
           <div className="grid gap-5 xl:grid-cols-[.82fr_1.18fr]">
-            <Card className="overflow-hidden">
+            <Card className="relative overflow-hidden">
               <CardContent className="p-6">
+                <div className="absolute right-4 top-4 z-10">
+                  <EditAvailableDialog />
+                </div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
-                      <EditAvailableDialog />
-                    </div>
+                    <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
                     <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inrShort(available)}</p>
                     <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
                   </div>
@@ -310,8 +310,8 @@ function EditAvailableDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" aria-label="Edit available this month" className="rounded-full p-1 text-muted-foreground transition hover:bg-surface-hover hover:text-primary">
-          <Pencil className="h-3.5 w-3.5" />
+        <button type="button" aria-label="Edit available this month" title="Edit available this month" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover hover:text-primary">
+          <Pencil className="h-4 w-4" />
         </button>
       </DialogTrigger>
       <DialogContent className="w-[min(440px,94vw)] p-0">

@@ -268,3 +268,9 @@ body {
 #__next-build-watcher {
   display: none !important;
 }
+
+/* Make user-entered values inside any popup/dialog bold for legibility. */
+[role="dialog"] input,
+[role="dialog"] textarea {
+  font-weight: 600;
+}
