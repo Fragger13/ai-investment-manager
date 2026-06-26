@@ -78,12 +78,10 @@ export default function RecommendationsPage() {
   const confidence = planConfidence(items);
   const confidenceTone: "good" | "warn" | "danger" = confidence >= 75 ? "good" : confidence >= 55 ? "warn" : "danger";
 
-  // Habit reinforcement: how many of the surfaced actions you've already done.
-  const doneCount = useMemo(() => items.filter((item) => takenKeys.has(item.key)).length, [items, takenKeys]);
-  const totalCount = items.length;
-
   return (
-    <AppShell sidebarExtra={<PlanProgressWidget confidence={confidence} done={doneCount} total={totalCount} />}>
+    // Match the sidebar "Keep going!" counts to the plan actually shown (top-3 +
+    // completed), so they agree with the "This month's progress" bar below.
+    <AppShell sidebarExtra={<PlanProgressWidget confidence={confidence} done={doneVisible.length} total={visible.length} />}>
       <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Your money plan ✨</h1>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, Coins, Gauge, Landmark, Layers, Lock, MessagesSquare, PieChart, ShieldCheck, Share2, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, Coins, Gauge, Landmark, Layers, Lock, MessagesSquare, PieChart, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,6 @@ export default function InvestmentDetailPage() {
         <Link href="/asset-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to Discover
         </Link>
-        <Button variant="outline" size="sm"><Share2 className="h-4 w-4" /> Share</Button>
       </div>
 
       <Card className="mb-6">

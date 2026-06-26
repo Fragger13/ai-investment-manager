@@ -204,6 +204,9 @@ export const api = {
   async communitySentiment(name: string, assetClass: string): Promise<CommunitySentiment> {
     return request(`/assets/community-sentiment?name=${encodeURIComponent(name)}&assetClass=${encodeURIComponent(assetClass)}`);
   },
+  async submitFeedback(payload: { kind: string; category?: string; rating?: number; message?: string; email?: string; page?: string }): Promise<{ status: string; id: number }> {
+    return request("/feedback", { method: "POST", body: JSON.stringify(payload) });
+  },
   async analyzeDocument(fileName: string): Promise<DocumentAnalysis> {
     return request<DocumentAnalysis>("/documents/analyze", {
       method: "POST",

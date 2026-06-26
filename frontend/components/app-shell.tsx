@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, CircleDollarSign, Compass, Home, LogOut, NotebookTabs, PieChart, Target, UserRound } from "lucide-react";
+import { Bot, CircleDollarSign, Compass, Home, LifeBuoy, LogOut, NotebookTabs, PieChart, Target, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FeedbackPrompt } from "@/components/feedback-prompt";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
 
@@ -11,9 +12,10 @@ const nav = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/recommendations", label: "Plan", icon: NotebookTabs },
-  { href: "/asset-intelligence", label: "Discover", icon: Compass },
   { href: "/portfolio", label: "Wallet", icon: PieChart },
+  { href: "/asset-intelligence", label: "Discover", icon: Compass },
   { href: "/chat", label: "Papa", icon: Bot },
+  { href: "/help", label: "Help", icon: LifeBuoy },
 ];
 
 export function AppShell({ children, sidebarExtra }: { children: React.ReactNode; sidebarExtra?: React.ReactNode }) {
@@ -149,6 +151,9 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
           })}
         </div>
       </nav>
+
+      {/* Occasional, dismissible star-rating prompt (self-paced via localStorage) */}
+      <FeedbackPrompt />
     </div>
   );
 }

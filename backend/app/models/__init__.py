@@ -7,6 +7,7 @@ from app.models.uploaded_document import UploadedDocument
 from app.models.user import User
 from app.models.pending_registration import PendingRegistration
 from app.models.activity_record import ActivityRecord
+from app.models.feedback import Feedback
 from app.models.asset_research import AssetResearch
 from app.models.asset_correlation_cache import AssetCorrelationCache
 from app.models.asset_impact_score import AssetImpactScore

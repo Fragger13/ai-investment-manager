@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, RefreshCw, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
+import { Bookmark, Check, Copy, RefreshCw, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ColorfulIcon } from "@/components/colorful-icon";
 import { InvestmentLogo } from "@/components/investment-logo";
@@ -300,6 +300,16 @@ function formatPrice(price: { value: number; unit: string }) {
 }
 
 function InviteWidget() {
+  const [copied, setCopied] = useState(false);
+  function shareLink() {
+    const link = "https://askpapa.in";
+    const done = () => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(() => done());
+    } else {
+      done();
+    }
+  }
   return (
     <div className="rounded-2xl border border-positive-soft bg-positive-soft/60 p-4">
       <div className="flex items-center gap-2">
@@ -308,8 +318,15 @@ function InviteWidget() {
         </span>
         <p className="text-sm font-semibold text-foreground">Invite a friend</p>
       </div>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Help your friends get started with their financial plan.</p>
-      <Link href="/chat" className="mt-3 inline-flex text-[13px] font-semibold text-primary hover:underline">Learn more →</Link>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Share AskPapa so your friends can start their money plan too.</p>
+      <button
+        type="button"
+        onClick={shareLink}
+        aria-live="polite"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground transition hover:bg-primary/90"
+      >
+        {copied ? (<><Check className="h-3.5 w-3.5" /> Link copied!</>) : (<><Copy className="h-3.5 w-3.5" /> Share askpapa.in</>)}
+      </button>
     </div>
   );
 }
