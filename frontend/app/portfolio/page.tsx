@@ -157,7 +157,7 @@ export default function PortfolioPage() {
       ) : null}
 
       {/* Hero — Net Worth */}
-      <Card className="relative mb-6 overflow-hidden">
+      <Card className="relative mb-6 overflow-hidden" data-tour="networth">
         <CardContent className="p-6">
           <div className="absolute right-4 top-4 z-10">
             <EditInvestmentsDialog onSaved={load} />

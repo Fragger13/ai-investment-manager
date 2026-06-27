@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Compass, Send } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import { useTourStore } from "@/store/tour-store";
 
 const CATEGORIES = [
   "Bug / something broke",
@@ -23,6 +25,8 @@ const CATEGORIES = [
 
 export default function HelpPage() {
   const user = useAuthStore((state) => state.user);
+  const router = useRouter();
+  const startTour = useTourStore((state) => state.start);
   const [category, setCategory] = useState("");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState(user?.email || "");
@@ -109,6 +113,27 @@ export default function HelpPage() {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-5 max-w-4xl border-primary/20 bg-primary/5">
+        <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Compass className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold text-foreground">New here, or need a refresher?</p>
+              <p className="mt-1 text-sm text-muted-foreground">Let Papa walk you through the app again — the Plan, taking actions, and where everything lives.</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => { startTour(); router.push("/dashboard"); }}
+          >
+            Take the app tour again
+          </Button>
         </CardContent>
       </Card>
     </AppShell>

@@ -75,6 +75,19 @@ export default function RecommendationsPage() {
   const visible = grouped["Must Do"];
   const pendingVisible = useMemo(() => visible.filter((item) => !takenKeys.has(item.key)), [visible, takenKeys]);
   const doneVisible = useMemo(() => visible.filter((item) => takenKeys.has(item.key)), [visible, takenKeys]);
+  // The tour spotlights a real fund/stock pick (not the emergency-fund step) so a
+  // new user sees what an actual investment recommendation looks like.
+  const tourIndex = useMemo(() => {
+    // Wait for recommendations to load before anchoring — otherwise the tour
+    // spotlights the emergency-fund placeholder that shows during loading, and
+    // the fund pick (which streams in a beat later) is missed.
+    if (loading || !pendingVisible.length) return -1;
+    const idx = pendingVisible.findIndex(
+      (item) => item.isFundPick || (item.actionKind === "fund" && !/emergency|safety|cash|liquid/i.test(item.category)),
+    );
+    if (idx >= 0) return idx;
+    return data.recommendations.length ? 0 : -1; // only fall back to the top move once real recs are in
+  }, [loading, pendingVisible, data.recommendations.length]);
   const confidence = planConfidence(items);
   const confidenceTone: "good" | "warn" | "danger" = confidence >= 75 ? "good" : confidence >= 55 ? "warn" : "danger";
 
@@ -104,7 +117,7 @@ export default function RecommendationsPage() {
       >
         {visible.length > 0 ? <DoFirstProgress done={doneVisible.length} total={visible.length} /> : null}
         <div className="space-y-3">
-          {pendingVisible.map((item) => <MustDoRow key={item.key} item={item} />)}
+          {pendingVisible.map((item, index) => <MustDoRow key={item.key} item={item} tour={index === tourIndex} />)}
           {!visible.length ? (
             <EmptyRow text="Refresh after completing your profile to see your first steps." />
           ) : null}
@@ -342,13 +355,13 @@ function PlanProgressWidget({ confidence, done, total }: { confidence: number; d
   );
 }
 
-function MustDoRow({ item }: { item: ActionItem }) {
+function MustDoRow({ item, tour }: { item: ActionItem; tour?: boolean }) {
   const actionFor = usePlanActionsStore((state) => state.actionsTaken.find((entry) => entry.key === item.key));
   const taken = Boolean(actionFor);
   const proof = proofFor(item);
 
   return (
-    <Card className={cn("card-pop overflow-hidden transition", taken && "bg-surface-soft opacity-60")}>
+    <Card className={cn("card-pop overflow-hidden transition", taken && "bg-surface-soft opacity-60")} data-tour={tour ? "plan-item" : undefined}>
       <CardContent className="p-5 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
         {/* Identity: logo + title + why + meta */}
@@ -379,6 +392,7 @@ function MustDoRow({ item }: { item: ActionItem }) {
             trigger={
               <Button
                 size="lg"
+                data-tour={tour ? "plan-action" : undefined}
                 className={cn(
                   "min-w-[140px] justify-center",
                   taken && "bg-positive-soft text-positive-foreground hover:bg-positive-soft"

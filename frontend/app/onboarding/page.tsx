@@ -297,6 +297,14 @@ export default function OnboardingPage() {
     if (flowMode === "default" && isLastDataScreen) {
       const success = await finalSubmit();
       if (success) {
+        // Kick off the slow post-onboarding work NOW (recommendations + their LLM
+        // summaries, asset research) so it completes in the background while the
+        // celebrate screen + Papa's tour play — Plan/Discover are warm by the
+        // time the tour walks the user there. Fire-and-forget, never blocks.
+        const submitted = form.getValues();
+        void api.generateAdvancedRecommendations(submitted, false).catch(() => {});
+        void api.dashboard(submitted).catch(() => {});
+        void api.assetIntelligence().catch(() => {});
         setDirection(1);
         setScreenIndex(safeIndex + 1); // advance to celebrate
       }

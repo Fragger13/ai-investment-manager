@@ -162,8 +162,8 @@ export default function AssetIntelligencePage() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        {visible.map((idea, index) => <InvestmentCard key={idea.id} idea={idea} topPick={index === 0} />)}
+      <div className="space-y-4" data-tour="discover">
+        {visible.map((idea, index) => <InvestmentCard key={idea.id} idea={idea} topPick={index === 0} tour={index === 0} />)}
       </div>
       {!visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
 
@@ -184,7 +184,7 @@ export default function AssetIntelligencePage() {
   );
 }
 
-function InvestmentCard({ idea, topPick }: { idea: InvestmentIdea; topPick?: boolean }) {
+function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick?: boolean; tour?: boolean }) {
   const inPlan = usePlanActionsStore((state) => state.planItems.some((entry) => entry.key === idea.id));
   const addToPlan = usePlanActionsStore((state) => state.addToPlan);
   const removeFromPlan = usePlanActionsStore((state) => state.removeFromPlan);
@@ -210,7 +210,7 @@ function InvestmentCard({ idea, topPick }: { idea: InvestmentIdea; topPick?: boo
 
   return (
     <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="block">
-      <Card className={cn("relative transition hover:border-primary/40 hover:shadow-md", topPick && "border-primary/50 shadow-sm")}>
+      <Card data-tour={tour ? "discover-pick" : undefined} className={cn("relative transition hover:border-primary/40 hover:shadow-md", topPick && "border-primary/50 shadow-sm")}>
         {topPick ? (
           <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-primary-foreground shadow-sm">
             <Sparkles className="h-3 w-3" /> Papa&apos;s pick

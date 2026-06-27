@@ -18,6 +18,14 @@ const nav = [
   { href: "/help", label: "Help", icon: LifeBuoy },
 ];
 
+// Anchors the Papa tour spotlights so it can teach users how to navigate.
+const TOUR_ANCHORS: Record<string, string> = {
+  "/recommendations": "nav-plan",
+  "/portfolio": "nav-portfolio",
+  "/asset-intelligence": "nav-discover",
+  "/chat": "nav-papa",
+};
+
 export function AppShell({ children, sidebarExtra }: { children: React.ReactNode; sidebarExtra?: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -69,6 +77,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={TOUR_ANCHORS[item.href]}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold transition",
                   active
@@ -134,7 +143,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
-              <Link key={item.href} href={item.href} className="group flex flex-1 flex-col items-center justify-center gap-1 py-2">
+              <Link key={item.href} href={item.href} data-tour={TOUR_ANCHORS[item.href]} className="group flex flex-1 flex-col items-center justify-center gap-1 py-2">
                 <span
                   className={cn(
                     "flex h-8 w-14 items-center justify-center rounded-full transition",

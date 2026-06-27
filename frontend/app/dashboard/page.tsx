@@ -116,7 +116,7 @@ export default function DashboardPage() {
       {!needsProfile ? (
         <div className="space-y-6">
           <div className="grid gap-5 xl:grid-cols-[.82fr_1.18fr]">
-            <Card className="relative overflow-hidden">
+            <Card className="relative overflow-hidden" data-tour="available">
               <CardContent className="p-6">
                 <div className="absolute right-4 top-4 z-10">
                   <EditAvailableDialog />
@@ -136,7 +136,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-tour="health">
               <CardContent className="grid gap-6 p-7 lg:grid-cols-[.85fr_1fr] lg:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

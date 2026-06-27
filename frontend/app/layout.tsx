@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PapaTour } from "@/components/papa-tour";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 import { caveat, sans } from "@/lib/fonts";
 import "./globals.css";
@@ -29,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <PapaTour />
+        </ThemeProvider>
       </body>
     </html>
   );
