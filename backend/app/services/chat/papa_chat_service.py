@@ -23,6 +23,7 @@ from app.schemas.financial import ChatCard, ChatResponse, OnboardingProfile
 from app.services.chat.context_builder_service import build_chat_context
 from app.services.intelligence import build_dashboard, current_ist_month, monthly_commitments, total_emi_payments
 from app.services.llm.model_router import generate_chat_answer
+from app.utils.inr_format import format_inr_indian, indianize_currency
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +113,11 @@ def papa_chat_answer(
     reply = generate_chat_answer(message, context, baseline)
     if not reply or not reply.strip():
         reply = baseline
+    # The LLM echoes whatever digit grouping it saw, so repair any Western
+    # grouping (Rs 234,000 → Rs 2,34,000) and drop a repeated opener when the
+    # previous Papa reply already started the same way (Arrey Tanishq, …).
+    reply = indianize_currency(reply)
+    reply = _vary_repeated_opener(reply, history)
 
     cards = _build_cards(intent, profile, dashboard, message)
     suggestions = _build_suggestions(intent)
@@ -187,7 +193,35 @@ def _opener(profile: OnboardingProfile, choices: list[str]) -> str:
 
 
 def _money_str(amount: float) -> str:
-    return f"Rs {amount:,.0f}"
+    return format_inr_indian(amount)
+
+
+_OPENER_WORDS = ("arrey", "arre", "acha", "achha", "haan", "beta", "theek")
+# Leading opener clause: an opener word, optionally followed by a name, up to
+# and including the first comma/exclamation — "Arrey Tanishq, " / "Acha, ".
+_OPENER_CLAUSE = re.compile(r"^\s*(?:%s)\b[^,!.]{0,24}[,!]\s*" % "|".join(_OPENER_WORDS), re.IGNORECASE)
+
+
+def _vary_repeated_opener(reply: str, history: list[dict] | None) -> str:
+    """Strip the opener clause when Papa's previous reply started the same way,
+    so consecutive replies don't all begin 'Arrey Tanishq, …'."""
+    if not history:
+        return reply
+    previous = next(
+        (str(turn.get("content") or "") for turn in reversed(history) if turn.get("role") == "assistant"),
+        "",
+    )
+    current_match = _OPENER_CLAUSE.match(reply or "")
+    previous_match = _OPENER_CLAUSE.match(previous)
+    if not current_match or not previous_match:
+        return reply
+    same_opener = current_match.group(0).strip(" ,!").lower() == previous_match.group(0).strip(" ,!").lower()
+    if not same_opener:
+        return reply
+    rest = reply[current_match.end():].strip()
+    if len(rest) < 20:  # reply was basically only the opener — leave it
+        return reply
+    return rest[0].upper() + rest[1:]
 
 
 def _months_from_message(message: str, default: int = 6) -> int:
@@ -354,7 +388,7 @@ def _papa_baseline(message: str, intent: str, profile: OnboardingProfile, dashbo
             )
         return (
             f"Arrey beta, only {rate:.0f}%? That's not saving, that's whatever happens to survive your "
-            f"spending. Flip the order — set aside Rs {round(income * 0.20):,} first thing every month, then "
+            f"spending. Flip the order — set aside {_money_str(income * 0.20)} first thing every month, then "
             f"spend what remains. It's the only thing that actually works."
         )
 
@@ -552,8 +586,8 @@ def _build_cards(intent: str, profile: OnboardingProfile, dashboard: dict, messa
         monthly = _affordable_monthly(income, available)
         if monthly > 0:
             body = (
-                f"Keep the monthly outgo under about {_money_str(monthly)} — that comfortably supports a "
-                f"purchase of {_money_str(monthly * 6)} – {_money_str(monthly * 12)} spread over 6–12 months, "
+                f"Keep the monthly outgo under about {_money_str(monthly)}. That comfortably supports a "
+                f"purchase of {_money_str(monthly * 6)} to {_money_str(monthly * 12)} spread over 6 to 12 months, "
                 f"without straining your cash flow."
             )
         else:
