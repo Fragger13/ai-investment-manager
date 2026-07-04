@@ -58,7 +58,7 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/papa-avatar.png" alt="AskPapa" className="h-16 w-16 rounded-full object-cover shadow-sm ring-4 ring-accent" />
             <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Welcome back! 👋</h1>
-            <p className="mt-1.5 text-[15px] text-muted-foreground">Let&apos;s pick up where you left off.</p>
+            <p className="mt-1.5 text-[0.9375rem] text-muted-foreground">Let&apos;s pick up where you left off.</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-4">

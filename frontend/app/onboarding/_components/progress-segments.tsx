@@ -19,7 +19,7 @@ export function ProgressSegments({ sections, activeIndex }: ProgressSegmentsProp
               }`}
             />
             <p
-              className={`mt-2 hidden text-[12px] font-semibold uppercase tracking-wider sm:block ${
+              className={`mt-2 hidden text-[0.75rem] font-semibold uppercase tracking-wider sm:block ${
                 active ? "text-[#138A3C]" : done ? "text-[#138A3C]/70" : "text-[#9CA3AF]"
               }`}
             >

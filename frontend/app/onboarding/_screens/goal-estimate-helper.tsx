@@ -139,7 +139,7 @@ export function GoalEstimateHelper({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-[13px] font-medium text-[#4B5563] hover:text-[#0F172A]"
+        className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-[#4B5563] hover:text-[#0F172A]"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back to the form
       </button>
@@ -171,7 +171,7 @@ export function GoalEstimateHelper({
           ) : current ? (
             <div className="space-y-2.5">
               {!isOther ? (
-                <p className="text-[12px] font-medium text-[#9CA3AF]">
+                <p className="text-[0.75rem] font-medium text-[#9CA3AF]">
                   Question {stepIndex + 1} of {questions.length}
                 </p>
               ) : null}
@@ -189,7 +189,7 @@ export function GoalEstimateHelper({
                       key={chip.value}
                       type="button"
                       onClick={() => choose(current.key, chip.value)}
-                      className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[14px] font-medium text-[#0F172A] shadow-sm transition hover:-translate-y-0.5 hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C]"
+                      className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[0.875rem] font-medium text-[#0F172A] shadow-sm transition hover:-translate-y-0.5 hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C]"
                     >
                       {chip.label}
                     </button>
@@ -223,7 +223,7 @@ function TextStep({ placeholder, onSubmit }: { placeholder?: string; onSubmit: (
             submit();
           }
         }}
-        className="max-w-[300px] flex-1 text-[15px]"
+        className="max-w-[300px] flex-1 text-[0.9375rem]"
       />
       <Button type="button" size="sm" className="bg-[#138A3C] text-white hover:bg-[#107132]" disabled={!value.trim()} onClick={submit}>
         Continue
@@ -234,7 +234,7 @@ function TextStep({ placeholder, onSubmit }: { placeholder?: string; onSubmit: (
 
 function Bubble({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative inline-block max-w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-[15px] leading-snug text-[#0F172A] shadow-sm">
+    <div className="relative inline-block max-w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-[0.9375rem] leading-snug text-[#0F172A] shadow-sm">
       <span className="absolute -left-1.5 top-4 h-3 w-3 rotate-45 border-b border-l border-[#E5E7EB] bg-white" aria-hidden />
       {children}
     </div>
@@ -254,16 +254,16 @@ function EstimateResult({
 }) {
   return (
     <div className="rounded-2xl border border-[#138A3C]/25 bg-[#E9F4EC] p-4">
-      <p className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#138A3C]">
+      <p className="inline-flex items-center gap-1.5 text-[0.75rem] font-semibold text-[#138A3C]">
         <Sparkles className="h-3.5 w-3.5" /> Papa&apos;s estimate for {goalLabel}
       </p>
       <p className="mt-1 text-3xl font-extrabold tracking-tight text-[#0F172A]">{formatINR(estimate.amount)}</p>
-      <p className="mt-0.5 text-[13px] text-[#4B5563]">
+      <p className="mt-0.5 text-[0.8125rem] text-[#4B5563]">
         Likely somewhere between {formatINR(estimate.low)} and {formatINR(estimate.high)}.
       </p>
-      <p className="mt-2 text-[13px] leading-5 text-[#374151]">{estimate.rationale}</p>
+      <p className="mt-2 text-[0.8125rem] leading-5 text-[#374151]">{estimate.rationale}</p>
       {estimate.assumptions?.length ? (
-        <p className="mt-1.5 text-[12px] text-[#6B7280]">Based on: {estimate.assumptions.join(" · ")}.</p>
+        <p className="mt-1.5 text-[0.75rem] text-[#6B7280]">Based on: {estimate.assumptions.join(" · ")}.</p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" className="bg-[#138A3C] text-white hover:bg-[#107132]" onClick={() => onUse(estimate.amount)}>
@@ -273,7 +273,7 @@ function EstimateResult({
           <RotateCcw className="h-3.5 w-3.5" /> Adjust answers
         </Button>
       </div>
-      <p className="mt-2 text-[11px] text-[#9CA3AF]">A rough starting point, not a quote. You can always edit it.</p>
+      <p className="mt-2 text-[0.6875rem] text-[#9CA3AF]">A rough starting point, not a quote. You can always edit it.</p>
     </div>
   );
 }

@@ -323,7 +323,7 @@ export default function ChatPage() {
             />
           </div>
         </div>
-        <p className="mt-3 flex items-center gap-2 text-[13px] text-muted-foreground">
+        <p className="mt-3 flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
           Educational guidance only — not investment advice. Your data never leaves your profile.
         </p>
@@ -382,7 +382,7 @@ function ConversationsPanel({
       </Button>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {groups.length === 0 ? (
-          <p className="px-2 py-4 text-[13px] text-muted-foreground">Your conversations will appear here.</p>
+          <p className="px-2 py-4 text-[0.8125rem] text-muted-foreground">Your conversations will appear here.</p>
         ) : null}
         {groups.map((group) => (
           <div key={group.label} className="mb-3">
@@ -449,8 +449,8 @@ function WelcomeIntro({
       <div className="flex items-start gap-3">
         <PapaAvatar avatarClass="h-14 w-14" mood="warm" ringClass="ring-2 ring-white shadow-sm" />
         <div className="rounded-3xl border border-border bg-surface-soft px-4 py-3 text-sm leading-7 text-foreground/90 shadow-sm">
-          <p className="text-[17px] leading-8 text-foreground">{greeting}</p>
-          <p className="mt-2 text-[17px] leading-8 text-foreground">{intro}</p>
+          <p className="text-[1.0625rem] leading-8 text-foreground">{greeting}</p>
+          <p className="mt-2 text-[1.0625rem] leading-8 text-foreground">{intro}</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2 pl-[68px]">
@@ -494,7 +494,7 @@ function ChatBubble({
           <span className="text-sm font-semibold">{initial}</span>
         </span>
         <div className="max-w-[78%] rounded-3xl bg-primary px-4 py-3 text-primary-foreground shadow-sm">
-          <p className="whitespace-pre-line text-[17px] leading-8">{message.content}</p>
+          <p className="whitespace-pre-line text-[1.0625rem] leading-8">{message.content}</p>
         </div>
       </div>
     );
@@ -515,7 +515,7 @@ function ChatBubble({
               : "border-border bg-surface-soft"
           )}
         >
-          <p className="whitespace-pre-line text-[17px] leading-8 text-foreground">{message.content}</p>
+          <p className="whitespace-pre-line text-[1.0625rem] leading-8 text-foreground">{message.content}</p>
         </div>
         {message.cards?.length ? <ChatCardsRenderer cards={message.cards} onOption={onOption} /> : null}
         {message.suggestions?.length ? (
@@ -539,7 +539,7 @@ function ChatBubble({
               <button
                 type="button"
                 onClick={onRegenerate}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.8125rem] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
                 aria-label="Regenerate response"
               >
                 <RefreshCw className="h-3 w-3" /> Regenerate
@@ -562,7 +562,7 @@ function CopyButton({ onCopy }: { onCopy: () => void }) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1200);
       }}
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.8125rem] text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
       aria-label="Copy message"
     >
       {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -620,7 +620,7 @@ function ChatInput({
           onChange={(event) => onChange(event.target.value)}
           placeholder="Ask Papa anything…  (Enter to send, Shift+Enter for a new line)"
           rows={1}
-          className="min-h-12 max-h-[200px] flex-1 resize-none rounded-2xl border-0 bg-transparent px-2 py-2 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+          className="min-h-12 max-h-[200px] flex-1 resize-none rounded-2xl border-0 bg-transparent px-2 py-2 text-[0.9375rem] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
@@ -669,13 +669,13 @@ function CoachSidebarWidget() {
     <div className="rounded-2xl border border-positive-soft bg-positive-soft/40 p-4 shadow-sm">
       <p className="text-sm font-semibold text-foreground">Papa is listening</p>
       <p
-        className="mt-1 text-[17px] font-semibold leading-snug"
+        className="mt-1 text-[1.0625rem] font-semibold leading-snug"
         style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}
       >
         Ask anything. About money, life, both.
       </p>
       {profile ? (
-        <div className="mt-3 rounded-xl bg-white px-3 py-2 text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+        <div className="mt-3 rounded-xl bg-white px-3 py-2 text-[0.8125rem] leading-relaxed text-muted-foreground shadow-sm">
           <p className="font-semibold text-foreground">Profile loaded</p>
           <p className="mt-0.5">Goals: {profile.goals?.length || 0}</p>
           <p>EMIs: {(profile.emiLoans || []).length}</p>

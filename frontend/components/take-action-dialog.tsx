@@ -202,7 +202,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                   {kind !== "lump_sum" ? <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} /> : null}
                 </div>
                 {purchasePrice > 0 ? (
-                  <p className="mt-3 text-center text-[13px] text-muted-foreground">Recorded buy price <span className="font-semibold text-foreground">{formatUnitPrice(purchasePrice)}</span> / unit</p>
+                  <p className="mt-3 text-center text-[0.8125rem] text-muted-foreground">Recorded buy price <span className="font-semibold text-foreground">{formatUnitPrice(purchasePrice)}</span> / unit</p>
                 ) : null}
               </>
             ) : kind === "habit" ? (
@@ -222,13 +222,13 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {payload.expectedReturn ? (
                   <div className="rounded-xl border border-border bg-surface-soft p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Est. return</p>
+                    <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Est. return</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">{payload.expectedReturn}</p>
                   </div>
                 ) : null}
                 {payload.risk ? (
                   <div className="rounded-xl border border-border bg-surface-soft p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Risk</p>
+                    <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Risk</p>
                     <p className="mt-1"><Badge tone={payload.risk === "Low" ? "good" : payload.risk === "High" ? "danger" : "warn"}>{payload.risk}</Badge></p>
                   </div>
                 ) : null}
@@ -342,7 +342,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                   />
                   <span className="min-w-0">
                     <span className="text-sm font-semibold text-foreground">Add to my {linkGoal.name} goal</span>
-                    <span className="mt-0.5 block text-[13px] text-muted-foreground">Counts this investment toward {linkGoal.name}. Untick to leave it unlinked — you can link it to another goal later from that goal&apos;s &ldquo;Manage links&rdquo;.</span>
+                    <span className="mt-0.5 block text-[0.8125rem] text-muted-foreground">Counts this investment toward {linkGoal.name}. Untick to leave it unlinked — you can link it to another goal later from that goal&apos;s &ldquo;Manage links&rdquo;.</span>
                   </span>
                 </label>
               ) : null}
@@ -406,7 +406,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-soft p-3 text-center">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
     </div>
   );

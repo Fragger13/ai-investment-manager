@@ -78,10 +78,10 @@ export function ScreenWrap({
     <div className="flex flex-1 flex-col">
       <div>
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-[22px] font-semibold leading-tight text-[#0F172A] sm:text-[28px]">{headline}</h2>
+          <h2 className="text-[1.375rem] font-semibold leading-tight text-[#0F172A] sm:text-[1.75rem]">{headline}</h2>
           {badge}
         </div>
-        {sub ? <p className="mt-1 text-[15px] leading-6 text-[#4B5563]">{sub}</p> : null}
+        {sub ? <p className="mt-1 text-[0.9375rem] leading-6 text-[#4B5563]">{sub}</p> : null}
       </div>
       <div className="mt-4 mb-[1cm]">
         <PapaBubble message={papa} mood={mood} size="md" />

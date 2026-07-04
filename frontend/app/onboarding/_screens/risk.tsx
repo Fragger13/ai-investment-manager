@@ -116,7 +116,7 @@ export function AnsweredBadge({ answered, total }: { answered: number; total: nu
   const done = answered >= total;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold transition ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8125rem] font-semibold transition ${
         done
           ? "border-[#138A3C] bg-[#138A3C] text-white"
           : "border-[#E5E7EB] bg-white text-[#4B5563]"
@@ -173,7 +173,7 @@ function RetirementBlock({ years }: { years: number }) {
         <div className="w-28">
           <NumberField name="retirementAge" placeholder="60" />
         </div>
-        <p className="flex-1 text-[13px] text-[#4B5563]">
+        <p className="flex-1 text-[0.8125rem] text-[#4B5563]">
           {years ? `About ${years} years from now feels right for many, but you decide.` : "Used to plan how long your money needs to last."}
         </p>
       </div>
@@ -215,7 +215,7 @@ function QuestionRow({
           />
         ))}
       </div>
-      {error ? <p className="text-[13px] font-medium text-red-600">Pick one to continue</p> : null}
+      {error ? <p className="text-[0.8125rem] font-medium text-red-600">Pick one to continue</p> : null}
     </div>
   );
 }

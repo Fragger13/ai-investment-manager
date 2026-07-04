@@ -96,7 +96,7 @@ export function OnboardingShell({
             <p className="text-sm font-bold uppercase tracking-wide text-[#0F172A]">
               Section {Math.min(activeSectionIndex + 1, sections.length)} of {sections.length} · {sectionLabel}
             </p>
-            <p className="text-2xl font-semibold sm:text-[28px]" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
+            <p className="text-2xl font-semibold sm:text-[1.75rem]" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
               {(() => {
                 const totalSteps = Math.max(sections.length - 1, 1);
                 const remaining = Math.max(1, Math.ceil(5 * (1 - activeSectionIndex / totalSteps)));

@@ -128,7 +128,7 @@ export default function InvestmentDetailPage() {
                 </span>
               </p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground">{idea.summary}</p>
-              {idea.whyNow ? <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">{idea.whyNow}</p> : null}
+              {idea.whyNow ? <p className="mt-2 max-w-2xl text-[0.8125rem] leading-6 text-muted-foreground">{idea.whyNow}</p> : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 {tags.slice(0, 4).map((tag) => (
                   <span key={tag} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground">
@@ -171,7 +171,7 @@ export default function InvestmentDetailPage() {
               <p className="text-sm font-semibold text-foreground">Expected return</p>
             </div>
             <p className="mt-3 text-2xl font-semibold text-positive-foreground">{idea.expectedReturn}</p>
-            <p className="mt-2 text-[13px] text-muted-foreground">Based on historical data</p>
+            <p className="mt-2 text-[0.8125rem] text-muted-foreground">Based on historical data</p>
           </CardContent>
         </Card>
         <Card>
@@ -181,7 +181,7 @@ export default function InvestmentDetailPage() {
               <p className="text-sm font-semibold text-foreground">Suggested SIP</p>
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / month` : "Review first"}</p>
-            <p className="mt-2 text-[13px] text-muted-foreground">Start with as low as ₹500/month</p>
+            <p className="mt-2 text-[0.8125rem] text-muted-foreground">Start with as low as ₹500/month</p>
           </CardContent>
         </Card>
       </div>
@@ -242,13 +242,13 @@ export default function InvestmentDetailPage() {
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-semibold text-foreground">Risk level — {idea.risk}</p>
               </div>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{riskBlurb(idea.risk)}</p>
+              <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">{riskBlurb(idea.risk)}</p>
               {idea.risks.length ? (
                 <>
                   <p className="mt-4 text-sm font-semibold text-foreground">Risks to be aware of</p>
                   <ul className="mt-2 space-y-2">
                     {idea.risks.slice(0, 4).map((risk) => (
-                      <li key={risk} className="flex items-start gap-2 text-[13px] text-foreground">
+                      <li key={risk} className="flex items-start gap-2 text-[0.8125rem] text-foreground">
                         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                         {risk}
                       </li>
@@ -267,8 +267,8 @@ export default function InvestmentDetailPage() {
 
           <div className="mt-4 rounded-2xl bg-white/[0.12] p-4">
             <p className="text-xs uppercase tracking-wide text-[#BFE4CD]">Suggested SIP to start</p>
-            <p className="mt-1 text-[28px] font-extrabold leading-none tracking-tight text-white">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
-            <p className="mt-2 text-[13px] text-[#BFE4CD]">Or invest a lump sum — pick in the next step.</p>
+            <p className="mt-1 text-[1.75rem] font-extrabold leading-none tracking-tight text-white">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Set your amount"}</p>
+            <p className="mt-2 text-[0.8125rem] text-[#BFE4CD]">Or invest a lump sum — pick in the next step.</p>
           </div>
 
           <div className="mt-4 space-y-2.5">
@@ -309,7 +309,7 @@ export default function InvestmentDetailPage() {
             </button>
           </div>
 
-          <p className="mt-4 text-[11.5px] leading-relaxed text-[#9CC8AE]">Past performance doesn&apos;t guarantee future returns. Read scheme-related documents carefully before investing.</p>
+          <p className="mt-4 text-[0.71875rem] leading-relaxed text-[#9CC8AE]">Past performance doesn&apos;t guarantee future returns. Read scheme-related documents carefully before investing.</p>
         </div>
       </div>
 
@@ -317,7 +317,7 @@ export default function InvestmentDetailPage() {
         <DialogContent className="max-h-[88vh] w-[min(820px,96vw)] overflow-y-auto p-0">
           <div className="border-b border-border px-6 py-5 pr-12">
             <DialogTitle className="text-lg font-semibold text-foreground">Compare options</DialogTitle>
-            <p className="mt-1 text-[13px] text-muted-foreground">Similar {idea.category.toLowerCase()} ideas matched to your profile.</p>
+            <p className="mt-1 text-[0.8125rem] text-muted-foreground">Similar {idea.category.toLowerCase()} ideas matched to your profile.</p>
           </div>
           <div className="space-y-3 p-5">
             {/* Current idea row, marked */}
@@ -340,16 +340,16 @@ function CompareRow({ idea, highlight }: { idea: InvestmentIdea; highlight?: boo
         <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="md" />
         <div className="min-w-0">
           <p className="line-clamp-1 text-sm font-semibold text-foreground">{idea.name}{highlight ? <span className="ml-2 text-xs font-normal text-primary">(this idea)</span> : null}</p>
-          <p className="text-[13px] text-muted-foreground">{idea.category}</p>
+          <p className="text-[0.8125rem] text-muted-foreground">{idea.category}</p>
         </div>
       </div>
       <Badge tone={riskTone(idea.risk)}>{idea.risk}</Badge>
       <div>
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Return</p>
+        <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Return</p>
         <p className="text-sm font-semibold text-foreground">{idea.expectedReturn}</p>
       </div>
       <div>
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">SIP</p>
+        <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">SIP</p>
         <p className="text-sm font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)}/mo` : "—"}</p>
       </div>
       <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="text-sm font-medium text-primary hover:underline justify-self-end">
@@ -363,7 +363,7 @@ function DetailSidebarWidget() {
   return (
     <div className="rounded-2xl border border-border bg-surface-soft p-4">
       <p className="text-sm font-semibold text-foreground">Small steps today</p>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Big freedom tomorrow. Build your plan one investment at a time.</p>
+      <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">Big freedom tomorrow. Build your plan one investment at a time.</p>
     </div>
   );
 }
@@ -377,7 +377,7 @@ function Impact({ label, value, tone }: { label: string; value: string; tone: "p
   return (
     <div className="rounded-xl bg-surface p-3 text-center">
       <p className={`text-xl font-semibold ${colors[tone]}`}>{value}</p>
-      <p className="mt-1 text-[13px] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-[0.8125rem] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -389,7 +389,7 @@ function DetailRow({ icon: Icon, label, value }: { icon: typeof Layers; label: s
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-muted-foreground">{label}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
         <p className="truncate font-medium text-foreground">{value}</p>
       </div>
     </div>
@@ -399,9 +399,9 @@ function DetailRow({ icon: Icon, label, value }: { icon: typeof Layers; label: s
 function PriceTile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-xl bg-surface-soft p-4">
-      <p className="text-[13px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[0.8125rem] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
-      <p className="mt-1 text-[13px] text-muted-foreground">{sub}</p>
+      <p className="mt-1 text-[0.8125rem] text-muted-foreground">{sub}</p>
     </div>
   );
 }
@@ -429,14 +429,14 @@ function CommunityPulse({ community }: { community?: CommunitySentiment | null }
             <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full ${tone.soft} px-2.5 py-1 text-xs font-semibold ${tone.text}`}>
               <span className={`h-2 w-2 rounded-full ${tone.dot}`} /> {tone.label}
             </span>
-            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">
               {community.scope === "category"
                 ? <>Overall mood across {subs || "investing forums"} ({community.mentionCount} recent posts) — not specific to this one.</>
                 : <>{community.mentionCount} recent mention{community.mentionCount === 1 ? "" : "s"}{subs ? ` · ${subs}` : ""}. Context from Reddit — not advice.</>}
             </p>
           </>
         ) : (
-          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">No notable community chatter on this one yet. We&apos;ll surface Reddit sentiment here when it appears.</p>
+          <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted-foreground">No notable community chatter on this one yet. We&apos;ll surface Reddit sentiment here when it appears.</p>
         )}
       </CardContent>
     </Card>

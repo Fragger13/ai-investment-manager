@@ -118,7 +118,7 @@ export function GoalsScreen({ form, values }: ScreenContext) {
           })}
         </div>
 
-        <p className="text-[13px] text-[#4B5563]">
+        <p className="text-[0.8125rem] text-[#4B5563]">
           {goals.length === 0
             ? "Pick at least one goal to continue. Each opens its own little planner."
             : `${goals.length} goal${goals.length > 1 ? "s" : ""} planned. Tap a tile to edit, X to remove.`}
@@ -168,11 +168,11 @@ function GoalChip({
             : "border-[#E5E7EB] bg-white shadow-md"
         }`}
       >
-        <span className="text-[36px] leading-none" aria-hidden>{emoji}</span>
+        <span className="text-[2.25rem] leading-none" aria-hidden>{emoji}</span>
         <span className="text-base font-semibold leading-tight text-[#0F172A]">{label}</span>
         {filled && summary ? <span className="text-xs font-semibold text-[#138A3C]">{summary}</span> : null}
         {popular && !filled ? (
-          <span className="rounded-full bg-[#E9F4EC] px-2 py-0.5 text-[12px] font-semibold text-[#138A3C]">Popular</span>
+          <span className="rounded-full bg-[#E9F4EC] px-2 py-0.5 text-[0.75rem] font-semibold text-[#138A3C]">Popular</span>
         ) : null}
         {filled ? (
           <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#138A3C] text-white">
@@ -264,7 +264,7 @@ function GoalDialog({
                   <button
                     type="button"
                     onClick={() => setEstimating(true)}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[11px] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[0.6875rem] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
                   >
                     <Sparkles className="h-3 w-3" /> Not sure?
                   </button>
@@ -280,7 +280,7 @@ function GoalDialog({
                 <button
                   type="button"
                   onClick={() => setDatePicking((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[11px] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
+                  className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[0.6875rem] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
                 >
                   <Sparkles className="h-3 w-3" /> Not sure?
                 </button>
@@ -291,10 +291,10 @@ function GoalDialog({
 
           {datePicking ? (
             <div className="rounded-2xl border border-[#138A3C]/25 bg-[#E9F4EC] p-4">
-              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#138A3C]">
+              <p className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-[#138A3C]">
                 <Sparkles className="h-3.5 w-3.5" /> Not sure when? Pick a rough timeline
               </p>
-              <p className="mt-1 text-[13px] text-[#4B5563]">Papa will set a target date from this. You can fine tune it anytime.</p>
+              <p className="mt-1 text-[0.8125rem] text-[#4B5563]">Papa will set a target date from this. You can fine tune it anytime.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {goalDateSuggestions(goal.type, values).map((chip) => (
                   <button
@@ -304,7 +304,7 @@ function GoalDialog({
                       form.setValue(`goals.${index}.targetDate`, chip.date, { shouldValidate: true });
                       setDatePicking(false);
                     }}
-                    className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[14px] font-medium text-[#0F172A] shadow-sm transition hover:-translate-y-0.5 hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C]"
+                    className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[0.875rem] font-medium text-[#0F172A] shadow-sm transition hover:-translate-y-0.5 hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C]"
                   >
                     {chip.label}
                   </button>

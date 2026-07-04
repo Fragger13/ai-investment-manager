@@ -57,7 +57,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
                   >
                     <X className="h-4 w-4" />
                   </button>
-                  <p className="text-[15px] font-medium leading-snug sm:text-[16px]" style={{ color: SCRIPT_GREEN }}>
+                  <p className="text-[0.9375rem] font-medium leading-snug sm:text-[1rem]" style={{ color: SCRIPT_GREEN }}>
                     {children}
                   </p>
                   <svg
@@ -91,7 +91,7 @@ export function PapaPeek({ open, onClose, mood = "warm", autoDismissMs, variant 
           <div className="relative flex items-start gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-2xl">
             <PapaAvatar avatarClass="h-14 w-14" mood={mood} />
             <div className="flex-1 pr-5">
-              <p className="text-[14px] font-medium leading-snug" style={{ color: SCRIPT_GREEN }}>
+              <p className="text-[0.875rem] font-medium leading-snug" style={{ color: SCRIPT_GREEN }}>
                 {children}
               </p>
             </div>

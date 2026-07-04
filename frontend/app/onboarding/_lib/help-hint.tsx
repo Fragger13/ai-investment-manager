@@ -126,7 +126,7 @@ export function HelpHint({ text, link, label }: { text: React.ReactNode; link?: 
               // pointerEvents auto: re-enable interaction even when a Radix modal
               // has set `body { pointer-events: none }` on everything else.
               style={{ position: "fixed", top: pos.top, left: pos.left, width: TOOLTIP_WIDTH, pointerEvents: "auto" }}
-              className="z-[200] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left text-[12.5px] font-normal leading-5 text-[#374151] shadow-2xl"
+              className="z-[200] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left text-[0.78125rem] font-normal leading-5 text-[#374151] shadow-2xl"
               onMouseEnter={cancelClose}
               onMouseLeave={scheduleClose}
             >

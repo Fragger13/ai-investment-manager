@@ -175,6 +175,20 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ── Global scale calibration ─────────────────────────────────────────────
+   The design was calibrated at 80% browser zoom on a 13.6" MacBook. Every
+   size in the app is rem-based (arbitrary text-[…px] utilities were converted
+   to rem), so shrinking the root font-size reproduces that exact look at 100%
+   zoom on laptops and desktops. Phones and portrait tablets keep the full
+   16px root: their layouts are mobile-first and sized for it, and iOS Safari
+   auto-zooms into inputs below 16px. Media queries are px-based, so layout
+   breakpoints are unaffected. */
+@media (min-width: 1024px) {
+  html {
+    font-size: 80%; /* 12.8px root — the calibrated laptop/desktop scale */
+  }
+}
+
 body {
   min-height: 100vh;
   background: var(--body-background);

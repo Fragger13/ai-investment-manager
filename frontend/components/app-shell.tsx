@@ -67,7 +67,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
           />
           <span className="leading-tight">
             <span className="block text-lg font-extrabold text-foreground">AskPapa</span>
-            <span className="block whitespace-nowrap text-[9px] font-medium tracking-tight text-muted-foreground">Your Papa for all things Finance</span>
+            <span className="block whitespace-nowrap text-[0.5625rem] font-medium tracking-tight text-muted-foreground">Your Papa for all things Finance</span>
           </span>
         </Link>
 
@@ -103,7 +103,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
             </span>
             <span className="min-w-0 flex-1 leading-tight">
               <span className="block truncate text-sm font-semibold text-foreground">{user?.name || "Your profile"}</span>
-              <span className="block text-[11px] text-muted-foreground">View profile</span>
+              <span className="block text-[0.6875rem] text-muted-foreground">View profile</span>
             </span>
           </Link>
           <Button
@@ -154,7 +154,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
                 >
                   <Icon className="h-[19px] w-[19px]" />
                 </span>
-                <span className={cn("text-[10px] font-bold leading-none", active ? "text-foreground" : "text-muted-foreground")}>
+                <span className={cn("text-[0.625rem] font-bold leading-none", active ? "text-foreground" : "text-muted-foreground")}>
                   {item.label}
                 </span>
               </Link>

@@ -133,7 +133,7 @@ export function TextField({ name, label, placeholder, helper, autoFocus, optiona
         render={({ field }) => (
           <Input
             type={type}
-            className="text-[15px] placeholder:text-[#4B5563]"
+            className="text-[0.9375rem] placeholder:text-[#4B5563]"
             value={String(field.value ?? "")}
             onChange={(event) => field.onChange(sanitize ? sanitize(event.target.value) : event.target.value)}
             placeholder={placeholder}
@@ -141,8 +141,8 @@ export function TextField({ name, label, placeholder, helper, autoFocus, optiona
           />
         )}
       />
-      {helper ? <p className="text-[13px] leading-5 text-[#4B5563]">{helper}</p> : null}
-      {error ? <p className="text-[13px] leading-5 text-negative-foreground">{error}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-[#4B5563]">{helper}</p> : null}
+      {error ? <p className="text-[0.8125rem] leading-5 text-negative-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -181,7 +181,7 @@ export function CityField({ name, label, placeholder, helper, optional, hint, hi
             <div className="relative">
               <Input
                 type="text"
-                className="text-[15px] placeholder:text-[#4B5563]"
+                className="text-[0.9375rem] placeholder:text-[#4B5563]"
                 value={String(field.value ?? "")}
                 placeholder={placeholder}
                 onChange={(event) => {
@@ -210,7 +210,7 @@ export function CityField({ name, label, placeholder, helper, optional, hint, hi
                     <li key={city}>
                       <button
                         type="button"
-                        className={`flex w-full items-center px-3 py-1.5 text-left text-[15px] ${idx === highlight ? "bg-surface-hover" : ""} hover:bg-surface-hover`}
+                        className={`flex w-full items-center px-3 py-1.5 text-left text-[0.9375rem] ${idx === highlight ? "bg-surface-hover" : ""} hover:bg-surface-hover`}
                         onMouseEnter={() => setHighlight(idx)}
                         onClick={() => choose(city)}
                       >
@@ -224,8 +224,8 @@ export function CityField({ name, label, placeholder, helper, optional, hint, hi
           );
         }}
       />
-      {helper ? <p className="text-[13px] leading-5 text-[#4B5563]">{helper}</p> : null}
-      {error ? <p className="text-[13px] leading-5 text-negative-foreground">{error}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-[#4B5563]">{helper}</p> : null}
+      {error ? <p className="text-[0.8125rem] leading-5 text-negative-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -241,7 +241,7 @@ export function NumberField({ name, label, placeholder, helper, autoFocus, optio
         name={name}
         render={({ field }) => (
           <NumberInput
-            className="text-[15px] placeholder:text-[#4B5563]"
+            className="text-[0.9375rem] placeholder:text-[#4B5563]"
             value={Number(field.value ?? 0)}
             onChange={field.onChange}
             placeholder={placeholder}
@@ -249,8 +249,8 @@ export function NumberField({ name, label, placeholder, helper, autoFocus, optio
           />
         )}
       />
-      {helper ? <p className="text-[13px] leading-5 text-[#4B5563]">{helper}</p> : null}
-      {error ? <p className="text-[13px] leading-5 text-negative-foreground">{error}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-[#4B5563]">{helper}</p> : null}
+      {error ? <p className="text-[0.8125rem] leading-5 text-negative-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -261,9 +261,9 @@ export function CurrencyField({ name, label, placeholder, helper, autoFocus, opt
   const sizeCls =
     size === "lg"
       ? "h-12 pl-9 text-lg font-semibold placeholder:text-[#4B5563] placeholder:font-normal"
-      : "pl-7 text-[15px] placeholder:text-[#4B5563] placeholder:font-normal";
+      : "pl-7 text-[0.9375rem] placeholder:text-[#4B5563] placeholder:font-normal";
   const symbolCls =
-    size === "lg" ? "left-3.5 text-lg font-semibold" : "left-3 text-[15px]";
+    size === "lg" ? "left-3.5 text-lg font-semibold" : "left-3 text-[0.9375rem]";
   return (
     <div className="space-y-2">
       {label ? <FieldLabel label={label} optional={optional} hint={hint} hintLink={hintLink} action={action} /> : null}
@@ -283,8 +283,8 @@ export function CurrencyField({ name, label, placeholder, helper, autoFocus, opt
           </div>
         )}
       />
-      {helper ? <p className="text-[13px] leading-5 text-[#4B5563]">{helper}</p> : null}
-      {error ? <p className="text-[13px] leading-5 text-negative-foreground">{error}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-[#4B5563]">{helper}</p> : null}
+      {error ? <p className="text-[0.8125rem] leading-5 text-negative-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -300,15 +300,15 @@ export function SelectField({ name, label, placeholder, helper, options, optiona
         name={name}
         render={({ field }) => (
           <Select value={String(field.value ?? "")} onValueChange={field.onChange}>
-            <SelectTrigger className="text-[15px]"><SelectValue placeholder={placeholder} /></SelectTrigger>
+            <SelectTrigger className="text-[0.9375rem]"><SelectValue placeholder={placeholder} /></SelectTrigger>
             <SelectContent>
               {options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
       />
-      {helper ? <p className="text-[13px] leading-5 text-[#4B5563]">{helper}</p> : null}
-      {error ? <p className="text-[13px] leading-5 text-negative-foreground">{error}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-[#4B5563]">{helper}</p> : null}
+      {error ? <p className="text-[0.8125rem] leading-5 text-negative-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -318,7 +318,7 @@ export function ReadOnly({ label, value, helper }: { label?: string; value: stri
     <div className="space-y-2">
       {label ? <Label>{label}</Label> : null}
       <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">{value}</div>
-      {helper ? <p className="text-[13px] leading-5 text-muted-foreground">{helper}</p> : null}
+      {helper ? <p className="text-[0.8125rem] leading-5 text-muted-foreground">{helper}</p> : null}
     </div>
   );
 }

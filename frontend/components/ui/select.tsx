@@ -10,7 +10,7 @@ export const SelectValue = SelectPrimitive.Value;
 export function SelectTrigger({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>) {
   return (
     <SelectPrimitive.Trigger
-      className={cn("flex h-12 w-full items-center justify-between rounded-xl border-2 border-input bg-surface px-4 text-[15px] text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15", className)}
+      className={cn("flex h-12 w-full items-center justify-between rounded-xl border-2 border-input bg-surface px-4 text-[0.9375rem] text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15", className)}
       {...props}
       type="button"
     >
@@ -32,7 +32,7 @@ export function SelectContent({ className, children, ...props }: React.Component
 
 export function SelectItem({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>) {
   return (
-    <SelectPrimitive.Item className={cn("relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2.5 text-[15px] outline-none hover:bg-surface-hover data-[highlighted]:bg-surface-hover", className)} {...props}>
+    <SelectPrimitive.Item className={cn("relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2.5 text-[0.9375rem] outline-none hover:bg-surface-hover data-[highlighted]:bg-surface-hover", className)} {...props}>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );
