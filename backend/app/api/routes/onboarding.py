@@ -124,12 +124,14 @@ def save_onboarding(
     db.add(record)
     db.flush()
 
-    db.add(Portfolio(allocations=json.dumps(dashboard["allocation"]), performance=json.dumps(dashboard["projection"])))
+    owner_id = user.id if user else None
+    db.add(Portfolio(user_id=owner_id, allocations=json.dumps(dashboard["allocation"]), performance=json.dumps(dashboard["projection"])))
     for goal in dashboard["goals"]:
-        db.add(Goal(name=goal["name"], target_amount=goal["targetAmount"], current_progress=goal["currentProgress"]))
+        db.add(Goal(user_id=owner_id, name=goal["name"], target_amount=goal["targetAmount"], current_progress=goal["currentProgress"]))
     for recommendation in dashboard["recommendations"]:
         db.add(
             RecommendationRecord(
+                user_id=owner_id,
                 recommendation_data=json.dumps(recommendation),
                 confidence_score=recommendation["confidenceScore"],
                 generated_at=now_iso(),
@@ -151,15 +153,17 @@ def latest_profile(
     db: Session = Depends(get_db),
 ) -> dict:
     user = _current_user_from_authorization(authorization, db)
-    query = db.query(FinancialProfile)
-    if user:
-        query = query.filter(FinancialProfile.user_id == user.id)
-    else:
-        # No (valid) token: only guest profiles (user_id NULL) may be returned.
-        # Serving the global latest here leaked one account's saved profile to
-        # any request without a token.
-        query = query.filter(FinancialProfile.user_id.is_(None))
-    record = query.order_by(FinancialProfile.id.desc()).first()
+    if not user:
+        # No (valid) token: nothing to serve. Every frontend caller passes a
+        # token; the old guest fallback (latest user_id NULL row) handed any
+        # anonymous request whatever legacy profile was saved last.
+        return {"profile": None}
+    record = (
+        db.query(FinancialProfile)
+        .filter(FinancialProfile.user_id == user.id)
+        .order_by(FinancialProfile.id.desc())
+        .first()
+    )
     if not record:
         return {"profile": None}
     return {"profile": json.loads(record.payload_json)}

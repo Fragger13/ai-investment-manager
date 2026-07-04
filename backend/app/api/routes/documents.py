@@ -4,11 +4,13 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.data_encryption import bind_key, encrypt_file_bytes
 from app.core.database import get_db
+from app.core.security import user_from_bearer
 from app.models.uploaded_document import UploadedDocument
 from app.schemas.document import DocumentAnalysisResponse, DocumentAnalyzeRequest
 from app.services.document_intelligence import analyze_document, analyze_saved_file, dumps
@@ -29,7 +31,11 @@ def analyze(payload: DocumentAnalyzeRequest) -> dict:
 
 
 @router.post("/upload", response_model=DocumentAnalysisResponse)
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)) -> dict:
+async def upload_document(
+    file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
     suffix = Path(file.filename or "").suffix.lower().lstrip(".")
     inferred_type = ALLOWED_TYPES.get(file.content_type or "", suffix)
     if inferred_type not in {"pdf", "csv", "xlsx", "xls"}:
@@ -49,7 +55,13 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     path = upload_dir / safe_name
     path.write_bytes(content)
 
-    record = UploadedDocument(file_type=inferred_type, extraction_status="processing", parsed_data="{}")
+    user = user_from_bearer(authorization, db)
+    record = UploadedDocument(
+        user_id=user.id if user else None,
+        file_type=inferred_type,
+        extraction_status="processing",
+        parsed_data="{}",
+    )
     db.add(record)
     db.commit()
     db.refresh(record)
@@ -65,3 +77,12 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         record.parsed_data = json.dumps({"error": str(exc)})
         db.commit()
         raise HTTPException(status_code=500, detail="Document parsing failed. Please check the file and try again.") from exc
+    finally:
+        # The statement/portfolio file itself is financial data: once analysis
+        # is done, what stays on disk is ciphered under the session's key.
+        key = bind_key()
+        if key is not None:
+            try:
+                path.write_bytes(encrypt_file_bytes(content, key))
+            except OSError:
+                path.unlink(missing_ok=True)

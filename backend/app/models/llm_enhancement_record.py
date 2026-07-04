@@ -2,6 +2,7 @@ from sqlalchemy import Boolean, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.encrypted_types import EncryptedText
 
 
 class LlmEnhancementRecord(Base):
@@ -14,7 +15,7 @@ class LlmEnhancementRecord(Base):
     input_hash: Mapped[str] = mapped_column(String(64), default="")
     status: Mapped[str] = mapped_column(String(40), default="not_requested", index=True)
     enhanced: Mapped[bool] = mapped_column(Boolean, default=False)
-    payload_json: Mapped[str] = mapped_column(String, default="{}")
+    payload_json: Mapped[str] = mapped_column(EncryptedText(fallback="{}"), default="{}")
     model: Mapped[str] = mapped_column(String(120), default="")
     fallback_reason: Mapped[str] = mapped_column(String(240), default="")
     last_error: Mapped[str] = mapped_column(String(500), default="")

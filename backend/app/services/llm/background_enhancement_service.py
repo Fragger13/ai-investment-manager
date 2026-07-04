@@ -10,6 +10,7 @@ from threading import Event, RLock
 from typing import Any, Callable
 
 from app.core.config import settings
+from app.core.data_encryption import current_scope, run_with_scope
 from app.services.cache.intelligence_cache import get_cached, set_cached
 from app.services.llm.batch_enhancement_service import (
     enhance_asset_intelligence_batch,
@@ -105,7 +106,10 @@ def _schedule(kind: str, items: list[WorkItem], enhancer: Enhancer) -> None:
             work.append((pending_key, item_id, input_hash, item))
             logger.info("[LLM ENHANCEMENT QUEUED] item_type=%s item_id=%s model=%s", kind, item_id, _model())
     if work:
-        _EXECUTOR.submit(_process, kind, work, enhancer)
+        # Carry the requesting session's encryption scope into the worker
+        # thread so the persisted results are ciphered under the same key the
+        # user's later requests can read.
+        _EXECUTOR.submit(run_with_scope, current_scope(), _process, kind, work, enhancer)
 
 
 def _process(kind: str, work: list[WorkItem], enhancer: Enhancer) -> None:

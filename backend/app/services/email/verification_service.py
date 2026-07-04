@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.data_encryption import unwrap_key_with_server, wrap_key_with_recovery
 from app.models.pending_registration import PendingRegistration
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -50,7 +51,16 @@ def _get_pending(db: Session, email: str) -> PendingRegistration | None:
     return db.query(PendingRegistration).filter(PendingRegistration.email == email).first()
 
 
-def start_registration(db: Session, *, name: str, email: str, password_hash: str) -> EmailResult:
+def start_registration(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    password_hash: str,
+    dek_wrapped_password: str = "",
+    dek_salt: str = "",
+    dek_wrapped_server: str = "",
+) -> EmailResult:
     """Create or refresh a pending registration and email a fresh code.
 
     If a pending row already exists for this email (a repeat sign-up before
@@ -70,6 +80,9 @@ def start_registration(db: Session, *, name: str, email: str, password_hash: str
             verification_code_expires=_expires_at(now).isoformat(),
             created_at=now.isoformat(),
             code_issued_at=now.isoformat(),
+            dek_wrapped_password=dek_wrapped_password,
+            dek_salt=dek_salt,
+            dek_wrapped_server=dek_wrapped_server,
         )
         db.add(pending)
     else:
@@ -80,6 +93,9 @@ def start_registration(db: Session, *, name: str, email: str, password_hash: str
         pending.verification_code = code
         pending.verification_code_expires = _expires_at(now).isoformat()
         pending.code_issued_at = now.isoformat()
+        pending.dek_wrapped_password = dek_wrapped_password
+        pending.dek_salt = dek_salt
+        pending.dek_wrapped_server = dek_wrapped_server
     db.commit()
     result = _send_verification_email(email, name, code)
     if not result.ok:
@@ -106,8 +122,13 @@ def resend_code(db: Session, email: str) -> EmailResult:
     return result
 
 
-def verify_and_create_user(db: Session, email: str, submitted: str) -> User:
-    """Validate the submitted code and promote the pending row into a real User."""
+def verify_and_create_user(db: Session, email: str, submitted: str) -> tuple[User, bytes | None]:
+    """Validate the submitted code and promote the pending row into a real User.
+
+    Returns the user plus their unwrapped data encryption key (for the login
+    token). The server-wrapped DEK copy is deleted along with the pending row,
+    so after this moment only the password can unlock the account's data.
+    """
     email = email.strip().lower()
     pending = _get_pending(db, email)
     if pending is None:
@@ -126,14 +147,18 @@ def verify_and_create_user(db: Session, email: str, submitted: str) -> User:
     if not secrets.compare_digest(code, submitted):
         raise VerificationError("That code doesn't match. Check your inbox or request a new one.")
 
+    dek = unwrap_key_with_server(pending.dek_wrapped_server) if pending.dek_wrapped_server else None
     user = UserRepository(db).create(
         name=pending.name,
         email=pending.email,
         password_hash=pending.password_hash,
+        dek_wrapped=pending.dek_wrapped_password or "",
+        dek_salt=pending.dek_salt or "",
+        dek_wrapped_recovery=wrap_key_with_recovery(dek) if dek else "",
     )
     db.delete(pending)
     db.commit()
-    return user
+    return user, dek
 
 
 def _is_in_cooldown(pending: PendingRegistration, now: datetime | None = None) -> bool:

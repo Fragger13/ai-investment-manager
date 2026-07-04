@@ -31,8 +31,11 @@ export function WelcomeScreen(_ctx: ScreenContext) {
         <WelcomePill icon="☕" label="Pause anytime" />
       </div>
       <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#E9F4EC] px-4 py-1.5 text-xs font-semibold text-[#138A3C]">
-        🔒 Private — only Papa sees this
+        🔒 Encrypted end to end
       </div>
+      <p className="mt-2 max-w-sm text-xs leading-5 text-[#6B7280]">
+        Your money details are locked with your password before they are saved. Nobody else can read them, not even the team behind AskPapa.
+      </p>
     </div>
   );
 }

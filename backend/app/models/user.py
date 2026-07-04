@@ -15,6 +15,13 @@ class User(Base):
     # A `users` row only exists once email is verified (see PendingRegistration),
     # so this is True for every real account. Kept for API-response compatibility.
     email_verified: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Data encryption key wrapped under the user's password (core/data_encryption).
+    # Empty for accounts created before encryption; filled on their next login.
+    dek_wrapped: Mapped[str] = mapped_column(String, default="", nullable=False)
+    dek_salt: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    # Escrow copy of the same key wrapped under the server's recovery secret,
+    # so a password reset re-wraps instead of losing the financial data.
+    dek_wrapped_recovery: Mapped[str] = mapped_column(String, default="", nullable=False)
 
     profile = relationship("FinancialProfile", back_populates="user", uselist=False)
     goals = relationship("Goal", back_populates="user")

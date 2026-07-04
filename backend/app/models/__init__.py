@@ -5,6 +5,7 @@ from app.models.portfolio import Portfolio
 from app.models.recommendation import RecommendationRecord
 from app.models.uploaded_document import UploadedDocument
 from app.models.user import User
+from app.models.password_reset import PasswordReset
 from app.models.pending_registration import PendingRegistration
 from app.models.activity_record import ActivityRecord
 from app.models.feedback import Feedback
@@ -62,6 +63,7 @@ from app.models.llm_enhancement_record import LlmEnhancementRecord
 
 __all__ = [
     "User",
+    "PasswordReset",
     "PendingRegistration",
     "FinancialProfile",
     "Goal",

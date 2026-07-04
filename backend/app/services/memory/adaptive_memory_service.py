@@ -269,11 +269,19 @@ def adaptive_summary(db: Session) -> dict:
     alerts = db.query(DriftAlert).filter(DriftAlert.status == "open").count()
     latest_event = db.query(FinancialMemoryEvent).order_by(FinancialMemoryEvent.id.desc()).first()
     latest_reassessment = db.query(RecommendationReassessmentLog).order_by(RecommendationReassessmentLog.id.desc()).first()
-    ignored_crypto = (
+    # entity_name is encrypted at rest, so the match runs in Python after the
+    # ORM decrypts it rather than as a SQL ilike.
+    rejected_actions = (
         db.query(UserActionEvent)
         .filter(UserActionEvent.action_type.in_(["rejected", "ignored", "dismissed"]))
-        .filter(UserActionEvent.entity_name.ilike("%bitcoin%") | UserActionEvent.entity_name.ilike("%ethereum%") | UserActionEvent.entity_name.ilike("%crypto%"))
-        .count()
+        .order_by(UserActionEvent.id.desc())
+        .limit(500)
+        .all()
+    )
+    ignored_crypto = sum(
+        1
+        for action in rejected_actions
+        if any(term in (action.entity_name or "").lower() for term in ("bitcoin", "ethereum", "crypto"))
     )
     return {
         "memoryEventCount": db.query(FinancialMemoryEvent).count(),
@@ -532,13 +540,15 @@ def _behavior_payload(profile: OnboardingProfile) -> dict:
 
 def _save_drift_alerts(db: Session, alerts: list[dict]) -> None:
     for alert in alerts:
-        existing = (
+        # title is encrypted at rest, so the dedup match runs on the decrypted
+        # values in Python instead of a SQL equality that ciphertext never hits.
+        open_alerts = (
             db.query(DriftAlert)
             .filter(DriftAlert.drift_type == alert["driftType"])
-            .filter(DriftAlert.title == alert["title"])
             .filter(DriftAlert.status == "open")
-            .first()
+            .all()
         )
+        existing = next((row for row in open_alerts if row.title == alert["title"]), None)
         if existing:
             existing.summary = alert["summary"]
             existing.current_value = str(alert.get("currentValue", ""))

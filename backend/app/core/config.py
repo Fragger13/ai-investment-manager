@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ai_investment_manager.db"
     jwt_secret: str = "prototype-secret-change-me"
     jwt_algorithm: str = "HS256"
+    # Derives the guest/server data-at-rest key (core/data_encryption); falls
+    # back to jwt_secret when unset. Rotating it is safe only for secrets
+    # listed in data_encryption._LEGACY_GUEST_SECRETS (startup rekeys them).
+    data_encryption_secret: str | None = None
+    # Wraps the escrow copy of each user's data key so password reset keeps
+    # their financial data. Losing this secret means reset = data loss again.
+    recovery_master_key: str | None = None
     access_token_expire_minutes: int = 60 * 24
     cors_origins: list[str] = [
         "http://localhost:3000",
@@ -44,6 +51,10 @@ class Settings(BaseSettings):
     llm_enabled: bool = True
     llm_model: str = "qwen3:8b"
     ollama_base_url: str = "http://localhost:11434"
+    # Set for Ollama Cloud (ollama_base_url=https://ollama.com): sent as a
+    # Bearer token, and makes the router trust the configured model names
+    # instead of resolving them against the local /api/tags list.
+    ollama_api_key: str | None = None
     # Defaults target qwen3:8b (commonly pulled here). The runtime resolves any
     # configured model that isn't actually installed to one that is (see
     # model_router._resolve_model), so a config/.env drift degrades to a working

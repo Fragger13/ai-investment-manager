@@ -2,6 +2,7 @@ from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.encrypted_types import EncryptedText
 
 
 class UserActionEvent(Base):
@@ -12,6 +13,6 @@ class UserActionEvent(Base):
     action_type: Mapped[str] = mapped_column(String(80), index=True)
     entity_type: Mapped[str] = mapped_column(String(80), default="")
     entity_id: Mapped[str] = mapped_column(String(180), default="")
-    entity_name: Mapped[str] = mapped_column(String(240), default="")
-    payload_json: Mapped[str] = mapped_column(String, default="{}")
+    entity_name: Mapped[str] = mapped_column(EncryptedText(fallback=""), default="")
+    payload_json: Mapped[str] = mapped_column(EncryptedText(fallback="{}"), default="{}")
     created_at: Mapped[str] = mapped_column(String(80), index=True)

@@ -23,14 +23,23 @@ def password_hash_supported(password_hash: str) -> bool:
     return bool(pwd_context.identify(password_hash))
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(subject: str, dek_claim: str | None = None) -> str:
+    # `dek_claim` is the user's data encryption key (see core/data_encryption).
+    # It lives only inside tokens held by the user's device — never at rest
+    # server-side — which is what keeps their financial data unreadable here.
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    return jwt.encode({"sub": subject, "exp": expire, "type": "access"}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    payload = {"sub": subject, "exp": expire, "type": "access"}
+    if dek_claim:
+        payload["dk"] = dek_claim
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_refresh_token(subject: str) -> str:
+def create_refresh_token(subject: str, dek_claim: str | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=30)
-    return jwt.encode({"sub": subject, "exp": expire, "type": "refresh"}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    payload = {"sub": subject, "exp": expire, "type": "refresh"}
+    if dek_claim:
+        payload["dk"] = dek_claim
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def user_from_bearer(authorization: str | None, db):

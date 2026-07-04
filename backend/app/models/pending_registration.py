@@ -22,3 +22,10 @@ class PendingRegistration(Base):
     verification_code_expires: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[str] = mapped_column(String(40))
     code_issued_at: Mapped[str] = mapped_column(String(40))
+    # The account's data encryption key, generated at sign-up: one copy wrapped
+    # by the password (promoted onto the User row) and one wrapped by the server
+    # key so verify-email can mint a token carrying the key without the password.
+    # The server-wrapped copy dies with this row at verification.
+    dek_wrapped_password: Mapped[str] = mapped_column(String, default="")
+    dek_salt: Mapped[str] = mapped_column(String(64), default="")
+    dek_wrapped_server: Mapped[str] = mapped_column(String, default="")

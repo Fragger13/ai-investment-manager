@@ -88,12 +88,31 @@ export class ApiError extends Error {
   }
 }
 
+// The access token carries the user's data decryption key, so every request
+// must present it for the backend to read or write that user's encrypted
+// rows. Read straight from the persisted session (importing the auth store
+// here would be a circular import).
+function sessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("ai-investment-manager-session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.token || null;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = sessionToken();
+  const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const headers = options?.body instanceof FormData
-    ? options.headers
+    ? { ...auth, ...((options.headers as Record<string, string>) || {}) }
     : {
         "Content-Type": "application/json",
-        ...(options?.headers || {})
+        ...auth,
+        ...((options?.headers as Record<string, string>) || {})
       };
   let response: Response;
   try {
@@ -168,6 +187,12 @@ export const api = {
     return request("/auth/password-reset", {
       method: "POST",
       body: JSON.stringify({ email })
+    });
+  },
+  async passwordResetConfirm(email: string, token: string, password: string): Promise<{ status: string; email: string }> {
+    return request("/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, token, password })
     });
   },
   async dashboard(profile: OnboardingProfile): Promise<DashboardData> {
