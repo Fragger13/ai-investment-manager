@@ -48,7 +48,7 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
     options: [
       { value: "Rarely", title: "Rarely", emoji: "🌪️" },
       { value: "Sometimes", title: "Sometimes", emoji: "🌤️" },
-      { value: "Often", title: "Like clockwork", emoji: "📆" }
+      { value: "Often", title: "Regularly", emoji: "📆" }
     ]
   },
   {

@@ -66,6 +66,28 @@ def recurring_liabilities(profile: OnboardingProfile) -> int:
     return int(profile.rent + profile.subscriptions + total_emi_payments(profile))
 
 
+def monthly_commitments(profile: OnboardingProfile) -> int:
+    """Total fixed monthly outflow: rent + everyday expenses + subscriptions + EMIs.
+
+    The onboarding UI collects rent and "other monthly expenses" as separate,
+    additive fields ("Don't include rent or EMIs" on the expenses screen), and
+    the frontend's lib/profile.ts monthlyCommitments() sums them the same way.
+    Every backend surplus calculation must go through this helper so "available
+    to invest" means the same thing everywhere (dashboard, engine, chat, memory).
+    """
+    return int(profile.rent + profile.monthlyExpenses + profile.subscriptions + total_emi_payments(profile))
+
+
+def computed_monthly_surplus(profile: OnboardingProfile) -> int:
+    """Income minus all fixed commitments, floored at zero."""
+    return max(monthly_income(profile) - monthly_commitments(profile), 0)
+
+
+def emergency_target_base(profile: OnboardingProfile) -> int:
+    """Default emergency-fund target: six months of total fixed commitments."""
+    return int(monthly_commitments(profile) * 6)
+
+
 def net_worth(profile: OnboardingProfile) -> int:
     additional = sum(item.value for item in profile.additionalInvestments)
     return int(
@@ -143,11 +165,11 @@ def health_agent(profile: OnboardingProfile) -> dict:
     income = monthly_income(profile)
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - emi_total, 0))
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     savings_rate = (surplus / income * 100) if income else 0
-    expense_burden = (profile.monthlyExpenses / income * 100) if income else 0
+    expense_burden = ((profile.rent + profile.monthlyExpenses + profile.subscriptions) / income * 100) if income else 0
     debt_burden = (emi_total / income * 100) if income else 0
-    months_of_buffer = profile.cashBalance / max(profile.monthlyExpenses + emi_total, 1)
+    months_of_buffer = profile.cashBalance / max(monthly_commitments(profile), 1)
     score = 50 + min(savings_rate, 40) * 0.65 + min(months_of_buffer, 12) * 1.4 - min(debt_burden, 45) * 0.45
     if profile.investsMonthly.lower() in {"yes", "always"}:
         score += 4
@@ -291,9 +313,9 @@ def _fund_phrase(funds: list[dict]) -> str:
 
 def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     income = monthly_income(profile)
-    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - total_emi_payments(profile), 0))
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     emergency_goal = next((goal for goal in profile.goals if goal.type == "Emergency fund"), None)
-    emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or profile.monthlyExpenses * 6, profile.monthlyExpenses * 6)
+    emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or emergency_target_base(profile), emergency_target_base(profile))
     emergency_gap = max(emergency_needed - profile.cashBalance, 0)
     high_long_term_risk = profile.volatilityComfort == "High" or profile.investmentHorizon in {"7-10 years", "10+ years"}
     short_term_ok = profile.shortTermVolatilityComfort == "High" and profile.shortTermLossTolerance in {"10-15%", "15%+"}
@@ -498,9 +520,9 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int, holdings_by
         {
             "id": "goal-emergency",
             "name": "Emergency fund",
-            "targetAmount": max(profile.emergencyFundTarget, profile.monthlyExpenses * 6),
+            "targetAmount": max(profile.emergencyFundTarget, emergency_target_base(profile)),
             "currentProgress": profile.cashBalance,
-            "requiredMonthlyInvestment": ceil(max(max(profile.emergencyFundTarget, profile.monthlyExpenses * 6) - profile.cashBalance, 0) / 6),
+            "requiredMonthlyInvestment": ceil(max(max(profile.emergencyFundTarget, emergency_target_base(profile)) - profile.cashBalance, 0) / 6),
             "feasibilityScore": min(96, round((surplus / max(profile.monthlyExpenses, 1)) * 60)),
             "timelineProjection": "6 months target",
             "explanation": "Emergency money protects you from job loss, medical costs, or sudden expenses.",
@@ -578,7 +600,7 @@ def build_dashboard(profile: OnboardingProfile, holdings_by_id: dict | None = No
     profile.monthlyCashInflow = income
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = investable_surplus(profile, max(income - profile.monthlyExpenses - emi_total, 0))
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     savings_rate = (surplus / income * 100) if income else 0
     risk_profile = "Higher growth comfort" if profile.volatilityComfort == "High" else "More stability preferred" if profile.volatilityComfort == "Low" else "Balanced growth"
     health = health_agent(profile)
@@ -604,7 +626,7 @@ def build_dashboard(profile: OnboardingProfile, holdings_by_id: dict | None = No
             {"name": "Housing", "value": profile.rent},
             {"name": "EMI and loans", "value": emi_total},
             {"name": "Subscriptions", "value": profile.subscriptions},
-            {"name": "Other spends", "value": max(profile.monthlyExpenses - profile.rent - profile.subscriptions, 0)},
+            {"name": "Other spends", "value": profile.monthlyExpenses},
         ],
         "alerts": [
             alert

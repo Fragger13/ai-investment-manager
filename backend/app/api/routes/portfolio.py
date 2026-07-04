@@ -4,14 +4,15 @@ import json
 from datetime import UTC, datetime
 from math import pow
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import user_from_bearer
 from app.models.user_action_event import UserActionEvent
 from app.schemas.financial import OnboardingProfile
 from app.services.holdings.pricing_service import _price_metal
-from app.services.intelligence import allocation, monthly_income, net_worth, total_emi_payments
+from app.services.intelligence import allocation, computed_monthly_surplus, investable_surplus, monthly_income, net_worth, total_emi_payments
 from app.services.memory.adaptive_memory_service import snapshot_portfolio
 from app.services.optimization.portfolio_optimizer import latest_optimization, optimize_portfolio
 from app.services.profile_resolution import latest_saved_profile, resolve_profile
@@ -74,27 +75,34 @@ def rebalancing_suggestions(db: Session = Depends(get_db)) -> list[dict]:
 
 
 @router.post("/summary")
-def portfolio_summary(payload: OnboardingProfile | None = None, db: Session = Depends(get_db)) -> dict:
+def portfolio_summary(
+    payload: OnboardingProfile | None = None,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
     """Comprehensive user-facing portfolio view.
 
     Combines static profile-based holdings with the user's recorded actions
     (Add to Plan / Take Action / Add to watchlist) to produce a single view
     that reflects what the user actually has and what they have committed to.
+    Actions are scoped to the caller so one account's commitments never show
+    up inside another account's portfolio.
     """
     profile = resolve_profile(db, payload)
 
     worth = net_worth(profile)
     income = monthly_income(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
 
-    # Recent user actions from the backend memory store
-    actions = (
-        db.query(UserActionEvent)
-        .order_by(UserActionEvent.id.desc())
-        .limit(200)
-        .all()
-    )
+    # Recent user actions from the backend memory store — this caller's only.
+    user = user_from_bearer(authorization, db)
+    actions_query = db.query(UserActionEvent)
+    if user:
+        actions_query = actions_query.filter(UserActionEvent.user_id == user.id)
+    else:
+        actions_query = actions_query.filter(UserActionEvent.user_id.is_(None))
+    actions = actions_query.order_by(UserActionEvent.id.desc()).limit(200).all()
 
     parsed_actions: list[dict] = []
     committed_monthly = 0.0
@@ -190,6 +198,28 @@ def _months_running(start_date: str, now: datetime) -> int:
 
 
 def _category_for_action(name: str, hint: str) -> str:
+    # The recommendation's own category (hint) is authoritative, so honor it
+    # before scanning the instrument name. Otherwise a "Debt mutual fund" whose
+    # name contains "liquid" (a liquid/debt fund) matched "liquid"→Cash and split
+    # identical debt funds across Cash and Debt buckets.
+    h = (hint or "").lower()
+    if h:
+        if "debt" in h or "bond" in h or "gilt" in h or "fixed income" in h:
+            return "Debt"
+        if "liquid" in h or "overnight" in h or (h.strip() in {"cash", "savings"}):
+            return "Cash"
+        if "gold" in h or "silver" in h or "sgb" in h:
+            return "Alternative"
+        if "crypto" in h:
+            return "Alternative"
+        if (
+            "equity" in h or "stock" in h or "index" in h or "etf" in h
+            or "flexi" in h or "large cap" in h or "mid cap" in h or "small cap" in h
+        ):
+            return "Equity"
+        if "fund" in h or "mutual" in h:
+            # Generic mutual fund with no debt/liquid qualifier → equity default.
+            return "Equity"
     value = f"{name} {hint}".lower()
     if "emergency" in value or "liquid" in value or "savings" in value:
         return "Cash"

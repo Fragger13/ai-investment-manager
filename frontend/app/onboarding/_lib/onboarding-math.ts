@@ -45,3 +45,21 @@ export function estimatedEmi(principal: number, annualRate: number, years: numbe
 export function hasModernLoanDetails(loan?: Partial<EmiLoan>): boolean {
   return Boolean(loan?.totalInterestAmount || loan?.startDate || loan?.endDate);
 }
+
+// Financial-freedom corpus suggestion, via the classic "4% rule": you can safely
+// withdraw ~4% of a nest egg each year, so the corpus that throws off a full
+// year of living costs is roughly 25× your annual spending. Falls back to ~60%
+// of income when expenses aren't filled in yet, and rounds to a clean ₹1L figure.
+export function suggestFinancialFreedomCorpus(p: {
+  rent?: number;
+  monthlyExpenses?: number;
+  monthlySalary?: number;
+  otherIncome?: number;
+}): number {
+  const spend = Number(p.rent || 0) + Number(p.monthlyExpenses || 0);
+  const income = Number(p.monthlySalary || 0) + Number(p.otherIncome || 0);
+  const monthlyLiving = spend > 0 ? spend : Math.round(income * 0.6);
+  if (monthlyLiving <= 0) return 0;
+  const corpus = monthlyLiving * 12 * 25;
+  return Math.round(corpus / 100000) * 100000;
+}

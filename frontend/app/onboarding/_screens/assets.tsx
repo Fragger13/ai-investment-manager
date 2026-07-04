@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencyField } from "../_lib/field-helpers";
+import { HelpHint, HintLink } from "../_lib/help-hint";
 import { PapaPeek } from "../_components/papa-peek";
 import { formatIndianCurrencyInput, formatINR, parseIndianCurrencyInput } from "@/lib/currency";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,49 @@ function isMetalClass(c: HoldingAssetClass | string): boolean {
   return c === "gold" || c === "silver";
 }
 
+// EPF/PPF are jargon to most first-timers, so the bucket carries a plain-language
+// explainer plus a link to the EPFO passbook where salaried users can look up
+// their actual balance.
+const EPFO_HINT_LINK: HintLink = {
+  href: "https://passbook.epfindia.gov.in/MemberPassBook/login",
+  label: "Check my EPF balance (EPFO passbook)",
+};
+const EPF_PPF_HINT =
+  "EPF is the retirement fund your employer sets aside from your salary every month. If you draw a salary, you almost certainly have one building up. PPF is a voluntary long term savings account, usually opened at your bank. Not sure of the balance? Log in to the EPFO passbook with your UAN to see it, or check PPF in your bank app.";
+
+// Plain-language explainer for the upload flow: what file to grab, where it
+// lives in common apps, and what it should contain. Shown on the intro + upload
+// screens so amateurs aren't stuck wondering what an "XIRR statement" even is.
+function UploadStatementHelp() {
+  return (
+    <details className="group rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 text-[13px] text-[#374151]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-[#0F172A]">
+        <span aria-hidden>📄</span>
+        <span>New to this? What should I upload, and how do I get it?</span>
+        <span className="ml-auto text-[#9CA3AF] transition group-open:rotate-180" aria-hidden>⌄</span>
+      </summary>
+      <div className="mt-2.5 space-y-2.5 leading-5">
+        <p>
+          You just need a <strong>holdings or portfolio statement</strong>, sometimes called an{" "}
+          <strong>XIRR</strong>, <strong>capital gains</strong>, or <strong>CAS</strong> statement. It&apos;s an
+          Excel or CSV file that lists what you own and what it&apos;s worth today. No need to understand the numbers.
+          Papa reads it for you.
+        </p>
+        <p className="font-semibold text-[#0F172A]">Where to download it:</p>
+        <ul className="list-disc space-y-1 pl-4">
+          <li><strong>Stocks (Zerodha):</strong> Console → Portfolio → Holdings → download as Excel.</li>
+          <li><strong>Groww / Upstox / Angel One:</strong> Profile → Reports or Statements → Holdings statement.</li>
+          <li><strong>Mutual funds (any platform):</strong> get a free <strong>Consolidated Account Statement (CAS)</strong> from <strong>CAMS</strong> or <strong>KFintech</strong>. They email it to you.</li>
+        </ul>
+        <p>
+          Look for a file showing each holding with its <strong>current value</strong>. Have more than one broker?
+          Upload them all and Papa merges everything into one portfolio.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 // ─────────────────────────── Intro ───────────────────────────
 
 export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
@@ -149,6 +193,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-800">⚠ No live P&amp;L — refresh values monthly to stay accurate</p>
           </button>
         </div>
+        <UploadStatementHelp />
         <p className="text-[13px] text-[#4B5563]">Hit “Continue” after picking. You can always come back to add more.</p>
       </div>
       <PapaPeek
@@ -170,14 +215,32 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
 // ─────────────────────────── Upload + Preview ───────────────────────────
 
 export function AssetsUploadScreen({ form, values }: ScreenContext) {
+  const intent = typeof window !== "undefined" ? window.localStorage.getItem("askpapa_assets_intent") : null;
+  const skippedFromIntro = intent === "manual";
+  return (
+    <ScreenWrap
+      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
+      headline="Your portfolio"
+      sub="Upload an XIRR statement (XLSX/CSV) to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
+      mood="curious"
+    >
+      <div className="space-y-6">
+        <StatementUploader form={form} />
+        <PortfolioBuckets form={form} values={values} />
+      </div>
+    </ScreenWrap>
+  );
+}
+
+// The statement-upload box + review preview. Extracted so the portfolio edit
+// dialog can offer the same upload flow — a fresh upload, or an updated
+// statement for someone who started out entering holdings by hand.
+export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<OnboardingProfile>; onCommitted?: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState<Holding[] | null>(null);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
-
-  const intent = typeof window !== "undefined" ? window.localStorage.getItem("askpapa_assets_intent") : null;
-  const skippedFromIntro = intent === "manual";
 
   const onPick = () => fileInputRef.current?.click();
 
@@ -226,19 +289,13 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
     if (!preview || preview.length === 0) return;
     writeHoldings(form, [...readHoldings(form), ...preview]);
     setPreview(null);
+    onCommitted?.();
   };
 
   const totalIncoming = preview?.reduce((sum, h) => sum + Number(h.currentValue || 0), 0) || 0;
 
   return (
-    <ScreenWrap
-      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
-      headline="Your portfolio"
-      sub="Upload an XIRR statement (XLSX/CSV) to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
-      mood="curious"
-    >
-      <div className="space-y-6">
-        <div className="space-y-4">
+    <div className="space-y-4">
         {preview ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-2xl border border-[#138A3C]/30 bg-[#E9F4EC] px-4 py-3">
@@ -312,12 +369,10 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
             {error ? <p className="text-[13px] text-negative-foreground">{error}</p> : null}
+            <UploadStatementHelp />
           </div>
         )}
-        </div>
-        <PortfolioBuckets form={form} values={values} />
-      </div>
-    </ScreenWrap>
+    </div>
   );
 }
 
@@ -408,6 +463,8 @@ export function PortfolioBuckets({ form, values }: { form: UseFormReturn<Onboard
         <ScalarBucketDialog
           title="EPF / PPF"
           helper="Latest balance from your last statement. Long-term retirement money."
+          hint={EPF_PPF_HINT}
+          hintLink={EPFO_HINT_LINK}
           fieldName="epfPpfValue"
           form={form}
           initialValue={epfValue}
@@ -455,11 +512,11 @@ function BucketTile({ bucket, onClick }: { bucket: { key: BucketKey; label: stri
 
 type LumpsumField = keyof Pick<OnboardingProfile, "stocksValue" | "mutualFundsValue" | "cashBalance" | "epfPpfValue">;
 
-const LUMPSUM_TILES: { value: LumpsumField; label: string; emoji: string; placeholder: string; helper: string }[] = [
-  { value: "stocksValue", label: "Direct stocks & ETFs", emoji: "📊", placeholder: "Total value today", helper: "Include any ETFs you hold. Today's value, not cost." },
-  { value: "mutualFundsValue", label: "Mutual funds / SIPs", emoji: "💼", placeholder: "Total MF value", helper: "SIP + lumpsum together." },
-  { value: "cashBalance", label: "Savings & cash", emoji: "🏦", placeholder: "Bank + cash", helper: "Counts toward emergency fund." },
-  { value: "epfPpfValue", label: "EPF / PPF", emoji: "🏛️", placeholder: "Latest balance", helper: "Long-term retirement savings." },
+const LUMPSUM_TILES: { value: LumpsumField; label: string; emoji: string; placeholder: string; helper: string; hint?: string; hintLink?: HintLink }[] = [
+  { value: "stocksValue", label: "Direct stocks & ETFs", emoji: "📊", placeholder: "Total value today", helper: "Include any ETFs you hold. Today's value, not cost.", hint: "Shares of individual companies (like Reliance or TCS) and ETFs you bought directly through a demat account. Enter what they're worth today, not what you paid." },
+  { value: "mutualFundsValue", label: "Mutual funds / SIPs", emoji: "💼", placeholder: "Total MF value", helper: "SIP + lumpsum together.", hint: "Money in mutual funds, whether you invested a lump sum or through a monthly SIP. Add up the current value of all your funds." },
+  { value: "cashBalance", label: "Savings & cash", emoji: "🏦", placeholder: "Bank + cash", helper: "Counts toward emergency fund.", hint: "Money sitting in your savings/current accounts plus cash in hand. This is what Papa counts toward your emergency fund." },
+  { value: "epfPpfValue", label: "EPF / PPF", emoji: "🏛️", placeholder: "Latest balance", helper: "Long-term retirement savings.", hint: EPF_PPF_HINT, hintLink: EPFO_HINT_LINK },
 ];
 
 // Keep the manual "Other investments" choices identical to the upload-flow
@@ -469,6 +526,22 @@ const ADDITIONAL_TYPES = OTHERS_OPTIONS.map((o) => o.label);
 type AdditionalInvestment = { type: string; value: number; notes?: string };
 
 export function AssetsManualScreen({ form, values }: ScreenContext) {
+  return (
+    <ScreenWrap
+      papa="Quick lumpsum entry — total for each bucket. Update these monthly to stay accurate."
+      headline="What you own"
+      sub="Enter what you have. Leave the rest at zero."
+      mood="proud"
+    >
+      <ManualLumpsumEditor form={form} values={values} />
+    </ScreenWrap>
+  );
+}
+
+// The concise "lumpsum totals" editor. Used in onboarding's manual path and
+// reused by the portfolio edit dialog when the user entered their holdings
+// manually (rather than via an upload).
+export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<OnboardingProfile>; values: OnboardingProfile }) {
   const items = (values.additionalInvestments || []) as AdditionalInvestment[];
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draftList, setDraftList] = useState<AdditionalInvestment[]>([]);
@@ -503,12 +576,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
   };
 
   return (
-    <ScreenWrap
-      papa="Quick lumpsum entry — total for each bucket. Update these monthly to stay accurate."
-      headline="What you own"
-      sub="Enter what you have. Leave the rest at zero."
-      mood="proud"
-    >
+    <>
       <div className="space-y-4">
         <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
           <strong>Heads up:</strong> live portfolio P&amp;L and live valuation are only available with the XIRR upload option. Since you&apos;re entering manually, please refresh these values once a month so your plan stays accurate.
@@ -519,6 +587,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
               <div className="flex items-center gap-2">
                 <span className="text-xl" aria-hidden>{tile.emoji}</span>
                 <p className="text-base font-semibold text-[#0F172A]">{tile.label}</p>
+                {tile.hint ? <HelpHint text={tile.hint} link={tile.hintLink} label={tile.label} /> : null}
               </div>
               <p className="mt-1 text-[13px] leading-snug text-[#4B5563]">{tile.helper}</p>
               <div className="mt-3">
@@ -587,7 +656,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
           </div>
         </DialogContent>
       </Dialog>
-    </ScreenWrap>
+    </>
   );
 }
 
@@ -686,7 +755,7 @@ function HoldingsBucketDialog({
 
 function ScalarBucketDialog({
   title, helper, fieldName, form, initialValue, onClose,
-  monthlyField, monthlyLabel, monthlyHelper, monthlyInitial = 0,
+  monthlyField, monthlyLabel, monthlyHelper, monthlyInitial = 0, hint, hintLink,
 }: {
   title: string;
   helper: string;
@@ -698,6 +767,8 @@ function ScalarBucketDialog({
   monthlyLabel?: string;
   monthlyHelper?: string;
   monthlyInitial?: number;
+  hint?: React.ReactNode;
+  hintLink?: HintLink;
 }) {
   const [value, setValue] = useState(initialValue);
   const [monthly, setMonthly] = useState(monthlyInitial);
@@ -709,7 +780,10 @@ function ScalarBucketDialog({
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
-        <DialogTitle className="text-lg font-semibold text-[#0F172A]">{title}</DialogTitle>
+        <DialogTitle className="flex items-center gap-1.5 text-lg font-semibold text-[#0F172A]">
+          <span>{title}</span>
+          {hint ? <HelpHint text={hint} link={hintLink} label={title} /> : null}
+        </DialogTitle>
         <p className="mt-1 text-[13px] text-[#4B5563]">{helper}</p>
         <div className="mt-4 space-y-1.5">
           <Label className="text-[13px]">Current balance</Label>
@@ -835,6 +909,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
             const unitLbl = unitLabelFor(row.assetClass);
             const showExtras = Boolean(row.assetClass);
             const isCrypto = row.assetClass === "crypto";
+            const isMetal = isMetalClass(row.assetClass);
             const nameLabel = (() => {
               switch (row.assetClass) {
                 case "crypto": return "Name (e.g., Bitcoin)";
@@ -891,7 +966,10 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                 {showExtras ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label className="text-[13px] text-[#6B7280]">Value at cost (optional)</Label>
+                      <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                        <span>Value at cost (optional)</span>
+                        <HelpHint label="value at cost" text="What you originally paid for this, the total you invested. Add it and Papa can show your profit or loss. Leave it blank if you don't remember." />
+                      </Label>
                       <div className="relative">
                         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                         <Input className="pl-7" inputMode="numeric" placeholder="For P&L" value={Number(row.valueAtCost || 0) ? formatIndianCurrencyInput(Number(row.valueAtCost)) : ""} onChange={(e) => updateRow(index, { valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
@@ -899,7 +977,10 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </div>
                     {unitLbl ? (
                       <div className="space-y-1">
-                        <Label className="text-[13px] text-[#6B7280]">{unitLbl}{isMetalClass(row.assetClass) ? <span className="ml-1 text-red-500" aria-hidden>*</span> : " (optional)"}</Label>
+                        <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                          <span>{unitLbl}{isMetalClass(row.assetClass) ? <span className="ml-1 text-red-500" aria-hidden>*</span> : " (optional)"}</span>
+                          <HelpHint label={unitLbl} text={isMetalClass(row.assetClass) ? "How many grams you own. Papa multiplies it by today's market rate to value your holding automatically, so you don't have to." : "How many units or coins you hold. Optional, it helps Papa track the live value."} />
+                        </Label>
                         <Input
                           type="number"
                           inputMode="decimal"
@@ -919,12 +1000,18 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     ) : null}
                   </div>
                 ) : null}
-                {isCrypto ? (
+                {isCrypto || isMetal ? (
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-[#4B5563]">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input type="checkbox" checked={Boolean(row.hasSip)} onChange={(e) => updateRow(index, { hasSip: e.target.checked, sipAmount: e.target.checked ? row.sipAmount || 0 : 0 })} className="h-3.5 w-3.5 rounded border-[#138A3C] text-[#138A3C] focus:ring-[#138A3C]" />
-                      Monthly SIP
+                      I have a monthly SIP
                     </label>
+                    {isMetal ? (
+                      <HelpHint
+                        label="gold or silver SIP"
+                        text={`A monthly plan that buys a fixed amount of ${row.assetClass} every month. For example a digital gold SIP, a jewellers' monthly scheme, or buying coins regularly. Tick this and tell Papa the monthly amount.`}
+                      />
+                    ) : null}
                     {row.hasSip ? (
                       <div className="relative w-32">
                         <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[12px] text-muted-foreground">₹</span>

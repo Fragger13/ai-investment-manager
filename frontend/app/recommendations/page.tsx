@@ -23,7 +23,7 @@ import {
   planConfidence,
   purposeTag,
 } from "@/lib/plan";
-import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { ActionTaken, usePlanActionsStore } from "@/store/plan-actions-store";
 import { AdvancedRecommendationResponse, DashboardData } from "@/types";
 
 const emptyAdvanced: AdvancedRecommendationResponse = {
@@ -64,6 +64,7 @@ export default function RecommendationsPage() {
   }, [profile]);
 
   const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
+  const planItems = usePlanActionsStore((state) => state.planItems);
   const takenKeys = useMemo(() => new Set(actionsTaken.map((entry) => entry.key)), [actionsTaken]);
   const items = useMemo(() => mergeIntoActionItems(data.recommendations, dashboard), [data.recommendations, dashboard]);
   // The budget every suggested amount is sized to. Recomputes (and the plan
@@ -74,7 +75,20 @@ export default function RecommendationsPage() {
   const grouped = useMemo(() => buildPlan(items, takenKeys, available, true), [items, takenKeys, available]);
   const visible = grouped["Must Do"];
   const pendingVisible = useMemo(() => visible.filter((item) => !takenKeys.has(item.key)), [visible, takenKeys]);
-  const doneVisible = useMemo(() => visible.filter((item) => takenKeys.has(item.key)), [visible, takenKeys]);
+  // Completed = every action you've taken, rendered from the taken record itself
+  // (falling back to the live recommendation when it's still in the plan). This
+  // way a commitment stays visible as a struck-off "Completed" row even after the
+  // plan refreshes and the underlying recommendation keys change. Items already
+  // shown under "Saved by you" are excluded so they aren't listed twice.
+  const itemByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
+  const savedKeys = useMemo(() => new Set(planItems.map((entry) => entry.key)), [planItems]);
+  const completedItems = useMemo(
+    () => actionsTaken
+      .filter((a) => a.actionType !== "watching" && !savedKeys.has(a.key))
+      .map((a) => itemByKey.get(a.key) || actionToItem(a)),
+    [actionsTaken, savedKeys, itemByKey]
+  );
+  const planTotal = pendingVisible.length + completedItems.length;
   // The tour spotlights a real fund/stock pick (not the emergency-fund step) so a
   // new user sees what an actual investment recommendation looks like.
   const tourIndex = useMemo(() => {
@@ -94,9 +108,9 @@ export default function RecommendationsPage() {
   return (
     // Match the sidebar "Keep going!" counts to the plan actually shown (top-3 +
     // completed), so they agree with the "This month's progress" bar below.
-    <AppShell sidebarExtra={<PlanProgressWidget confidence={confidence} done={doneVisible.length} total={visible.length} />}>
+    <AppShell sidebarExtra={<PlanProgressWidget confidence={confidence} done={completedItems.length} total={planTotal} />}>
       <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div data-tour="plan-intro">
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Your money plan ✨</h1>
           <p className="mt-2 text-base text-muted-foreground">Simple steps, picked just for you. Do them one at a time — no finance degree needed.</p>
         </div>
@@ -110,22 +124,22 @@ export default function RecommendationsPage() {
           ? `Your top 3, sized to the ${inr(available)} you have to invest this month. Tick one off — it drops to Completed below.`
           : "Your top 3 things worth doing now. Tick one off and it drops to Completed below."}
         action={
-          <Button variant="outline" onClick={() => load(true)} disabled={loading}>
+          <Button variant="outline" data-tour="plan-refresh" onClick={() => load(true)} disabled={loading}>
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh plan"}
           </Button>
         }
       >
-        {visible.length > 0 ? <DoFirstProgress done={doneVisible.length} total={visible.length} /> : null}
+        {planTotal > 0 ? <DoFirstProgress done={completedItems.length} total={planTotal} /> : null}
         <div className="space-y-3">
           {pendingVisible.map((item, index) => <MustDoRow key={item.key} item={item} tour={index === tourIndex} />)}
-          {!visible.length ? (
+          {!visible.length && !completedItems.length ? (
             <EmptyRow text="Refresh after completing your profile to see your first steps." />
           ) : null}
-          {doneVisible.length ? (
+          {completedItems.length ? (
             <div className="pt-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completed ✓</p>
               <div className="space-y-3">
-                {doneVisible.map((item) => <MustDoRow key={item.key} item={item} />)}
+                {completedItems.map((item) => <MustDoRow key={item.key} item={item} />)}
               </div>
             </div>
           ) : null}
@@ -202,7 +216,7 @@ function DoFirstProgress({ done, total }: { done: number; total: number }) {
         ? "Every step done — you're on a roll! 🔥"
         : `${done} done, ${total - done} to go. Keep the streak alive!`;
   return (
-    <div className="mb-4 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+    <div data-tour="plan-progress" className="mb-4 rounded-2xl border border-primary/15 bg-primary/5 p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-foreground">This month&apos;s progress</p>
         <span className="text-sm font-bold text-primary">{done}/{total}</span>
@@ -316,7 +330,7 @@ function Section({ heading, subtitle, action, children }: { heading?: string; su
 function PlanConfidenceCard({ confidence, tone }: { confidence: number; tone: "good" | "warn" | "danger" }) {
   const label = confidence >= 75 ? "Good" : confidence >= 55 ? "Review slowly" : "Needs review";
   return (
-    <Card className="w-full lg:w-72">
+    <Card data-tour="plan-confidence" className="w-full lg:w-72">
       <CardContent className="flex items-center gap-3 p-4">
         <span className={cn("flex h-10 w-10 items-center justify-center rounded-full", tone === "good" ? "bg-positive-soft" : tone === "warn" ? "bg-warning-soft" : "bg-negative-soft")}>
           <CheckCircle2 className={cn("h-5 w-5", tone === "good" ? "text-positive-foreground" : tone === "warn" ? "text-warning-foreground" : "text-negative-foreground")} />
@@ -446,6 +460,28 @@ function proofFor(item: ActionItem): string | null {
   }
   const fv = inr(sipFutureValue(amt, annualRateFromReturn(item.expectedReturn)));
   return `${inr(amt)}/mo grows to about ${fv} in a year, invested steadily.`;
+}
+
+// Build a minimal plan item from a recorded action so it can render as a
+// struck-off "Completed" row even when the live recommendation that spawned it
+// is no longer in the plan (recommendation keys change when the plan refreshes).
+function actionToItem(a: ActionTaken): ActionItem {
+  return {
+    key: a.key,
+    kind: "recommendation",
+    actionKind: a.cadence === "one_time" ? "lump_sum" : "fund",
+    title: a.instrumentName,
+    instrumentName: a.instrumentName,
+    reason: "",
+    impact: "Medium",
+    confidence: 0,
+    category: a.category,
+    ticker: a.ticker,
+    suggestedMonthlyAmount: a.amount,
+    bucket: "Must Do",
+    ctaLabel: "Take Action",
+    explanationCards: [],
+  };
 }
 
 function takePayload(item: ActionItem) {

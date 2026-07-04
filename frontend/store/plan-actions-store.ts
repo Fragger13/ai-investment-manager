@@ -3,6 +3,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/store/auth-store";
+
+// Actions recorded on the backend are stamped with the logged-in user so
+// portfolio views stay per-account; read the token at call time (not module
+// load) so login/logout is always respected.
+const sessionToken = () => useAuthStore.getState().token;
 
 export type PlanItem = {
   key: string;
@@ -67,7 +73,7 @@ export const usePlanActionsStore = create<PlanActionsState>()(
           recommendationKey: item.key,
           instrumentName: item.instrumentName,
           suggestedMonthlyAmount: item.suggestedMonthlyAmount,
-        }).catch(() => null);
+        }, sessionToken()).catch(() => null);
       },
       removeFromPlan: (key) => {
         set({ planItems: get().planItems.filter((entry) => entry.key !== key) });
@@ -91,11 +97,11 @@ export const usePlanActionsStore = create<PlanActionsState>()(
           purchasePrice: action.purchasePrice,
           livePrice: action.livePrice,
           goalName: action.goalName,
-        }).catch(() => null);
+        }, sessionToken()).catch(() => null);
       },
       removeAction: (key) => {
         set({ actionsTaken: get().actionsTaken.filter((entry) => entry.key !== key) });
-        api.removeUserAction(key).catch(() => null);
+        api.removeUserAction(key, sessionToken()).catch(() => null);
       },
       hasInPlan: (key) => get().planItems.some((entry) => entry.key === key),
       actionFor: (key) => get().actionsTaken.find((entry) => entry.key === key),

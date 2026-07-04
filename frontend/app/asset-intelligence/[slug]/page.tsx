@@ -141,7 +141,7 @@ export default function InvestmentDetailPage() {
           </div>
 
           {/* Why this matches you — top-right per reference */}
-          <div className="min-w-0 rounded-2xl bg-positive-soft/50 p-5">
+          <div data-tour="detail-why" className="min-w-0 rounded-2xl bg-positive-soft/50 p-5">
             <div className="flex items-center gap-2 text-positive-foreground">
               <Sparkles className="h-4 w-4" />
               <p className="text-sm font-semibold">Why this matches you</p>
@@ -162,7 +162,7 @@ export default function InvestmentDetailPage() {
       </Card>
 
       {/* Key facts — community pulse + return + SIP */}
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
+      <div data-tour="detail-numbers" className="mb-5 grid gap-4 sm:grid-cols-3">
         <CommunityPulse community={sentiment ?? idea.community} />
         <Card>
           <CardContent className="p-5">
@@ -237,7 +237,7 @@ export default function InvestmentDetailPage() {
             </div>
 
             {/* Risk level + risks — relocated here to keep the top of the page clean */}
-            <div className="mt-5 border-t border-border pt-5">
+            <div data-tour="detail-risk" className="mt-5 border-t border-border pt-5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-semibold text-foreground">Risk level — {idea.risk}</p>
@@ -261,7 +261,7 @@ export default function InvestmentDetailPage() {
         </Card>
 
         {/* Ready to invest — green-gradient card matching the AskPapa design */}
-        <div className="flex flex-col overflow-hidden rounded-3xl bg-[linear-gradient(160deg,#0E7A4A,#0A5C39)] p-6 text-white shadow-pop">
+        <div data-tour="detail-invest" className="flex flex-col overflow-hidden rounded-3xl bg-[linear-gradient(160deg,#0E7A4A,#0A5C39)] p-6 text-white shadow-pop">
           <h3 className="text-lg font-bold tracking-tight text-white">Ready to invest?</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-[#BFE4CD]">Add this fund to your plan, then choose a monthly SIP or a one-time lump sum when you take action.</p>
 

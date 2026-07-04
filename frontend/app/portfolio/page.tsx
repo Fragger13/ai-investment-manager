@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Pencil, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Pencil, RefreshCw, Sparkles, TrendingUp, Upload, Wallet } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { AppShell } from "@/components/app-shell";
-import { PortfolioBuckets } from "@/app/onboarding/_screens/assets";
+import { PortfolioBuckets, ManualLumpsumEditor, StatementUploader } from "@/app/onboarding/_screens/assets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,7 +54,7 @@ export default function PortfolioPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.portfolioSummary(profile);
+      const result = await api.portfolioSummary(profile, useAuthStore.getState().token);
       setData(result);
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Could not load portfolio.";
@@ -140,7 +140,7 @@ export default function PortfolioPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(profile?.holdings || []).length > 0 ? (
-            <Button variant="outline" onClick={refreshPrices} disabled={pricing || loading} title={pricedAt ? `Last refreshed ${pricedAt}` : "Pull live prices for stocks, MFs, crypto, gold/silver"}>
+            <Button variant="outline" data-tour="portfolio-prices" onClick={refreshPrices} disabled={pricing || loading} title={pricedAt ? `Last refreshed ${pricedAt}` : "Pull live prices for stocks, MFs, crypto, gold/silver"}>
               <TrendingUp className={cn("h-4 w-4", pricing && "animate-pulse")} /> {pricing ? "Pricing..." : "Refresh live prices"}
             </Button>
           ) : null}
@@ -203,7 +203,7 @@ export default function PortfolioPage() {
         <HoldingsCard data={data} />
 
         {/* Projection */}
-        <Card>
+        <Card data-tour="portfolio-projection">
           <CardContent className="p-6">
             <p className="text-lg font-bold tracking-tight text-foreground">Projected wealth</p>
             <p className="mt-0.5 text-[13px] text-muted-foreground">Based on current holdings + monthly commitments from your plan.</p>
@@ -280,7 +280,7 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
 
   if (!data.holdings.length) {
     return (
-      <Card>
+      <Card data-tour="portfolio-holdings">
         <CardContent className="p-6">
           <p className="text-lg font-bold tracking-tight text-foreground">Holdings mix</p>
           <div className="mt-4 rounded-xl bg-surface-soft p-6 text-center text-sm text-muted-foreground">
@@ -299,7 +299,7 @@ function HoldingsCard({ data }: { data: PortfolioSummary }) {
   const centerPct = activeSlice && total ? Math.round((activeSlice.value / total) * 100) : null;
 
   return (
-    <Card>
+    <Card data-tour="portfolio-holdings">
       <CardContent className="p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -486,6 +486,7 @@ function EditInvestmentsDialog({ onSaved }: { onSaved: () => void }) {
   const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const form = useForm<OnboardingProfile>({ defaultValues: profile || undefined });
   const values = form.watch();
 
@@ -493,7 +494,19 @@ function EditInvestmentsDialog({ onSaved }: { onSaved: () => void }) {
     if (open && profile) form.reset(profile);
   }, [open, profile, form]);
 
+  useEffect(() => {
+    if (!open) setShowUpload(false);
+  }, [open]);
+
   if (!profile) return null;
+
+  // Match the editor to how the portfolio currently looks. Per-holding records
+  // (from an upload or a live refresh) get the detailed bucket editor; otherwise
+  // we show the concise lumpsum-totals form. Reading live form state means an
+  // in-dialog upload immediately flips a manual entrant over to the detailed view.
+  const liveHoldings = values.holdings || [];
+  const enteredViaUpload = liveHoldings.some((h) => h.source === "upload" || h.source === "live");
+  const detailed = enteredViaUpload || liveHoldings.length > 0;
 
   async function handleSave() {
     if (!profile) return;
@@ -520,10 +533,50 @@ function EditInvestmentsDialog({ onSaved }: { onSaved: () => void }) {
       <DialogContent className="max-h-[90vh] w-[min(720px,95vw)] overflow-y-auto">
         <DialogTitle className="text-lg font-semibold text-foreground">Update your investments</DialogTitle>
         <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">
-          Add, edit or remove holdings — the same buckets as onboarding. Changes save to your profile and sync across every tab.
+          {detailed
+            ? "Add, edit or remove holdings in the same detailed buckets you used to upload. Changes save to your profile and sync across every tab."
+            : "Update your totals, the same quick way you entered them. Changes save to your profile and sync across every tab."}
         </DialogDescription>
+
+        <div className="mt-4 rounded-xl border border-dashed border-primary/40 bg-surface-soft p-3">
+          {showUpload ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-semibold text-foreground">{detailed ? "Add an updated statement" : "Upload a statement"}</p>
+                <button type="button" onClick={() => setShowUpload(false)} className="text-[12px] font-medium text-muted-foreground hover:text-foreground">Close</button>
+              </div>
+              <StatementUploader
+                form={form}
+                onCommitted={() => {
+                  // A manual entrant who just uploaded now has real holdings, which
+                  // would double-count against the stocks/MF totals they typed. Clear
+                  // those two so the portfolio doesn't add the same money twice.
+                  if (!detailed) {
+                    form.setValue("stocksValue", 0, { shouldDirty: true });
+                    form.setValue("mutualFundsValue", 0, { shouldDirty: true });
+                  }
+                  setShowUpload(false);
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowUpload(true)}
+              className="flex w-full items-center gap-2 text-left text-[13px] font-semibold text-primary"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10"><Upload className="h-4 w-4" /></span>
+              {detailed ? "Add an updated statement (XLSX/CSV)" : "Prefer to upload a statement instead?"}
+            </button>
+          )}
+        </div>
+
         <div className="mt-4">
-          <PortfolioBuckets form={form} values={values} />
+          {detailed ? (
+            <PortfolioBuckets form={form} values={values} />
+          ) : (
+            <ManualLumpsumEditor form={form} values={values} />
+          )}
         </div>
         <div className="mt-6 flex items-center justify-end gap-2">
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

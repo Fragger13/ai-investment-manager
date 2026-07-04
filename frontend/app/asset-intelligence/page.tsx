@@ -150,7 +150,7 @@ export default function AssetIntelligencePage() {
         </Link>
       ) : null}
 
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="mb-5 flex flex-wrap gap-2" data-tour="discover-tabs">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -167,7 +167,7 @@ export default function AssetIntelligencePage() {
       </div>
       {!visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
 
-      <Card className="mt-6 border-positive-soft bg-positive-soft/40">
+      <Card className="mt-6 border-positive-soft bg-positive-soft/40" data-tour="discover-coach">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <ColorfulIcon icon={Sparkles} accent="emerald" label="Coach" />
@@ -271,7 +271,7 @@ function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick
             >
               <Bookmark className={cn("h-4 w-4", inPlan && "fill-current")} /> {inPlan ? "Saved" : "Save"}
             </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">View Details</Button>
+            <Button data-tour={tour ? "discover-details" : undefined} className="bg-primary text-primary-foreground hover:bg-primary/90">View Details</Button>
           </div>
         </CardContent>
       </Card>

@@ -154,6 +154,11 @@ def latest_profile(
     query = db.query(FinancialProfile)
     if user:
         query = query.filter(FinancialProfile.user_id == user.id)
+    else:
+        # No (valid) token: only guest profiles (user_id NULL) may be returned.
+        # Serving the global latest here leaked one account's saved profile to
+        # any request without a token.
+        query = query.filter(FinancialProfile.user_id.is_(None))
     record = query.order_by(FinancialProfile.id.desc()).first()
     if not record:
         return {"profile": None}

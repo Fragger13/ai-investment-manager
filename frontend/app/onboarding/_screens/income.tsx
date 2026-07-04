@@ -24,8 +24,8 @@ export function IncomeScreen({ form, values }: ScreenContext) {
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <CurrencyField name="monthlySalary" label="In-hand salary" placeholder="e.g., 1,50,000" autoFocus />
-          <CurrencyField name="otherIncome" label="Other income" placeholder="Rent, freelance, dividends…" optional />
+          <CurrencyField name="monthlySalary" label="In-hand salary" placeholder="e.g., 1,50,000" autoFocus hint="The pay that actually reaches your bank each month, after tax and PF deductions. Not your CTC or gross figure." />
+          <CurrencyField name="otherIncome" label="Other income" placeholder="Rent, freelance, dividends…" optional hint="Any regular extra money: rent you receive, freelance or side income, dividends, and so on. Leave it blank if you don't have any." />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -41,6 +41,7 @@ export function IncomeScreen({ form, values }: ScreenContext) {
             placeholder="e.g., 30,000"
             helper="Just for this month — later months auto-use income minus expenses."
             optional
+            hint="Spare money you could put into investments right now, on top of your normal spending. A rough estimate is fine. From next month, Papa works it out as income minus expenses."
           />
         </div>
 

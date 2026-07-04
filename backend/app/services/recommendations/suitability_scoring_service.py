@@ -23,7 +23,15 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from app.schemas.financial import OnboardingProfile, ProfileGoal
-from app.services.intelligence import calculate_age, monthly_income, net_worth, total_emi_payments
+from app.services.intelligence import (
+    calculate_age,
+    computed_monthly_surplus,
+    emergency_target_base,
+    investable_surplus,
+    monthly_income,
+    net_worth,
+    total_emi_payments,
+)
 from app.services.recommendations.asset_screening_service import ResearchAsset
 
 
@@ -67,11 +75,14 @@ class ProfileContext:
 def build_profile_context(profile: OnboardingProfile) -> ProfileContext:
     income = monthly_income(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    # Same "available to invest" the dashboard shows: income minus ALL fixed
+    # commitments (rent + expenses + subscriptions + EMIs), respecting the
+    # user's explicit this-month override when it applies.
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     emergency_goal = next((goal for goal in profile.goals if goal.type == "Emergency fund"), None)
     emergency_target = max(
         emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget or 0,
-        (profile.monthlyExpenses + emi_total) * 6,
+        emergency_target_base(profile),
     )
     emergency_gap = max(emergency_target - profile.cashBalance, 0)
     savings_rate = (surplus / income * 100) if income else 0
@@ -289,7 +300,12 @@ def risk_level(asset: ResearchAsset, context: ProfileContext) -> str:
     if asset.asset_key in {"crypto", "tactical"}:
         return "High"
     if asset.asset_key == "equity":
-        if context.panic_risk or context.age_band in {"pre_retire", "senior"}:
+        # Age alone should not brand equity "High" for someone who has told us
+        # they are comfortable riding out drawdowns; 45-59 with genuine
+        # long-term risk appetite reads Medium like younger investors.
+        if context.panic_risk or context.age_band == "senior":
+            return "High"
+        if context.age_band == "pre_retire" and not context.long_term_growth_ok:
             return "High"
         return "Medium"
     if asset.asset_key == "gold":

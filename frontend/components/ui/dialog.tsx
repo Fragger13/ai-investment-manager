@@ -16,7 +16,7 @@ export function DialogContent({ className, children, ...props }: React.Component
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground">
+        <DialogPrimitive.Close data-tour-close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground">
           <X className="h-4 w-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

@@ -17,6 +17,12 @@ type AuthState = {
   onboardingComplete: boolean;
   emailVerified: boolean;
   profile: OnboardingProfile | null;
+  // True once the persisted session has been read back from localStorage.
+  // Pages must wait for this before treating a null profile/token as "no
+  // session" — otherwise a fetch can race rehydration, pull someone else's
+  // latest saved profile from the backend and overwrite this user's session.
+  hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
   login: (email: string, password: string) => Promise<{ emailVerified: boolean; onboardingComplete: boolean }>;
   register: (name: string, email: string, password: string) => Promise<{ emailVerified: boolean; sent: boolean }>;
   verifyEmail: (email: string, code: string) => Promise<void>;
@@ -32,6 +38,8 @@ export const useAuthStore = create<AuthState>()(
       onboardingComplete: false,
       emailVerified: false,
       profile: null,
+      hasHydrated: false,
+      setHasHydrated: (value: boolean) => set({ hasHydrated: value }),
       login: async (email, password) => {
         const response = await api.login(email, password);
         const latest = await api.latestProfile(response.access_token).catch(() => ({ profile: null }));
@@ -84,7 +92,10 @@ export const useAuthStore = create<AuthState>()(
         onboardingComplete: state.onboardingComplete,
         emailVerified: state.emailVerified,
         profile: state.profile
-      })
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      }
     }
   )
 );

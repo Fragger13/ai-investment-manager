@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.agents.chat_context_assembler_agent import assemble_chat_context
 from app.schemas.financial import ChatCard, ChatResponse, OnboardingProfile
 from app.services.chat.context_builder_service import build_chat_context
-from app.services.intelligence import build_dashboard, current_ist_month, total_emi_payments
+from app.services.intelligence import build_dashboard, current_ist_month, monthly_commitments, total_emi_payments
 from app.services.llm.model_router import generate_chat_answer
 
 
@@ -205,9 +205,10 @@ def _months_from_message(message: str, default: int = 6) -> int:
 
 
 def _monthly_commitments(profile: OnboardingProfile) -> float:
-    """Mirror the frontend's monthlyCommitments exactly (rent + monthly expenses
-    + EMIs) so the chat's numbers match the Dashboard, Plan and Portfolio."""
-    return float(profile.rent or 0) + float(profile.monthlyExpenses or 0) + float(total_emi_payments(profile))
+    """Single source of truth: intelligence.monthly_commitments (rent + monthly
+    expenses + subscriptions + EMIs) so the chat's numbers match the Dashboard,
+    Plan and Portfolio."""
+    return float(monthly_commitments(profile))
 
 
 def _available_this_month(profile: OnboardingProfile, dashboard: dict) -> float:

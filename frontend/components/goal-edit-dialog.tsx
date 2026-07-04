@@ -13,7 +13,6 @@ import { useAuthStore } from "@/store/auth-store";
 import { OnboardingProfile, ProfileGoal } from "@/types";
 
 const GOAL_TYPES = [
-  "Emergency fund",
   "Retirement",
   "Financial freedom",
   "House purchase",

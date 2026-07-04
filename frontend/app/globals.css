@@ -274,3 +274,28 @@ body {
 [role="dialog"] textarea {
   font-weight: 600;
 }
+
+/* Onboarding is a light-only funnel; force every field's typed value to pure
+   black for maximum legibility. Scoped via the data-onboarding marker set by
+   the ThemeProvider so it reaches inputs inside popups that portal to <body>,
+   yet never touches the rest of the app. Placeholders keep their own muted
+   color (set explicitly via placeholder:text-* utilities). */
+html[data-onboarding="true"] input,
+html[data-onboarding="true"] textarea,
+html[data-onboarding="true"] [role="combobox"] {
+  color: #000;
+}
+
+/* Onboarding: render the entered value in bold for legibility. Placeholders
+   stay normal weight so an empty field still reads as a hint, not an answer.
+   A select shows its placeholder while it carries data-placeholder, so bold
+   only kicks in once a real value is chosen. */
+html[data-onboarding="true"] input,
+html[data-onboarding="true"] textarea,
+html[data-onboarding="true"] [role="combobox"]:not([data-placeholder]) {
+  font-weight: 600;
+}
+html[data-onboarding="true"] input::placeholder,
+html[data-onboarding="true"] textarea::placeholder {
+  font-weight: 400;
+}

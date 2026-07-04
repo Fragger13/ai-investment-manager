@@ -54,6 +54,7 @@ export function SpendingScreen(_ctx: ScreenContext) {
           placeholder="Total monthly spend"
           helper="Groceries, shopping, eating out, subscriptions (Netflix, Spotify), bills — bundle it all in. Don't include rent or EMIs."
           size="lg"
+          hint="Everything you spend in a normal month except rent and loan EMIs: groceries, transport, eating out, shopping, bills and subscriptions. A rough monthly average is perfectly fine."
         />
       </div>
     </ScreenWrap>

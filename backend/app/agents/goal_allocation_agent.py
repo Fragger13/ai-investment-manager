@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.schemas.financial import OnboardingProfile
-from app.services.intelligence import calculated_goal_target, months_until, total_emi_payments
+from app.services.intelligence import calculated_goal_target, emergency_target_base, months_until, total_emi_payments
 
 
 ESSENTIAL_GOALS = {"Emergency fund", "Debt repayment", "Child education", "Higher education", "Retirement"}
@@ -36,7 +36,7 @@ def build_goal_hierarchy(profile: OnboardingProfile) -> list[dict]:
     if goals:
         return sorted(goals, key=lambda item: (item["priority"], item["timeHorizonMonths"]))
 
-    emergency_target = max(profile.emergencyFundTarget or 0, (profile.monthlyExpenses + total_emi_payments(profile)) * 6)
+    emergency_target = max(profile.emergencyFundTarget or 0, emergency_target_base(profile))
     return [
         {
             "name": "Emergency fund",

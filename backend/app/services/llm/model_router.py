@@ -14,6 +14,8 @@ from app.services.llm.ollama_client import OllamaClient
 from app.services.llm.prompt_registry import (
     asset_explanation_prompt,
     chat_prompt,
+    goal_clarify_prompt,
+    goal_estimate_prompt,
     market_explanation_prompt,
     market_signal_copy_prompt,
     recommendation_explanation_prompt,
@@ -24,6 +26,36 @@ from app.services.llm.schemas import LLMRequest, LLMTask
 def generate_chat_answer(message: str, context: dict[str, Any], fallback_answer: str) -> str:
     prompt = chat_prompt(message, context, fallback_answer)
     return _complete_text("chat", prompt, fallback_answer)
+
+
+def refine_goal_estimate(
+    goal_type: str,
+    answers: dict[str, Any],
+    profile_ctx: dict[str, Any],
+    baseline: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Refine a deterministic goal-cost baseline with the LLM. Returns
+    (payload, metadata); payload is the deterministic baseline when the model is
+    unavailable, so callers can read metadata["llm_enhanced"] for the source."""
+    prompt = goal_estimate_prompt(goal_type, answers, profile_ctx, baseline)
+    payload, metadata = _complete_json_with_metadata("goal_estimate", prompt, baseline)
+    if not isinstance(payload, dict):
+        return baseline, metadata
+    return payload, metadata
+
+
+def generate_goal_clarify(
+    description: str,
+    profile_ctx: dict[str, Any],
+    fallback: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Ask the LLM for clarifying questions tailored to a free-form goal. Returns
+    (payload, metadata); payload is the fallback when the model is unavailable."""
+    prompt = goal_clarify_prompt(description, profile_ctx)
+    payload, metadata = _complete_json_with_metadata("goal_clarify", prompt, fallback)
+    if not isinstance(payload, dict):
+        return fallback, metadata
+    return payload, metadata
 
 
 def summarize_text(text: str, max_words: int = 30, fallback: str | None = None) -> str:
@@ -258,7 +290,7 @@ def _resolve_model(model: str) -> str:
 def _model_for_task(task: LLMTask) -> str:
     if task in {"chat", "recommendation_explanation", "market_explanation"}:
         configured = settings.llm_model_reasoning or settings.llm_model or "qwen3:8b"
-    elif task in {"asset_explanation", "market_signal_copy"}:
+    elif task in {"asset_explanation", "market_signal_copy", "goal_estimate", "goal_clarify"}:
         configured = settings.llm_model_fast or settings.llm_model or "qwen3:8b"
     elif task == "summarize":
         configured = settings.llm_model_summarize or settings.llm_model_fast or settings.llm_model or "qwen3:8b"
@@ -280,12 +312,21 @@ def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
         return 180
     if task == "recommendation_explanation":
         return 210
+    if task == "goal_estimate":
+        return 160
+    if task == "goal_clarify":
+        # One clarifying question with a few options — a tight cap keeps the
+        # onboarding round-trip fast.
+        return 140
     return 520 if expect_json else 180
 
 
 def _timeout_for_task(task: LLMTask) -> int:
     if task == "chat":
         return min(30, max(5, int(settings.llm_timeout_chat_seconds or 25)))
+    if task in {"goal_estimate", "goal_clarify"}:
+        # In the onboarding request path — keep it snappy and fall back fast.
+        return min(15, max(5, int(settings.llm_timeout_chat_seconds or 12)))
     if task == "summarize":
         return min(10, max(3, int(settings.llm_timeout_summarize_seconds or 8)))
     if task in {"recommendation_explanation", "asset_explanation", "market_signal_copy", "market_explanation"}:

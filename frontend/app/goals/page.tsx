@@ -35,7 +35,7 @@ export default function GoalsPage() {
   useEffect(() => {
     if (profile) {
       api.dashboard(profile).then(setData);
-      api.portfolioSummary(profile).then(setPortfolio).catch(() => setPortfolio(null));
+      api.portfolioSummary(profile, useAuthStore.getState().token).then(setPortfolio).catch(() => setPortfolio(null));
       // Pull the same plan recommendations so each goal's "Save more" fix can
       // offer the user's goal-linked picks to act on (amount pre-filled).
       api.generateAdvancedRecommendations(profile, false).then((res) => setRawRecs(res.recommendations || [])).catch(() => setRawRecs([]));
@@ -94,14 +94,14 @@ export default function GoalsPage() {
         </div>
         <GoalEditDialog
           mode={{ kind: "add" }}
-          trigger={<Button className="rounded-full px-5"><Plus className="h-4 w-4" /> Add Goal</Button>}
+          trigger={<Button data-tour="goal-add" className="rounded-full px-5"><Plus className="h-4 w-4" /> Add Goal</Button>}
         />
       </div>
 
       <div className="space-y-5">
-        {data.goals.map((goal) => {
+        {data.goals.map((goal, i) => {
           const match = findProfileGoal(goal.name);
-          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} planItems={planVisible} moderateFunds={moderateFunds} />;
+          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} planItems={planVisible} moderateFunds={moderateFunds} tour={i === 0} />;
         })}
       </div>
 
@@ -124,7 +124,7 @@ export default function GoalsPage() {
   );
 }
 
-function GoalCard({ goal, profileGoal, holdings, planItems, moderateFunds }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; planItems: ActionItem[]; moderateFunds: ModerateFund[] }) {
+function GoalCard({ goal, profileGoal, holdings, planItems, moderateFunds, tour }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; planItems: ActionItem[]; moderateFunds: ModerateFund[]; tour?: boolean }) {
   const linkedIds = profileGoal?.goal.linkedHoldingIds || [];
   const linkedHoldings = useMemo(
     () => holdings.filter((h) => linkedIds.includes(h.id)),
@@ -141,7 +141,7 @@ function GoalCard({ goal, profileGoal, holdings, planItems, moderateFunds }: { g
   const icon = goalIconSpec(goal.name);
 
   return (
-    <Card>
+    <Card data-tour={tour ? "goal-card" : undefined}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ function LinkedHoldingsRow({
           mode={{ index: profileGoal.index, goal: profileGoal.goal }}
           holdings={holdings}
           trigger={
-            <Button size="sm" variant={hasLinks ? "outline" : "default"} className="shrink-0">
+            <Button size="sm" variant={hasLinks ? "outline" : "default"} className="shrink-0" data-tour="goal-link">
               <Link2 className="h-3.5 w-3.5" /> {hasLinks ? "Manage links" : "Link holdings"}
             </Button>
           }

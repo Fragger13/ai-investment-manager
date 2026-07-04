@@ -18,6 +18,7 @@ from math import ceil
 from app.schemas.financial import OnboardingProfile, ProfileGoal
 from app.services.intelligence import (
     calculated_goal_target,
+    computed_monthly_surplus,
     goal_display_name,
     investable_surplus,
     monthly_income,
@@ -102,8 +103,7 @@ def solve_goal_funding(
     returns_by_goal_id = returns_by_goal_id or {}
     income = monthly_income(profile)
     emi_total = total_emi_payments(profile)
-    computed_surplus = max(income - profile.monthlyExpenses - emi_total, 0)
-    surplus = investable_surplus(profile, computed_surplus)
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     worth = net_worth(profile)
 
     goals = list(profile.goals or [])

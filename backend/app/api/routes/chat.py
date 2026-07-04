@@ -2,9 +2,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.financial import ChatRequest, ChatResponse, OnboardingProfile
+from app.schemas.financial import (
+    ChatRequest,
+    ChatResponse,
+    GoalClarifyRequest,
+    GoalClarifyResponse,
+    GoalEstimateRequest,
+    GoalEstimateResponse,
+    OnboardingProfile,
+)
 from app.services.chat.chat_memory_service import save_chat_message
 from app.services.chat.papa_chat_service import papa_chat_answer
+from app.services.goals.goal_clarify_service import clarify_goal
+from app.services.goals.goal_estimate_service import estimate_goal_amount
+from app.services.goals.goal_estimator import estimate_goal
 from app.services.memory.adaptive_memory_service import record_user_action
 from app.services.profile_resolution import latest_saved_profile, resolve_profile
 
@@ -49,3 +60,42 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     except Exception:  # noqa: BLE001
         pass
     return response
+
+
+@router.post("/goal-estimate", response_model=GoalEstimateResponse)
+def goal_estimate(payload: GoalEstimateRequest, db: Session = Depends(get_db)) -> GoalEstimateResponse:
+    """Estimate a ballpark target amount for an onboarding goal from a few
+    quick-reply answers. Hybrid: a deterministic India cost+inflation baseline,
+    optionally refined by the LLM, with the baseline as an instant fallback."""
+    profile_dict = None
+    try:
+        profile_obj = resolve_profile(db, payload.profile)
+        if profile_obj is not None:
+            profile_dict = profile_obj.model_dump()
+    except Exception:  # noqa: BLE001
+        profile_dict = payload.profile.model_dump() if payload.profile else None
+
+    try:
+        result = estimate_goal_amount(payload.goalType, payload.answers, profile_dict)
+    except Exception:  # noqa: BLE001 — never hard-fail onboarding; fall back to the pure calculator
+        result = {**estimate_goal(payload.goalType, payload.answers, profile_dict), "source": "calculator"}
+    return GoalEstimateResponse(**result)
+
+
+@router.post("/goal-clarify", response_model=GoalClarifyResponse)
+def goal_clarify(payload: GoalClarifyRequest, db: Session = Depends(get_db)) -> GoalClarifyResponse:
+    """For a free-form ("Something else") goal, return clarifying questions
+    tailored to what the user described."""
+    profile_dict = None
+    try:
+        profile_obj = resolve_profile(db, payload.profile)
+        if profile_obj is not None:
+            profile_dict = profile_obj.model_dump()
+    except Exception:  # noqa: BLE001
+        profile_dict = payload.profile.model_dump() if payload.profile else None
+
+    try:
+        result = clarify_goal(payload.description, profile_dict)
+    except Exception:  # noqa: BLE001
+        result = {"questions": []}
+    return GoalClarifyResponse(**result)

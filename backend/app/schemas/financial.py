@@ -349,3 +349,38 @@ class ChatResponse(BaseModel):
     cards: list[ChatCard] = []
     suggestions: list[str] = []
     mood: str = "warm"
+
+
+class GoalEstimateRequest(BaseModel):
+    goalType: str
+    answers: dict[str, Any] = {}
+    profile: OnboardingProfile | None = None
+
+
+class GoalEstimateResponse(BaseModel):
+    amount: int
+    low: int
+    high: int
+    rationale: str
+    assumptions: list[str] = []
+    source: str = "calculator"  # "ai" | "calculator"
+
+
+class GoalClarifyRequest(BaseModel):
+    description: str
+    profile: OnboardingProfile | None = None
+
+
+class GoalClarifyOption(BaseModel):
+    value: str
+    label: str
+
+
+class GoalClarifyQuestion(BaseModel):
+    key: str
+    prompt: str
+    options: list[GoalClarifyOption] = []
+
+
+class GoalClarifyResponse(BaseModel):
+    questions: list[GoalClarifyQuestion] = []

@@ -95,6 +95,7 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
 
     recommendations = []
     asset_key_counts: dict[str, int] = {}
+    bucket_members: dict[str, list[dict]] = {}
     max_by_key = _asset_count_caps(cluster)
     for asset in assets:
         if asset_key_counts.get(asset.asset_key, 0) >= max_by_key.get(asset.asset_key, 1):
@@ -174,11 +175,13 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
             fund_choice=fund_choice,
         )
         recommendations.append(enriched)
+        bucket_members.setdefault(asset.asset_key, []).append(enriched)
         asset_key_counts[asset.asset_key] = asset_key_counts.get(asset.asset_key, 0) + 1
         if len(recommendations) >= 15:
             break
 
     recommendations = rerank_recommendations(recommendations)
+    recommendations = _normalize_bucket_sizing(recommendations, bucket_members, portfolio_plan, context.surplus)
     _apply_goal_funding(recommendations, funding)
     for index, recommendation in enumerate(recommendations, start=1):
         recommendation["priorityOrder"] = index
@@ -850,6 +853,55 @@ def _recommendation_type(asset_key: str, asset_type: str, instrument_name: str, 
     if asset_key == "debt":
         return "Defensive"
     return "Core"
+
+
+MIN_SIP_TICKET = 500  # realistic fund SIP minimum; avoids ₹109/month "plans"
+
+
+def _normalize_bucket_sizing(
+    recommendations: list[dict],
+    bucket_members: dict[str, list[dict]],
+    portfolio_plan: dict,
+    surplus: int,
+) -> list[dict]:
+    """Make each asset-class bucket's picks share that bucket's budget.
+
+    size_position() prices every pick as if it were the ONLY pick in its bucket
+    (each debt fund used to get the full debt allocation), so a plan with three
+    debt funds and six equity funds suggested ~3x the user's investable surplus
+    in total. Here each bucket's budget (its target allocation of the surplus)
+    is divided across that bucket's best picks with a realistic minimum SIP
+    ticket; picks that would fall below the minimum are dropped so a ₹650
+    equity sleeve becomes one meaningful SIP, not six ₹109 ones. Alias fields
+    the response mirrors (suggestedAmount / allocationPercent) are re-synced.
+    """
+    target = portfolio_plan.get("targetAllocation", {}) or {}
+    dropped_ids: set[int] = set()
+    for key, members in bucket_members.items():
+        if not members:
+            continue
+        budget_pct = target.get(key, 0)
+        total_pct = sum(max(m.get("suggestedAllocationPercentage", 0), 0) for m in members)
+        if budget_pct > 0 and total_pct > budget_pct:
+            budget_amount = round(surplus * budget_pct / 100)
+            ranked = sorted(
+                members,
+                key=lambda m: (m.get("finalScore", 0), m.get("suitabilityScore", 0)),
+                reverse=True,
+            )
+            keep = max(1, min(len(ranked), budget_amount // MIN_SIP_TICKET or 1))
+            kept, extras = ranked[:keep], ranked[keep:]
+            per_pick_pct = budget_pct / len(kept)
+            for m in kept:
+                m["suggestedAllocationPercentage"] = max(round(per_pick_pct), 1)
+                m["suggestedMonthlyAmount"] = max(round(budget_amount / len(kept)), 0)
+            dropped_ids.update(id(m) for m in extras)
+        for m in members:
+            m["suggestedAmount"] = m.get("suggestedMonthlyAmount", 0)
+            m["allocationPercent"] = m.get("suggestedAllocationPercentage", 0)
+    if not dropped_ids:
+        return recommendations
+    return [rec for rec in recommendations if id(rec) not in dropped_ids]
 
 
 def _asset_count_caps(cluster: dict) -> dict[str, int]:

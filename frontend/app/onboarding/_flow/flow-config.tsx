@@ -99,15 +99,11 @@ export function buildScreens(
   screens.push({
     id: "risk",
     sectionId: "risk",
-    fields: [
-      "shortTermLossTolerance",
-      "shortTermHorizon",
-      "drawdownTolerance",
-      "investmentHorizon",
-      "shortTermVolatilityComfort",
-      "opportunityPreference",
-      "retirementAge"
-    ],
+    // Only the two questions the user actually answers are validated here; the
+    // finer-grained risk fields (loss tolerance, short-term horizon, opportunity
+    // preference, volatility comfort) are derived from these in RiskScreen /
+    // onboarding page and validated at final submit.
+    fields: ["drawdownTolerance", "investmentHorizon", "retirementAge"],
     render: RiskScreen
   });
 

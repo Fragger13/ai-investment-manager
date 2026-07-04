@@ -1,10 +1,12 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     email: EmailStr
-    password: str
+    # Enforced at the API too (not just the form): a leaked curl one-liner
+    # should not be able to create an account with a 1-character password.
+    password: str = Field(min_length=8)
 
 
 class LoginRequest(BaseModel):

@@ -485,3 +485,72 @@ def _trim(value: Any, limit: int) -> str:
         return window[: sentence_end + 1].strip()
     words = window.split()
     return " ".join(words[:-1]).strip()
+
+
+def goal_estimate_prompt(
+    goal_type: str,
+    answers: dict[str, Any],
+    profile_ctx: dict[str, Any],
+    baseline: dict[str, Any],
+) -> str:
+    """Ask the model to refine a deterministic goal-cost baseline into a single
+    realistic India figure. The baseline is the anchor; the model nudges it using
+    the user's specifics and stays close to it."""
+    description = str((answers or {}).get("description") or "").strip()
+    payload = {
+        "goalType": goal_type,
+        "goalDescription": description or None,
+        "answers": answers,
+        "user": {
+            "city": profile_ctx.get("city"),
+            "occupation": profile_ctx.get("occupation"),
+            "monthlyIncome": profile_ctx.get("monthlyIncome"),
+        },
+        "baselineEstimate": {
+            "amount": baseline.get("amount"),
+            "low": baseline.get("low"),
+            "high": baseline.get("high"),
+        },
+    }
+    if description:
+        anchor = (
+            "'goalDescription' is exactly what the user is saving for. Estimate its realistic current cost in "
+            "India from your own knowledge, taking the clarifying answers into account. Some goals are small "
+            "(a gadget can be well under ₹1,00,000) and some are large — give the true figure, not a rounded-up "
+            "one. The baseline is only a rough hint, not a constraint; ignore it if it looks off. "
+        )
+    else:
+        anchor = (
+            "A baseline estimate has already been computed from Indian cost tables and goal inflation — treat it "
+            "as your anchor. Adjust the figure only if the user's specifics clearly warrant it, and keep it "
+            "realistic for India and close to the baseline (within roughly its low–high range). "
+        )
+    return (
+        "You are a practical Indian financial coach helping a first-time investor put a realistic number "
+        "on a money goal. " + anchor +
+        "All amounts are Indian rupees as whole numbers — no commas, no currency symbol, no text inside numbers.\n"
+        "Return ONLY a JSON object, nothing else, in exactly this shape:\n"
+        '{"amount": <int>, "low": <int>, "high": <int>, "rationale": "<one short plain-English sentence>"}\n\n'
+        f"Context:\n{json.dumps(payload, ensure_ascii=False, default=str)}"
+    )
+
+
+def goal_clarify_prompt(description: str, profile_ctx: dict[str, Any]) -> str:
+    """Given a free-form goal description, ask the model for ONE short clarifying
+    question (with concrete chip options) that most affects its cost in India.
+    One question keeps the onboarding round-trip fast."""
+    payload = {
+        "goalDescription": description,
+        "user": {"city": profile_ctx.get("city"), "occupation": profile_ctx.get("occupation")},
+    }
+    return (
+        "A first-time Indian investor wants to save up for the goal described below but isn't sure how much it costs. "
+        "Ask exactly ONE short clarifying question whose answer most changes the price in India (e.g. for 'Apple Watch': "
+        "which model; for 'a vacation': domestic or international). The question must have 2 to 4 concrete quick-reply "
+        "options. Do NOT ask the user how much it costs — that's the whole point, they don't know. "
+        "Keep the prompt under 12 words and option labels under 5 words. Use a short snake_case key.\n"
+        "Return ONLY a JSON object with exactly ONE question, nothing else, in this shape:\n"
+        '{"questions": [{"key": "<snake_case>", "prompt": "<question>", '
+        '"options": [{"value": "<short_code>", "label": "<short label>"}]}]}\n\n'
+        f"Context:\n{json.dumps(payload, ensure_ascii=False, default=str)}"
+    )

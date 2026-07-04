@@ -9,7 +9,9 @@ export function currentBudgetMonth(): string {
 
 export function monthlyCommitments(profile?: OnboardingProfile | null): number {
   if (!profile) return 0;
-  return Number(profile.rent || 0) + Number(profile.monthlyExpenses || 0) + totalMonthlyEmi(profile.emiLoans, profile.emi);
+  // Keep in lockstep with backend intelligence.monthly_commitments():
+  // rent + everyday expenses + subscriptions (legacy field) + EMIs.
+  return Number(profile.rent || 0) + Number(profile.monthlyExpenses || 0) + Number(profile.subscriptions || 0) + totalMonthlyEmi(profile.emiLoans, profile.emi);
 }
 
 // The single source of truth for "what can I invest this month". Respects the

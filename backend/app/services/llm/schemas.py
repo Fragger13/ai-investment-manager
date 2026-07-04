@@ -11,6 +11,8 @@ LLMTask = Literal[
     "market_signal_copy",
     "market_explanation",
     "summarize",
+    "goal_estimate",
+    "goal_clarify",
 ]
 
 

@@ -4,5 +4,8 @@
     "build": "npm run build --prefix frontend",
     "install:all": "npm install --prefix frontend",
     "import:fund-logos": "node --experimental-strip-types scripts/import-mutual-fund-logos.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

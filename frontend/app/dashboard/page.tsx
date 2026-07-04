@@ -26,12 +26,18 @@ export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const token = useAuthStore((state) => state.token);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [advRecs, setAdvRecs] = useState<AdvancedRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
 
   useEffect(() => {
+    // Wait for the persisted session to rehydrate before treating a null
+    // profile as "no session". Firing early raced rehydration with token=null,
+    // fetched whatever profile the backend saved last (possibly another
+    // user's) and persisted it into THIS user's session.
+    if (!hasHydrated) return;
     async function load() {
       setLoading(true);
       let activeProfile: OnboardingProfile | null = profile;
@@ -52,7 +58,7 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, [profile, saveProfile, token]);
+  }, [hasHydrated, profile, saveProfile, token]);
 
   const needsProfile = !profile && !data.summary.monthlyIncome;
   // Total monthly outflow (rent + everyday expenses + EMIs) and what's left to
@@ -167,7 +173,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <section>
+          <section data-tour="dash-snapshot">
             <h2 className="ap-section mb-3">Money snapshot</h2>
             <div className="grid gap-4 md:grid-cols-3">
               <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly income" value={inrShort(data.summary.monthlyIncome)} detail="Coming in monthly" />
@@ -197,7 +203,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-tour="dash-actions">
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>Do this first</CardTitle>
                 <Link href="/recommendations" className="text-sm font-bold text-primary hover:underline">Full plan <ArrowRight className="inline h-4 w-4" /></Link>
@@ -478,6 +484,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
   const trigger = (
     <button
       type="button"
+      data-tour="dash-commitments-open"
       className="flex w-full items-center gap-5 text-left"
       disabled={!canOpen}
       aria-label="Open commitments breakdown"
@@ -498,18 +505,18 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
 
   if (!canOpen) {
     return (
-      <Card>
+      <Card data-tour="dash-commitments">
         <CardContent className="p-5">{trigger}</CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="transition hover:border-primary/40">
+    <Card data-tour="dash-commitments" className="transition hover:border-primary/40">
       <CardContent className="p-5">
         <Dialog>
           <DialogTrigger asChild>{trigger}</DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[min(640px,94vw)] overflow-y-auto p-0">
+          <DialogContent data-tour="commitments-detail" className="max-h-[90vh] w-[min(640px,94vw)] overflow-y-auto p-0">
             <div className="border-b border-border px-6 py-5 pr-12">
               <DialogTitle className="text-lg font-semibold text-foreground">Monthly commitments breakdown</DialogTitle>
               <DialogDescription className="mt-1 text-xs text-muted-foreground">

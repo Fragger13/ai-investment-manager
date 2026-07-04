@@ -176,7 +176,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-h-[90vh] w-[min(620px,94vw)] overflow-y-auto p-0">
+      <DialogContent data-tour="takeaction-detail" className="max-h-[90vh] w-[min(620px,94vw)] overflow-y-auto p-0">
         <div className="border-b border-border px-6 py-5 pr-12">
           <div className="flex items-center gap-3">
             <InvestmentLogo name={payload.instrumentName} category={payload.category} ticker={payload.ticker} size="md" />

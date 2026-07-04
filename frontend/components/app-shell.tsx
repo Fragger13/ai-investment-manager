@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bot, CircleDollarSign, Compass, Home, LifeBuoy, LogOut, NotebookTabs, PieChart, Target, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FeedbackPrompt } from "@/components/feedback-prompt";
+import { PageGuide } from "@/components/page-tour";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ const nav = [
 
 // Anchors the Papa tour spotlights so it can teach users how to navigate.
 const TOUR_ANCHORS: Record<string, string> = {
+  "/goals": "nav-goals",
   "/recommendations": "nav-plan",
   "/portfolio": "nav-portfolio",
   "/asset-intelligence": "nav-discover",
@@ -160,6 +162,9 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
           })}
         </div>
       </nav>
+
+      {/* Per-page "Guide me" walkthrough launcher (route-aware). */}
+      <PageGuide />
 
       {/* Occasional, dismissible star-rating prompt (self-paced via localStorage) */}
       <FeedbackPrompt />
