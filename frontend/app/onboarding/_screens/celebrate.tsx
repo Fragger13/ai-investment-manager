@@ -21,7 +21,7 @@ export function CelebrateScreen({ values }: ScreenContext) {
           <Sparkles className="h-3 w-3" /> All set
         </p>
         <h1
-          className="mt-2 text-[40px] leading-[1.05] sm:text-[52px]"
+          className="mt-2 text-[2.5rem] leading-[1.05] sm:text-[3.25rem]"
           style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}
         >
           That&apos;s My Kid!

@@ -132,7 +132,7 @@ export default function AssetIntelligencePage() {
           <p className="mt-2 text-base text-muted-foreground">Hand-picked ideas that fit your goals and risk level. Tap any to learn more, then save the ones you like to your plan.</p>
         </div>
         <div className="flex w-full gap-3 xl:w-auto">
-          <div className="relative w-full min-w-[260px]">
+          <div className="relative w-full min-w-0 sm:min-w-[260px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search investments, funds..." className="pl-9" />
           </div>
@@ -163,9 +163,10 @@ export default function AssetIntelligencePage() {
       </div>
 
       <div className="space-y-4" data-tour="discover">
+        {loading && !visible.length ? <SampleDiscoverCard /> : null}
         {visible.map((idea, index) => <InvestmentCard key={idea.id} idea={idea} topPick={index === 0} tour={index === 0} />)}
       </div>
-      {!visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
+      {!loading && !visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
 
       <Card className="mt-6 border-positive-soft bg-positive-soft/40" data-tour="discover-coach">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
@@ -179,8 +180,48 @@ export default function AssetIntelligencePage() {
           <Button variant="outline" asChild><Link href="/chat">Ask AI Coach <Send className="h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
-      <p className="mt-4 text-[13px] text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
+      <p className="mt-4 text-[0.8125rem] text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
     </AppShell>
+  );
+}
+
+// Shown while fresh ideas are loading. Doubles as a friendly loading state and
+// gives the guided tour a real element to spotlight (data-tour anchor) so it
+// never stalls on an empty page. Clearly labelled; replaced by real ideas.
+function SampleDiscoverCard() {
+  return (
+    <>
+      <div className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-primary" />
+        <p className="text-sm text-foreground">
+          <span className="font-semibold">Papa is fetching fresh ideas…</span>{" "}
+          meanwhile, here is what an idea card looks like.
+        </p>
+      </div>
+      <Card data-tour="discover-pick" className="relative">
+        <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-wide text-muted-foreground shadow-sm">
+          Sample
+        </span>
+        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 gap-4">
+            <InvestmentLogo name="Nifty 50 Index Fund" category="Index fund" size="lg" />
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold tracking-tight text-foreground">Nifty 50 Index Fund</h3>
+              <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">Index fund</p>
+              <ul className="mt-2 space-y-1">
+                {["Owns India's 50 biggest companies in one fund", "Low cost, no fund manager guesswork", "A calm first step for long term money"].map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive-foreground" />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <Button disabled className="shrink-0 bg-primary text-primary-foreground">View Details</Button>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
@@ -212,7 +253,7 @@ function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick
     <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="block">
       <Card data-tour={tour ? "discover-pick" : undefined} className={cn("relative transition hover:border-primary/40 hover:shadow-md", topPick && "border-primary/50 shadow-sm")}>
         {topPick ? (
-          <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-primary-foreground shadow-sm">
+          <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-wide text-primary-foreground shadow-sm">
             <Sparkles className="h-3 w-3" /> Papa&apos;s pick
           </span>
         ) : null}
@@ -222,7 +263,7 @@ function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick
             <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="lg" />
             <div className="min-w-0">
               <h3 className="line-clamp-1 text-lg font-bold tracking-tight text-foreground">{idea.name}</h3>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
+              <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
               <ul className="mt-2 space-y-1">
                 {idea.bullets.slice(0, 3).map((bullet) => (
                   <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground">
@@ -242,17 +283,17 @@ function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick
             </span>
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Est. return</p>
-              <p className="text-[15px] font-bold text-foreground">{idea.expectedReturn}</p>
+              <p className="text-[0.9375rem] font-bold text-foreground">{idea.expectedReturn}</p>
             </div>
             {idea.livePrice ? (
-              <p className="text-[13px] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
+              <p className="text-[0.8125rem] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
             ) : null}
           </div>
 
           {/* Suggested starting SIP — its own column */}
           <div className="text-left lg:text-center">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Start with</p>
-            <p className="mt-0.5 text-[15px] font-bold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
+            <p className="mt-0.5 text-[0.9375rem] font-bold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
           </div>
 
           {/* Right: save-to-plan + View Details */}
@@ -318,12 +359,12 @@ function InviteWidget() {
         </span>
         <p className="text-sm font-semibold text-foreground">Invite a friend</p>
       </div>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Share AskPapa so your friends can start their money plan too.</p>
+      <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">Share AskPapa so your friends can start their money plan too.</p>
       <button
         type="button"
         onClick={shareLink}
         aria-live="polite"
-        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground transition hover:bg-primary/90"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[0.8125rem] font-semibold text-primary-foreground transition hover:bg-primary/90"
       >
         {copied ? (<><Check className="h-3.5 w-3.5" /> Link copied!</>) : (<><Copy className="h-3.5 w-3.5" /> Share askpapa.in</>)}
       </button>

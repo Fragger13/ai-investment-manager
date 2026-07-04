@@ -39,9 +39,9 @@ type PapaBubbleProps = {
 };
 
 const sizeMap = {
-  sm: { avatar: "h-14 w-14", text: "text-[22px]", pad: "px-5 py-3" },
-  md: { avatar: "h-20 w-20", text: "text-[28px] sm:text-[32px]", pad: "px-6 py-4" },
-  lg: { avatar: "h-28 w-28", text: "text-[34px] sm:text-[40px]", pad: "px-7 py-5" }
+  sm: { avatar: "h-14 w-14", text: "text-[1.375rem]", pad: "px-5 py-3" },
+  md: { avatar: "h-20 w-20", text: "text-[1.75rem] sm:text-[2rem]", pad: "px-6 py-4" },
+  lg: { avatar: "h-28 w-28", text: "text-[2.125rem] sm:text-[2.5rem]", pad: "px-7 py-5" }
 };
 
 export function PapaBubble({ message, size = "md", hideAvatar = false, mood = "warm", className = "", textClassName }: PapaBubbleProps) {

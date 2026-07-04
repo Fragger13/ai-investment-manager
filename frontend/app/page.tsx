@@ -58,14 +58,14 @@ function Hero() {
           </span>
         </span>
 
-        <h1 className="mt-6 text-[64px] font-extrabold leading-[1.04] tracking-tight md:text-[76px]">
+        <h1 className="mt-6 text-[4rem] font-extrabold leading-[1.04] tracking-tight md:text-[4.75rem]">
           Financial advice
           <br />
           you can trust,
         </h1>
         <div className="relative mt-1 inline-block">
           <span
-            className="block text-[84px] leading-[1]"
+            className="block text-[5.25rem] leading-[1]"
             style={{ ...script, color: SCRIPT_GREEN }}
           >
             from Papa.
@@ -88,7 +88,7 @@ function Hero() {
           </Link>
           <div className="flex items-center gap-3" style={{ color: SCRIPT_GREEN }}>
             <CurlyArrow className="h-8 w-14" />
-            <p className="text-[24px] leading-tight" style={script}>
+            <p className="text-[1.5rem] leading-tight" style={script}>
               Start your journey
               <br />
               <span className="relative inline-block">
@@ -162,13 +162,13 @@ function QuoteBar() {
           &ldquo;
         </span>
         <div>
-          <p className="text-[30px] leading-[1.2]" style={{ ...script, color: "#0F172A", fontWeight: 600 }}>
+          <p className="text-[1.875rem] leading-[1.2]" style={{ ...script, color: "#0F172A", fontWeight: 600 }}>
             Paise ki value samajh kar chaloge, to zindagi aaram se nikaloge.
             <span className="ml-1 text-4xl leading-none text-[#138A3C] align-bottom" aria-hidden>
               &rdquo;
             </span>
           </p>
-          <p className="mt-1 flex items-center gap-1 text-[26px]" style={{ ...script, color: SCRIPT_GREEN }}>
+          <p className="mt-1 flex items-center gap-1 text-[1.625rem]" style={{ ...script, color: SCRIPT_GREEN }}>
             – Papa <HeartGlyph className="h-3.5 w-3.5" />
           </p>
         </div>
@@ -187,10 +187,10 @@ function QuoteBar() {
 function SectionHeading() {
   return (
     <div className="mt-12 flex items-center justify-center gap-3">
-      <span className="text-[26px] leading-none" style={{ ...script, color: SCRIPT_GREEN }}>
+      <span className="text-[1.625rem] leading-none" style={{ ...script, color: SCRIPT_GREEN }}>
         &raquo;
       </span>
-      <h2 className="text-2xl font-semibold text-[#0F172A] md:text-[28px]">
+      <h2 className="text-2xl font-semibold text-[#0F172A] md:text-[1.75rem]">
         Everything you need, in{" "}
         <span className="relative inline-block">
           one
@@ -198,7 +198,7 @@ function SectionHeading() {
         </span>{" "}
         place
       </h2>
-      <span className="text-[26px] leading-none" style={{ ...script, color: SCRIPT_GREEN }}>
+      <span className="text-[1.625rem] leading-none" style={{ ...script, color: SCRIPT_GREEN }}>
         &laquo;
       </span>
     </div>

@@ -100,7 +100,9 @@ export default function RecommendationsPage() {
       (item) => item.isFundPick || (item.actionKind === "fund" && !/emergency|safety|cash|liquid/i.test(item.category)),
     );
     if (idx >= 0) return idx;
-    return data.recommendations.length ? 0 : -1; // only fall back to the top move once real recs are in
+    // Load is done: anchor the top move even if no fund pick came back, so the
+    // tour always has something real to spotlight (loading shows sample cards).
+    return 0;
   }, [loading, pendingVisible, data.recommendations.length]);
   const confidence = planConfidence(items);
   const confidenceTone: "good" | "warn" | "danger" = confidence >= 75 ? "good" : confidence >= 55 ? "warn" : "danger";
@@ -131,8 +133,9 @@ export default function RecommendationsPage() {
       >
         {planTotal > 0 ? <DoFirstProgress done={completedItems.length} total={planTotal} /> : null}
         <div className="space-y-3">
+          {loading && !pendingVisible.length && !completedItems.length ? <SamplePlanRows /> : null}
           {pendingVisible.map((item, index) => <MustDoRow key={item.key} item={item} tour={index === tourIndex} />)}
-          {!visible.length && !completedItems.length ? (
+          {!loading && !visible.length && !completedItems.length ? (
             <EmptyRow text="Refresh after completing your profile to see your first steps." />
           ) : null}
           {completedItems.length ? (
@@ -159,7 +162,7 @@ function SavedByYouSection() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="ap-section">Saved by you</h2>
-          <p className="mt-0.5 text-[15px] leading-relaxed text-muted-foreground">Investments you added from Discover.</p>
+          <p className="mt-0.5 text-[0.9375rem] leading-relaxed text-muted-foreground">Investments you added from Discover.</p>
         </div>
         <Badge tone="primary">{items.length}</Badge>
       </div>
@@ -173,7 +176,7 @@ function SavedByYouSection() {
                   <InvestmentLogo name={item.instrumentName} category={item.category} ticker={item.ticker} size="md" />
                   <div className="min-w-0">
                     <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.instrumentName}</p>
-                    <p className="text-[13px] text-muted-foreground">{item.category}{item.ticker ? ` · ${item.ticker}` : ""}</p>
+                    <p className="text-[0.8125rem] text-muted-foreground">{item.category}{item.ticker ? ` · ${item.ticker}` : ""}</p>
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
@@ -222,7 +225,7 @@ function DoFirstProgress({ done, total }: { done: number; total: number }) {
         <span className="text-sm font-bold text-primary">{done}/{total}</span>
       </div>
       <Progress value={percent} className="mt-2 h-2" />
-      <p className="mt-2 text-[13px] text-muted-foreground">{message}</p>
+      <p className="mt-2 text-[0.8125rem] text-muted-foreground">{message}</p>
     </div>
   );
 }
@@ -292,7 +295,7 @@ function AmountBlock({ item, committedAmount, committedCadence }: { item: Action
     return (
       <div className="md:text-right">
         <p className="text-2xl font-extrabold tracking-tight text-foreground">{inr(committedAmount)}</p>
-        <p className="text-[13px] font-medium text-muted-foreground">{committedCadence === "one_time" ? "committed · one-time" : "committed / month"}</p>
+        <p className="text-[0.8125rem] font-medium text-muted-foreground">{committedCadence === "one_time" ? "committed · one-time" : "committed / month"}</p>
       </div>
     );
   }
@@ -301,7 +304,7 @@ function AmountBlock({ item, committedAmount, committedCadence }: { item: Action
     return (
       <div className="md:text-right">
         <p className="text-2xl font-extrabold tracking-tight text-foreground">{inr(item.suggestedMonthlyAmount)}</p>
-        <p className="text-[13px] font-medium text-muted-foreground">start / month</p>
+        <p className="text-[0.8125rem] font-medium text-muted-foreground">start / month</p>
         {note ? <p className="mt-0.5 text-xs font-medium text-warning-foreground">{note}</p> : null}
       </div>
     );
@@ -309,7 +312,7 @@ function AmountBlock({ item, committedAmount, committedCadence }: { item: Action
   return (
     <div className="md:text-right">
       <p className="text-base font-bold text-foreground">{amountLabel(item)}</p>
-      <p className="text-[13px] text-muted-foreground">No money needed</p>
+      <p className="text-[0.8125rem] text-muted-foreground">No money needed</p>
     </div>
   );
 }
@@ -319,7 +322,7 @@ function Section({ heading, subtitle, action, children }: { heading?: string; su
     <div className="mb-6">
       {heading ? <h2 className="ap-section">{heading}</h2> : null}
       <div className="flex items-start justify-between gap-4">
-        <p className={cn("text-[15px] leading-relaxed text-muted-foreground", heading && "mt-1")}>{subtitle}</p>
+        <p className={cn("text-[0.9375rem] leading-relaxed text-muted-foreground", heading && "mt-1")}>{subtitle}</p>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       <div className="mt-4">{children}</div>
@@ -338,7 +341,7 @@ function PlanConfidenceCard({ confidence, tone }: { confidence: number; tone: "g
         <div className="flex-1">
           <p className="ap-label">Plan Confidence</p>
           <p className="text-2xl font-extrabold text-foreground tnum">{confidence}%</p>
-          <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
+          <p className="text-[0.8125rem] font-medium text-muted-foreground">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -355,7 +358,7 @@ function PlanProgressWidget({ confidence, done, total }: { confidence: number; d
         </span>
         <p className="text-sm font-semibold text-foreground">Keep going!</p>
       </div>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">
         {done > 0 ? `${done} action${done === 1 ? "" : "s"} done. Small steps add up fast.` : "You're making great progress towards your goals."}
       </p>
       <div className="mt-3">
@@ -366,6 +369,66 @@ function PlanProgressWidget({ confidence, done, total }: { confidence: number; d
         <Progress value={percent} className="mt-1.5 h-1.5" />
       </div>
     </div>
+  );
+}
+
+// Shown while the real plan is still generating (the first build can take a
+// couple of minutes). These stand in as a friendly loading state AND give the
+// guided tour real elements to spotlight (data-tour anchors), so it never
+// stalls on a dark screen waiting for the plan. Clearly labelled as samples;
+// they disappear the moment real picks stream in.
+function SamplePlanRows() {
+  const samples = [
+    {
+      name: "Nifty 50 Index Fund",
+      category: "Index fund",
+      reason: "A steady, low cost way to own India's 50 biggest companies in one go.",
+      amount: 5000,
+    },
+    {
+      name: "Emergency Fund top up",
+      category: "Liquid fund",
+      reason: "Your safety net comes first, so surprises never touch your investments.",
+      amount: 3000,
+    },
+  ];
+  return (
+    <>
+      <div className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-primary" />
+        <p className="text-sm text-foreground">
+          <span className="font-semibold">Papa is building your real plan…</span>{" "}
+          it can take a minute or two the first time. Meanwhile, here is what a pick looks like.
+        </p>
+      </div>
+      {samples.map((sample, index) => (
+        <Card key={sample.name} className="overflow-hidden" data-tour={index === 0 ? "plan-item" : undefined}>
+          <CardContent className="p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+              <div className="flex min-w-0 flex-1 items-start gap-4">
+                <InvestmentLogo name={sample.name} category={sample.category} size="lg" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-lg font-bold leading-snug text-foreground">{sample.name}</p>
+                    <Badge tone="neutral">Sample</Badge>
+                  </div>
+                  <p className="mt-1 text-[0.9375rem] leading-relaxed text-muted-foreground">Why: {sample.reason}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-end justify-between gap-4 border-t border-border pt-4 md:flex-col md:items-end md:justify-center md:gap-3 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                <div className="text-right">
+                  <p className="text-xl font-extrabold text-foreground">{inr(sample.amount)}</p>
+                  <p className="text-xs text-muted-foreground">per month</p>
+                </div>
+                <Button size="lg" disabled className="min-w-[140px] justify-center" data-tour={index === 0 ? "plan-action" : undefined}>
+                  Take Action
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </>
   );
 }
 
@@ -384,12 +447,12 @@ function MustDoRow({ item, tour }: { item: ActionItem; tour?: boolean }) {
           <div className="min-w-0">
             <p className={cn("text-lg font-bold leading-snug text-foreground", taken && "text-muted-foreground line-through")}>{item.title}</p>
             {taken ? (
-              <p className="mt-1 inline-flex items-center gap-1.5 text-[15px] font-semibold text-positive-foreground">
+              <p className="mt-1 inline-flex items-center gap-1.5 text-[0.9375rem] font-semibold text-positive-foreground">
                 <CheckCircle2 className="h-4 w-4" /> Done — nice work!
               </p>
             ) : (
               <>
-                <p className="mt-1 line-clamp-2 text-[15px] leading-relaxed text-muted-foreground">Why: {item.reason}</p>
+                <p className="mt-1 line-clamp-2 text-[0.9375rem] leading-relaxed text-muted-foreground">Why: {item.reason}</p>
                 <MetaChips item={item} />
                 <FactorChips item={item} />
                 <CommunityChip item={item} />
@@ -426,8 +489,8 @@ function MustDoRow({ item, tour }: { item: ActionItem; tour?: boolean }) {
               <CheckCircle2 className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-positive-foreground">If you start this</p>
-              <p className="mt-0.5 text-[13px] leading-relaxed text-foreground">{proof}</p>
+              <p className="text-[0.6875rem] font-extrabold uppercase tracking-wide text-positive-foreground">If you start this</p>
+              <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-foreground">{proof}</p>
             </div>
           </div>
         ) : null}

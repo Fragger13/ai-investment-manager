@@ -229,12 +229,12 @@ function LinkedHoldingsRow({
             {hasLinks ? <Badge tone="primary">{linkedHoldings.length}</Badge> : null}
           </div>
           {hasLinks ? (
-            <p className="mt-1 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-[0.8125rem] text-muted-foreground">
               Tracking {inr(linkedValue)}
               {linkedMonthly > 0 ? ` · ${inr(linkedMonthly)}/mo flowing in` : ""}
             </p>
           ) : (
-            <p className="mt-1 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-[0.8125rem] text-muted-foreground">
               Connect investments from your portfolio so this goal updates automatically.
             </p>
           )}
@@ -336,7 +336,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
 
   return (
     <div className="mt-5">
-      <p className="text-[13px] font-bold uppercase tracking-wide text-muted-foreground">Pick a fix — see what happens</p>
+      <p className="text-[0.8125rem] font-bold uppercase tracking-wide text-muted-foreground">Pick a fix — see what happens</p>
       <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
         {fixes.map((f) => (
           <button
@@ -351,13 +351,13 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
             )}
           >
             {f.rec ? (
-              <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-primary-foreground">Recommended</span>
+              <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[0.625rem] font-extrabold uppercase tracking-wide text-primary-foreground">Recommended</span>
             ) : null}
             <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", f.rec ? "bg-positive-soft text-positive-foreground" : "bg-surface-soft text-muted-foreground")}>
               <f.icon className="h-4 w-4" />
             </span>
             <p className="mt-3 text-sm font-bold text-foreground">{f.label}</p>
-            <p className={cn("mt-1 text-[13px] leading-snug", f.rec ? "text-positive-foreground" : "text-muted-foreground")}>{f.outcome}</p>
+            <p className={cn("mt-1 text-[0.8125rem] leading-snug", f.rec ? "text-positive-foreground" : "text-muted-foreground")}>{f.outcome}</p>
           </button>
         ))}
       </div>
@@ -365,7 +365,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
       {selected === "save" ? (
         <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
           <p className="text-sm font-bold text-foreground">Put {inr(saveMore)}/mo toward {goal.name}</p>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+          <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">
             {linkedOptions.length ? "Pick one of your plan picks linked to this goal — the amount is pre-filled when you take action." : "Start a fresh contribution toward this goal."}
           </p>
           <div className="mt-3 space-y-2">
@@ -374,7 +374,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
                 <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
-                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.completed ? " · already started" : ""}</p>
+                  <p className="text-[0.75rem] text-muted-foreground">{opt.category}{opt.completed ? " · already started" : ""}</p>
                 </div>
                 <TakeActionDialog
                   payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: opt.completed ? "Top up" : "Start SIP", expectedReturn: opt.expectedReturn, risk: opt.risk, kind: "fund" as const, goalName: goal.name }}
@@ -391,7 +391,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
       {selected === "risk" ? (
         <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
           <p className="text-sm font-bold text-foreground">Grow {goal.name} with a moderate-risk fund</p>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+          <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">
             {moderateFunds.length ? "Real moderate-risk funds, each with its own return estimate — the amount is pre-filled when you take action." : "No moderate-risk funds available right now."}
           </p>
           <div className="mt-3 space-y-2">
@@ -400,7 +400,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
                 <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
-                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.expectedReturn ? ` · ~${opt.expectedReturn}` : ""}</p>
+                  <p className="text-[0.75rem] text-muted-foreground">{opt.category}{opt.expectedReturn ? ` · ~${opt.expectedReturn}` : ""}</p>
                 </div>
                 <TakeActionDialog
                   payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: "Start SIP", expectedReturn: opt.expectedReturn, risk: "Medium", kind: "fund" as const, goalName: goal.name }}
@@ -424,7 +424,7 @@ function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: Dashb
             ) : (
               <>
                 <p className="text-sm font-bold text-foreground">Push the target to {newTargetDate ? formatMonthYear(newTargetDate) : "later"}</p>
-                <p className="mt-0.5 text-[13px] text-muted-foreground">Keeps your current saving pace — the required monthly drops as the deadline moves out.</p>
+                <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">Keeps your current saving pace — the required monthly drops as the deadline moves out.</p>
               </>
             )}
           </div>

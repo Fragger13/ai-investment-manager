@@ -107,7 +107,7 @@ const EPF_PPF_HINT =
 // screens so amateurs aren't stuck wondering what an "XIRR statement" even is.
 function UploadStatementHelp() {
   return (
-    <details className="group rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 text-[13px] text-[#374151]">
+    <details className="group rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 text-[0.8125rem] text-[#374151]">
       <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-[#0F172A]">
         <span aria-hidden>📄</span>
         <span>New to this? What should I upload, and how do I get it?</span>
@@ -167,8 +167,8 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
       <div className="space-y-4">
         {totalHoldings > 0 ? (
           <div className="rounded-2xl border border-[#138A3C]/20 bg-[#E9F4EC] p-4">
-            <p className="text-[15px] font-semibold text-[#0F172A]">{totalHoldings} holding{totalHoldings === 1 ? "" : "s"} on file · {formatINR(totalValue)}</p>
-            <p className="mt-1 text-[13px] text-[#4B5563]">You can edit them in the next screens.</p>
+            <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{totalHoldings} holding{totalHoldings === 1 ? "" : "s"} on file · {formatINR(totalValue)}</p>
+            <p className="mt-1 text-[0.8125rem] text-[#4B5563]">You can edit them in the next screens.</p>
           </div>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
@@ -178,9 +178,9 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
             className="group flex flex-col items-start gap-2 rounded-2xl border border-[#138A3C] bg-[#138A3C] p-5 text-left text-white shadow-md transition hover:bg-[#107132] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C] focus-visible:ring-offset-2"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15"><Upload className="h-5 w-5" /></span>
-            <p className="text-[17px] font-semibold">Upload statement</p>
-            <p className="text-[14px] leading-snug text-white/85">Upload XIRR statements from your broker, mutual fund platform, or demat account. I&apos;ll automatically build a complete picture of your investments.</p>
-            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[12px] font-medium text-white">⚡ Live P&amp;L · auto-refresh with the market</p>
+            <p className="text-[1.0625rem] font-semibold">Upload statement</p>
+            <p className="text-[0.875rem] leading-snug text-white/85">Upload XIRR statements from your broker, mutual fund platform, or demat account. I&apos;ll automatically build a complete picture of your investments.</p>
+            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[0.75rem] font-medium text-white">⚡ Live P&amp;L · auto-refresh with the market</p>
           </button>
           <button
             type="button"
@@ -188,13 +188,13 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
             className="group flex flex-col items-start gap-2 rounded-2xl border border-[#138A3C]/40 bg-white p-5 text-left shadow-md transition hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C] focus-visible:ring-offset-2"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E9F4EC] text-[#138A3C]"><Pencil className="h-5 w-5" /></span>
-            <p className="text-[17px] font-semibold text-[#0F172A]">Add manually</p>
-            <p className="text-[14px] leading-snug text-[#4B5563]">Just enter what you remember. We can always update the details later.</p>
-            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-800">⚠ No live P&amp;L — refresh values monthly to stay accurate</p>
+            <p className="text-[1.0625rem] font-semibold text-[#0F172A]">Add manually</p>
+            <p className="text-[0.875rem] leading-snug text-[#4B5563]">Just enter what you remember. We can always update the details later.</p>
+            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[0.75rem] font-medium text-amber-800">⚠ No live P&amp;L — refresh values monthly to stay accurate</p>
           </button>
         </div>
         <UploadStatementHelp />
-        <p className="text-[13px] text-[#4B5563]">Hit “Continue” after picking. You can always come back to add more.</p>
+        <p className="text-[0.8125rem] text-[#4B5563]">Hit “Continue” after picking. You can always come back to add more.</p>
       </div>
       <PapaPeek
         open={peekOpen}
@@ -300,8 +300,8 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-2xl border border-[#138A3C]/30 bg-[#E9F4EC] px-4 py-3">
               <div>
-                <p className="text-[15px] font-semibold text-[#0F172A]">{preview.length} holding{preview.length === 1 ? "" : "s"} detected · {formatINR(totalIncoming)}</p>
-                <p className="mt-0.5 text-[12px] text-[#4B5563]">Review, edit names, or mark SIPs before committing.</p>
+                <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{preview.length} holding{preview.length === 1 ? "" : "s"} detected · {formatINR(totalIncoming)}</p>
+                <p className="mt-0.5 text-[0.75rem] text-[#4B5563]">Review, edit names, or mark SIPs before committing.</p>
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setPreview(null)}>Discard</Button>
@@ -312,9 +312,9 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
               {preview.map((h) => (
                 <div key={h.id} className="rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-sm">
                   <div className="grid gap-2 sm:grid-cols-[1.4fr_1fr_0.7fr_auto] sm:items-center">
-                    <Input value={h.name} onChange={(e) => setPreviewField(h.id, { name: e.target.value })} placeholder="Name" className="text-[14px]" />
+                    <Input value={h.name} onChange={(e) => setPreviewField(h.id, { name: e.target.value })} placeholder="Name" className="text-[0.875rem]" />
                     <Select value={h.assetClass} onValueChange={(v) => setPreviewField(h.id, { assetClass: v as HoldingAssetClass })}>
-                      <SelectTrigger className="text-[14px]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="text-[0.875rem]"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="stock">Direct stock</SelectItem>
                         <SelectItem value="mutualFund">Mutual fund</SelectItem>
@@ -330,20 +330,20 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
                       </SelectContent>
                     </Select>
                     <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13px] text-muted-foreground">₹</span>
-                      <Input className="pl-7 text-[14px]" inputMode="numeric" value={formatIndianCurrencyInput(Number(h.currentValue || 0))} onChange={(e) => setPreviewField(h.id, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
+                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.8125rem] text-muted-foreground">₹</span>
+                      <Input className="pl-7 text-[0.875rem]" inputMode="numeric" value={formatIndianCurrencyInput(Number(h.currentValue || 0))} onChange={(e) => setPreviewField(h.id, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
                     </div>
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeFromPreview(h.id)} title="Skip this row"><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <div className="mt-2 flex items-center gap-3 text-[12px] text-[#4B5563]">
+                  <div className="mt-2 flex items-center gap-3 text-[0.75rem] text-[#4B5563]">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input type="checkbox" checked={h.hasSip} onChange={() => togglePreview(h.id)} className="h-3.5 w-3.5 rounded border-[#138A3C] text-[#138A3C] focus:ring-[#138A3C]" />
                       Has SIP
                     </label>
                     {h.hasSip ? (
                       <div className="relative w-28">
-                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[12px] text-muted-foreground">₹</span>
-                        <Input className="pl-5 h-7 text-[12px]" inputMode="numeric" placeholder="Monthly" value={Number(h.sipAmount || 0) === 0 ? "" : formatIndianCurrencyInput(Number(h.sipAmount))} onChange={(e) => setPreviewField(h.id, { sipAmount: parseIndianCurrencyInput(e.target.value) })} />
+                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[0.75rem] text-muted-foreground">₹</span>
+                        <Input className="pl-5 h-7 text-[0.75rem]" inputMode="numeric" placeholder="Monthly" value={Number(h.sipAmount || 0) === 0 ? "" : formatIndianCurrencyInput(Number(h.sipAmount))} onChange={(e) => setPreviewField(h.id, { sipAmount: parseIndianCurrencyInput(e.target.value) })} />
                       </div>
                     ) : null}
                     {h.units ? <span>Units: {h.units}</span> : null}
@@ -353,7 +353,7 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
                 </div>
               ))}
             </div>
-            {warning ? <p className="text-[12px] text-[#92400E]">{warning}</p> : null}
+            {warning ? <p className="text-[0.75rem] text-[#92400E]">{warning}</p> : null}
           </div>
         ) : (
           <div className="space-y-3">
@@ -364,11 +364,11 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
               className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#138A3C]/40 bg-white p-8 text-center transition hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C] focus-visible:ring-offset-2 disabled:opacity-50"
             >
               {parsing ? <Loader2 className="h-7 w-7 animate-spin text-[#138A3C]" /> : <Upload className="h-7 w-7 text-[#138A3C]" />}
-              <p className="text-[15px] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more XIRR files"}</p>
-              <p className="text-[12px] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech, etc. — select multiple if you have more than one broker</p>
+              <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more XIRR files"}</p>
+              <p className="text-[0.75rem] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech, etc. — select multiple if you have more than one broker</p>
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
-            {error ? <p className="text-[13px] text-negative-foreground">{error}</p> : null}
+            {error ? <p className="text-[0.8125rem] text-negative-foreground">{error}</p> : null}
             <UploadStatementHelp />
           </div>
         )}
@@ -409,11 +409,11 @@ export function PortfolioBuckets({ form, values }: { form: UseFormReturn<Onboard
       <div className="space-y-3">
         {totalHoldings > 0 ? (
           <div className="rounded-2xl border border-[#138A3C]/20 bg-[#E9F4EC] p-4">
-            <p className="text-[15px] font-semibold text-[#0F172A]">{totalHoldings} entr{totalHoldings === 1 ? "y" : "ies"} on file · Net assets {formatINR(grandTotal)}</p>
-            <p className="mt-1 text-[13px] text-[#4B5563]">Tap any bucket below to add more or edit.</p>
+            <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{totalHoldings} entr{totalHoldings === 1 ? "y" : "ies"} on file · Net assets {formatINR(grandTotal)}</p>
+            <p className="mt-1 text-[0.8125rem] text-[#4B5563]">Tap any bucket below to add more or edit.</p>
           </div>
         ) : (
-          <p className="text-[13px] text-[#4B5563]">Or add any bucket by hand — tap one below.</p>
+          <p className="text-[0.8125rem] text-[#4B5563]">Or add any bucket by hand — tap one below.</p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           {buckets.map((b) => (
@@ -499,10 +499,10 @@ function BucketTile({ bucket, onClick }: { bucket: { key: BucketKey; label: stri
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F8FAF9] text-xl" aria-hidden>{bucket.emoji}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="text-[15px] font-semibold text-[#0F172A] truncate">{bucket.label}</p>
+          <p className="text-[0.9375rem] font-semibold text-[#0F172A] truncate">{bucket.label}</p>
           {bucket.filled ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#138A3C]" /> : null}
         </div>
-        <p className={cn("mt-0.5 text-[12px] truncate", bucket.filled ? "text-[#0F172A]" : "text-[#4B5563]")}>{bucket.subtitle}</p>
+        <p className={cn("mt-0.5 text-[0.75rem] truncate", bucket.filled ? "text-[#0F172A]" : "text-[#4B5563]")}>{bucket.subtitle}</p>
       </div>
     </button>
   );
@@ -578,7 +578,7 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
   return (
     <>
       <div className="space-y-4">
-        <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+        <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-[0.75rem] text-amber-900">
           <strong>Heads up:</strong> live portfolio P&amp;L and live valuation are only available with the XIRR upload option. Since you&apos;re entering manually, please refresh these values once a month so your plan stays accurate.
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -589,7 +589,7 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
                 <p className="text-base font-semibold text-[#0F172A]">{tile.label}</p>
                 {tile.hint ? <HelpHint text={tile.hint} link={tile.hintLink} label={tile.label} /> : null}
               </div>
-              <p className="mt-1 text-[13px] leading-snug text-[#4B5563]">{tile.helper}</p>
+              <p className="mt-1 text-[0.8125rem] leading-snug text-[#4B5563]">{tile.helper}</p>
               <div className="mt-3">
                 <CurrencyField name={tile.value} placeholder={tile.placeholder} />
               </div>
@@ -606,7 +606,7 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
               </span>
               <p className="text-base font-semibold text-[#0F172A]">Other investments</p>
             </div>
-            <p className="mt-1 text-[13px] leading-snug text-[#4B5563]">Gold, silver, crypto, real estate, bonds, NPS, FDs, RSUs and anything else.</p>
+            <p className="mt-1 text-[0.8125rem] leading-snug text-[#4B5563]">Gold, silver, crypto, real estate, bonds, NPS, FDs, RSUs and anything else.</p>
             <p className="mt-3 text-sm font-semibold text-[#138A3C]">
               {items.length ? `${items.length} added · Tap to edit` : "Tap to add"}
             </p>
@@ -622,7 +622,7 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
             {draftList.map((row, index) => (
               <div key={index} className="grid gap-2 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                 <div className="space-y-1">
-                  <Label className="text-[13px]">Type</Label>
+                  <Label className="text-[0.8125rem]">Type</Label>
                   <Select value={row.type || ""} onValueChange={(v) => setDraftList(draftList.map((r, i) => i === index ? { ...r, type: v } : r))}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -631,14 +631,14 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[13px]">Value today</Label>
+                  <Label className="text-[0.8125rem]">Value today</Label>
                   <div className="relative">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                     <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.value || 0) ? formatIndianCurrencyInput(Number(row.value)) : ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, value: parseIndianCurrencyInput(e.target.value) } : r))} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[13px]">Notes</Label>
+                  <Label className="text-[0.8125rem]">Notes</Label>
                   <Input placeholder="Optional" value={row.notes || ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} />
                 </div>
                 <div className="flex items-end">
@@ -706,7 +706,7 @@ function HoldingsBucketDialog({
       <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
         <DialogContent className="max-h-[88vh] overflow-y-auto">
           <DialogTitle className="text-lg font-semibold text-[#0F172A]">{title}</DialogTitle>
-          <p className="mt-1 text-[13px] text-[#4B5563]">{list.length ? `${list.length} item${list.length === 1 ? "" : "s"} on file.` : "Nothing here yet."}</p>
+          <p className="mt-1 text-[0.8125rem] text-[#4B5563]">{list.length ? `${list.length} item${list.length === 1 ? "" : "s"} on file.` : "Nothing here yet."}</p>
           <div className="mt-3 space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             {list.map((h) => {
               const pl = h.valueAtCost && h.valueAtCost > 0 ? h.currentValue - h.valueAtCost : 0;
@@ -714,8 +714,8 @@ function HoldingsBucketDialog({
               return (
                 <div key={h.id} className="flex items-start justify-between gap-3 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-[#0F172A] truncate">{h.name}</p>
-                    <p className="mt-0.5 text-[12px] text-[#4B5563]">
+                    <p className="text-[0.8125rem] font-semibold text-[#0F172A] truncate">{h.name}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-[#4B5563]">
                       {formatINR(h.currentValue)}
                       {h.units ? ` · ${h.units} units` : ""}
                       {h.symbol ? ` · ${h.symbol}` : ""}
@@ -784,22 +784,22 @@ function ScalarBucketDialog({
           <span>{title}</span>
           {hint ? <HelpHint text={hint} link={hintLink} label={title} /> : null}
         </DialogTitle>
-        <p className="mt-1 text-[13px] text-[#4B5563]">{helper}</p>
+        <p className="mt-1 text-[0.8125rem] text-[#4B5563]">{helper}</p>
         <div className="mt-4 space-y-1.5">
-          <Label className="text-[13px]">Current balance</Label>
+          <Label className="text-[0.8125rem]">Current balance</Label>
           <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
             <Input className="pl-7" inputMode="numeric" autoFocus value={formatIndianCurrencyInput(Number(value || 0))} onChange={(e) => setValue(parseIndianCurrencyInput(e.target.value))} />
           </div>
         </div>
         {monthlyField ? (
           <div className="mt-4 space-y-1.5">
-            <Label className="text-[13px] text-[#6B7280]">{monthlyLabel || "Monthly contribution"} <span className="font-normal">(optional)</span></Label>
+            <Label className="text-[0.8125rem] text-[#6B7280]">{monthlyLabel || "Monthly contribution"} <span className="font-normal">(optional)</span></Label>
             <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
               <Input className="pl-7" inputMode="numeric" placeholder="e.g., 12,000" value={Number(monthly || 0) === 0 ? "" : formatIndianCurrencyInput(Number(monthly))} onChange={(e) => setMonthly(parseIndianCurrencyInput(e.target.value))} />
             </div>
-            {monthlyHelper ? <p className="text-[12px] text-[#4B5563]">{monthlyHelper}</p> : null}
+            {monthlyHelper ? <p className="text-[0.75rem] text-[#4B5563]">{monthlyHelper}</p> : null}
           </div>
         ) : null}
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -934,7 +934,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
               <div key={row.id} className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
                 <div className="grid gap-2 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                   <div className="space-y-1">
-                    <Label className="text-[13px]">Type</Label>
+                    <Label className="text-[0.8125rem]">Type</Label>
                     <Select value={row.assetClass || ""} onValueChange={(v) => updateRow(index, { assetClass: v as HoldingAssetClass })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
@@ -943,7 +943,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[13px]">Value today{isMetalClass(row.assetClass) ? <span className="ml-1 font-normal text-[#6B7280]">(auto)</span> : null}</Label>
+                    <Label className="text-[0.8125rem]">Value today{isMetalClass(row.assetClass) ? <span className="ml-1 font-normal text-[#6B7280]">(auto)</span> : null}</Label>
                     {isMetalClass(row.assetClass) ? (
                       <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
                         {metalPrices[row.assetClass as "gold" | "silver"] > 0 ? formatINR(Number(row.currentValue || 0)) : "Awaiting price…"}
@@ -956,7 +956,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[13px]">{nameLabel}</Label>
+                    <Label className="text-[0.8125rem]">{nameLabel}</Label>
                     <Input placeholder={namePlaceholder} value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} />
                   </div>
                   <div className="flex items-end">
@@ -966,7 +966,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                 {showExtras ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                      <Label className="inline-flex items-center gap-1 text-[0.8125rem] text-[#6B7280]">
                         <span>Value at cost (optional)</span>
                         <HelpHint label="value at cost" text="What you originally paid for this, the total you invested. Add it and Papa can show your profit or loss. Leave it blank if you don't remember." />
                       </Label>
@@ -977,7 +977,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </div>
                     {unitLbl ? (
                       <div className="space-y-1">
-                        <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                        <Label className="inline-flex items-center gap-1 text-[0.8125rem] text-[#6B7280]">
                           <span>{unitLbl}{isMetalClass(row.assetClass) ? <span className="ml-1 text-red-500" aria-hidden>*</span> : " (optional)"}</span>
                           <HelpHint label={unitLbl} text={isMetalClass(row.assetClass) ? "How many grams you own. Papa multiplies it by today's market rate to value your holding automatically, so you don't have to." : "How many units or coins you hold. Optional, it helps Papa track the live value."} />
                         </Label>
@@ -994,14 +994,14 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     ) : null}
                     {isCrypto ? (
                       <div className="space-y-1">
-                        <Label className="text-[13px] text-[#6B7280]">Symbol (optional)</Label>
+                        <Label className="text-[0.8125rem] text-[#6B7280]">Symbol (optional)</Label>
                         <Input placeholder="BTC, ETH" value={row.symbol || ""} onChange={(e) => updateRow(index, { symbol: e.target.value.toUpperCase() })} />
                       </div>
                     ) : null}
                   </div>
                 ) : null}
                 {isCrypto || isMetal ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-[#4B5563]">
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[0.75rem] text-[#4B5563]">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input type="checkbox" checked={Boolean(row.hasSip)} onChange={(e) => updateRow(index, { hasSip: e.target.checked, sipAmount: e.target.checked ? row.sipAmount || 0 : 0 })} className="h-3.5 w-3.5 rounded border-[#138A3C] text-[#138A3C] focus:ring-[#138A3C]" />
                       I have a monthly SIP
@@ -1014,8 +1014,8 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     ) : null}
                     {row.hasSip ? (
                       <div className="relative w-32">
-                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[12px] text-muted-foreground">₹</span>
-                        <Input className="pl-5 h-7 text-[12px]" inputMode="numeric" placeholder="Monthly" value={Number(row.sipAmount || 0) === 0 ? "" : formatIndianCurrencyInput(Number(row.sipAmount))} onChange={(e) => updateRow(index, { sipAmount: parseIndianCurrencyInput(e.target.value) })} />
+                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[0.75rem] text-muted-foreground">₹</span>
+                        <Input className="pl-5 h-7 text-[0.75rem]" inputMode="numeric" placeholder="Monthly" value={Number(row.sipAmount || 0) === 0 ? "" : formatIndianCurrencyInput(Number(row.sipAmount))} onChange={(e) => updateRow(index, { sipAmount: parseIndianCurrencyInput(e.target.value) })} />
                       </div>
                     ) : null}
                   </div>
@@ -1080,61 +1080,61 @@ function HoldingEditorDialog({
         <DialogTitle className="text-lg font-semibold text-[#0F172A]">{labelForClass(holding.assetClass)} details</DialogTitle>
         <div className="mt-4 space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-[13px]">Name</Label>
+            <Label className="text-[0.8125rem]">Name</Label>
             <Input value={holding.name} onChange={(e) => onChange({ ...holding, name: e.target.value })} placeholder={placeholderName || "e.g., Investment name"} />
           </div>
           {symbolLabel ? (
             <div className="space-y-1.5">
-              <Label className="text-[13px]">{symbolLabel}</Label>
+              <Label className="text-[0.8125rem]">{symbolLabel}</Label>
               <Input
                 value={symbolField === "schemeCode" ? (holding.schemeCode || "") : (holding.symbol || "")}
                 onChange={(e) => onChange(symbolField === "schemeCode" ? { ...holding, schemeCode: e.target.value } : { ...holding, symbol: e.target.value.toUpperCase() })}
                 placeholder={symbolPlaceholder}
               />
-              <p className="text-[12px] text-[#4B5563]">Helps us refresh prices live later.</p>
+              <p className="text-[0.75rem] text-[#4B5563]">Helps us refresh prices live later.</p>
             </div>
           ) : null}
           {isMetal ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Grams<span className="ml-1 text-red-500" aria-hidden>*</span></Label>
+                <Label className="text-[0.8125rem]">Grams<span className="ml-1 text-red-500" aria-hidden>*</span></Label>
                 <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="e.g., 50" autoFocus />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Current value <span className="text-[#4B5563] font-normal">(auto)</span></Label>
+                <Label className="text-[0.8125rem]">Current value <span className="text-[#4B5563] font-normal">(auto)</span></Label>
                 <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
                   {perGram > 0 ? formatINR(holding.currentValue) : "Awaiting live price…"}
                 </div>
-                <p className="text-[12px] text-[#4B5563]">{perGram > 0 ? `Live ₹${formatIndianCurrencyInput(Math.round(perGram))}/g — updates with the market.` : "We'll value this on the next price refresh."}</p>
+                <p className="text-[0.75rem] text-[#4B5563]">{perGram > 0 ? `Live ₹${formatIndianCurrencyInput(Math.round(perGram))}/g — updates with the market.` : "We'll value this on the next price refresh."}</p>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(optional)</span></Label>
+                <Label className="text-[0.8125rem]">Value at cost <span className="text-[#4B5563] font-normal">(optional)</span></Label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
                   <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
                 </div>
-                {cost > 0 ? <p className={cn("text-[12px] font-medium", pl >= 0 ? "text-positive-foreground" : "text-negative-foreground")}>P&L {formatINR(pl)} ({plPct.toFixed(1)}%)</p> : null}
+                {cost > 0 ? <p className={cn("text-[0.75rem] font-medium", pl >= 0 ? "text-positive-foreground" : "text-negative-foreground")}>P&L {formatINR(pl)} ({plPct.toFixed(1)}%)</p> : null}
               </div>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Current value</Label>
+                <Label className="text-[0.8125rem]">Current value</Label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
                   <Input className="pl-7" inputMode="numeric" value={formatIndianCurrencyInput(Number(holding.currentValue || 0))} onChange={(e) => onChange({ ...holding, currentValue: parseIndianCurrencyInput(e.target.value) })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
+                <Label className="text-[0.8125rem]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
                   <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
                 </div>
               </div>
               {isUnitClass ? (
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">{unitFieldLabel(holding.assetClass)}</Label>
+                  <Label className="text-[0.8125rem]">{unitFieldLabel(holding.assetClass)}</Label>
                   <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="Optional" />
                 </div>
               ) : null}
@@ -1142,15 +1142,15 @@ function HoldingEditorDialog({
           )}
           {canSip ? (
             <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
-              <label className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]">
+              <label className="flex items-center gap-2 text-[0.8125rem] font-medium text-[#0F172A]">
                 <input type="checkbox" checked={holding.hasSip} onChange={(e) => onChange({ ...holding, hasSip: e.target.checked, sipAmount: e.target.checked ? holding.sipAmount : 0 })} className="h-4 w-4 rounded border-[#138A3C] text-[#138A3C] focus:ring-[#138A3C]" />
                 I have a monthly SIP on this
               </label>
               {holding.hasSip ? (
                 <div className="mt-3 space-y-1.5">
-                  <Label className="text-[13px]">Monthly SIP amount</Label>
+                  <Label className="text-[0.8125rem]">Monthly SIP amount</Label>
                   <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[0.875rem] text-muted-foreground">₹</span>
                     <Input className="pl-7" inputMode="numeric" value={Number(holding.sipAmount || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.sipAmount))} onChange={(e) => onChange({ ...holding, sipAmount: parseIndianCurrencyInput(e.target.value) })} />
                   </div>
                 </div>

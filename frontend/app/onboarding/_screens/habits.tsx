@@ -147,7 +147,7 @@ function QuestionRow({
           />
         ))}
       </div>
-      {error ? <p className="text-[13px] font-medium text-red-600">Pick one to continue</p> : null}
+      {error ? <p className="text-[0.8125rem] font-medium text-red-600">Pick one to continue</p> : null}
     </div>
   );
 }

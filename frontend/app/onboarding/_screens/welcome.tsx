@@ -17,7 +17,7 @@ export function WelcomeScreen(_ctx: ScreenContext) {
       />
       <p className="mt-5 text-sm font-medium uppercase tracking-wide text-[#138A3C]">A note from Papa</p>
       <h1
-        className="mt-2 text-[40px] leading-[1.05] sm:text-[52px]"
+        className="mt-2 text-[2.5rem] leading-[1.05] sm:text-[3.25rem]"
         style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}
       >
         Hi Bacche!

@@ -52,7 +52,7 @@ export function RecommendationCard({ rec, compact = false }: { rec: Recommendati
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[0.6875rem] text-muted-foreground">
                     {fund.plan}
                     {fund.return1y != null ? ` · 1Y ${fund.return1y.toFixed(1)}%` : ""}
                     {fund.return3y != null ? ` · 3Y ${fund.return3y.toFixed(1)}%` : ""}
@@ -61,7 +61,7 @@ export function RecommendationCard({ rec, compact = false }: { rec: Recommendati
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[11px] text-muted-foreground">Past returns don&apos;t guarantee future results. Returns are net of expenses (NAV-based).</p>
+            <p className="mt-2 text-[0.6875rem] text-muted-foreground">Past returns don&apos;t guarantee future results. Returns are net of expenses (NAV-based).</p>
           </div>
         ) : null}
         {!compact ? (

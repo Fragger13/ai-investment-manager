@@ -131,7 +131,7 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
                     <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inrShort(available)}</p>
-                    <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
+                    <p className="mt-2 text-[0.9375rem] text-muted-foreground">Can be invested or saved.</p>
                   </div>
                   <MoneyJar className="-mt-1 hidden shrink-0 -translate-x-[1.5cm] sm:block" />
                 </div>
@@ -167,7 +167,7 @@ export default function DashboardPage() {
                   mood={papaMood(data.health.score)}
                   size="md"
                   className="-ml-[1.3cm]"
-                  textClassName="text-[26px] sm:text-[30px]"
+                  textClassName="text-[1.625rem] sm:text-[1.875rem]"
                 />
               </CardContent>
             </Card>
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 <ColorfulIcon icon={Sparkles} accent="emerald" label="Insight for you" />
                 <div>
                   <p className="font-bold text-foreground">Insight for you</p>
-                  <p className="mt-1 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">{insight}</p>
+                  <p className="mt-1 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground">{insight}</p>
                 </div>
               </div>
               <Button variant="outline" asChild><Link href="/chat">Explore how <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -245,7 +245,7 @@ function SnapshotCard({ icon, accent, label, value, detail, highlight }: { icon:
         <div>
           <p className="ap-label flex items-center gap-1.5">
             {label}
-            {highlight ? <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Total</span> : null}
+            {highlight ? <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-primary">Total</span> : null}
           </p>
           <p className={cn("mt-1 text-2xl font-bold tracking-tight tnum", highlight ? "text-primary" : "text-foreground")}>{value}</p>
           <p className="ap-help mt-1">{detail}</p>
@@ -260,8 +260,8 @@ function DashboardActionRow({ action }: { action: ActionItem }) {
     <Link href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
       <InvestmentLogo name={action.title} extraHint={action.instrumentName} category={action.category} ticker={action.ticker} size="sm" />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-1 block text-[15px] font-bold text-foreground">{action.title}</span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px]">
+        <span className="line-clamp-1 block text-[0.9375rem] font-bold text-foreground">{action.title}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.8125rem]">
           <span className="font-bold text-primary tnum">{amountLabel(action)}</span>
           <span className="text-muted-foreground">· 🎯 {purposeTag(action)}</span>
         </span>
@@ -323,7 +323,7 @@ function EditAvailableDialog() {
       <DialogContent className="w-[min(440px,94vw)] p-0">
         <div className="border-b border-border px-6 py-5 pr-12">
           <DialogTitle className="text-lg font-semibold text-foreground">Available to invest this month</DialogTitle>
-          <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
+          <DialogDescription className="mt-0.5 text-[0.8125rem] text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
         </div>
         <div className="p-6">
           <label htmlFor="edit-available" className="text-sm font-semibold text-foreground">Amount this month</label>
@@ -340,7 +340,7 @@ function EditAvailableDialog() {
             />
             <span className="text-xs text-muted-foreground">/ month</span>
           </div>
-          <p className="mt-2 text-[13px] text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
+          <p className="mt-2 text-[0.8125rem] text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
           <div className="mt-5 flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
             <Button className="flex-1" onClick={save} disabled={saving || amount <= 0}>{saving ? "Saving…" : "Save"}</Button>
@@ -362,7 +362,7 @@ function NetWorthCard({ value }: { value: string }) {
       <div className="relative min-w-0">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
           Net worth
-          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Total</span>
+          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-white">Total</span>
         </p>
         <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white tnum">{value}</p>
         <p className="mt-0.5 text-sm font-medium text-white/90">Everything you own today</p>
@@ -605,7 +605,7 @@ function CommitSummaryTile({ label, amount, icon: Icon }: { label: string; amoun
 function CommitFact({ label, value, icon: Icon }: { label: string; value: string; icon?: typeof Home }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-[0.625rem] uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-foreground">
         {Icon ? <Icon className="h-3 w-3 text-muted-foreground" /> : null}
         {value}

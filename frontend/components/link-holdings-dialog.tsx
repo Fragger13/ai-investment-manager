@@ -104,7 +104,7 @@ export function LinkHoldingsDialog({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="line-clamp-1 text-sm font-semibold text-foreground">{holding.name}</p>
-                      {fromAction ? <Badge tone="primary" className="text-[10px]">From plan</Badge> : null}
+                      {fromAction ? <Badge tone="primary" className="text-[0.625rem]">From plan</Badge> : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {holding.category}
