@@ -182,6 +182,11 @@ def ollama_reachable() -> bool:
 def ollama_model_available(model: str | None = None) -> bool:
     if settings.llm_provider.lower() != "ollama":
         return False
+    if settings.ollama_api_key:
+        # Ollama Cloud: /api/tags reflects the account's local pushes, not the
+        # hosted catalog, so trust the configured model (reachability is
+        # checked separately and generate errors degrade to fallbacks).
+        return True
     configured_model = model or settings.llm_model_fast or settings.llm_model
     return OllamaClient().has_model(configured_model)
 
@@ -276,6 +281,9 @@ def _resolve_model(model: str) -> str:
     configured model that IS installed. This keeps the LLM working when a config
     or .env points at a model that was never pulled (e.g. summarize → qwen2.5:7b),
     instead of silently failing to the deterministic baseline every time."""
+    if settings.ollama_api_key:
+        # Ollama Cloud hosts the model catalog server-side; never substitute.
+        return model
     available = _available_models()
     if not available:  # can't verify (offline / unreachable) — trust the config
         return model

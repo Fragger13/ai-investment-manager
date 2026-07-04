@@ -224,6 +224,28 @@ npm run lint --prefix frontend
 npm run build
 ```
 
+## Deploy (production)
+
+Production layout: frontend on Vercel, backend + SQLite on a single always-on
+VM (a 1GB EC2 t3.micro is enough), LLM on Ollama Cloud. Assets live in `deploy/`:
+
+1. **Backend VM** (Ubuntu 24.04): `git clone <repo> ~/askpapa && cd ~/askpapa && bash deploy/setup-ec2.sh api.<domain> <domain>`.
+   The script sets up swap, Python venv, Caddy (automatic Let's Encrypt SSL),
+   a systemd service, a nightly DB backup cron, and generates `backend/.env`
+   with fresh secrets. Then edit `backend/.env` to paste the Ollama Cloud and
+   Resend API keys — and back that file up somewhere safe: losing
+   `DATA_ENCRYPTION_SECRET` or `RECOVERY_MASTER_KEY` orphans encrypted user data.
+2. **Email**: verify the domain at resend.com/domains (DKIM/SPF DNS records) —
+   the sandbox `resend.dev` sender does not deliver to other people, and
+   registration/password reset depend on email.
+3. **Vercel**: import the repo, root directory `frontend/`, env var
+   `NEXT_PUBLIC_API_URL=https://api.<domain>/api/v1`, add the domain.
+4. **DNS**: `A api → VM elastic IP`; apex/www per Vercel's instructions; plus
+   Resend's records. SSL is automatic on both hosts (nothing to buy).
+5. **LLM**: create an API key at ollama.com; production uses the cloud model
+   `qwen3.5:9b` via `OLLAMA_BASE_URL=https://ollama.com` + `OLLAMA_API_KEY`.
+   Free-tier caps degrade copy to deterministic fallbacks, never an outage.
+
 ## Safety
 
 The app provides educational decision support, not guaranteed financial advice. Investments involve market risk. Users should verify source links and suitability before investing.

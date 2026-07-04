@@ -1,0 +1,19 @@
+# AskPapa backend — systemd unit (template; deploy/setup-ec2.sh substitutes
+# __APP_DIR__ and __RUN_USER__ and installs it to /etc/systemd/system/).
+# Single uvicorn worker on loopback; Caddy terminates TLS in front of it.
+[Unit]
+Description=AskPapa FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__APP_DIR__/backend
+ExecStart=__APP_DIR__/backend/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+# The app reads backend/.env itself (pydantic-settings); no EnvironmentFile needed.
+
+[Install]
+WantedBy=multi-user.target
