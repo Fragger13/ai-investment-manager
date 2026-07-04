@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     # Bearer token, and makes the router trust the configured model names
     # instead of resolving them against the local /api/tags list.
     ollama_api_key: str | None = None
+    # Ollama `think` field. Local models: leave false. Hosted reasoning models
+    # (gpt-oss) ignore false and reason anyway, blowing the token budget on
+    # hidden reasoning — set to "low" so the visible answer is produced.
+    ollama_think: str | None = None
     # Defaults target qwen3:8b (commonly pulled here). The runtime resolves any
     # configured model that isn't actually installed to one that is (see
     # model_router._resolve_model), so a config/.env drift degrades to a working

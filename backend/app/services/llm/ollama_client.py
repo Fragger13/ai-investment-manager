@@ -10,6 +10,23 @@ from app.services.llm.llm_client import BaseLLMClient, LLMUnavailable
 from app.services.llm.schemas import LLMRequest, LLMResponse
 
 
+def _think_setting() -> bool | str:
+    """Resolve the Ollama `think` request field from config.
+
+    Local non-reasoning models (qwen3:8b) want `False`. Hosted reasoning models
+    like gpt-oss ignore `False` and reason anyway — which, under a small
+    num_predict, burns the whole token budget on hidden reasoning and returns
+    an empty answer. For those, set OLLAMA_THINK=low so reasoning stays minimal
+    and the visible answer is produced. Accepts false/true or low/medium/high.
+    """
+    raw = str(settings.ollama_think or "").strip().lower()
+    if raw in ("", "false", "off", "no", "0"):
+        return False
+    if raw in ("true", "on", "yes", "1"):
+        return True
+    return raw
+
+
 class OllamaClient(BaseLLMClient):
     def __init__(self, base_url: str | None = None) -> None:
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
@@ -20,7 +37,7 @@ class OllamaClient(BaseLLMClient):
             "model": request.model,
             "prompt": request.prompt,
             "stream": False,
-            "think": False,
+            "think": _think_setting(),
             "keep_alive": "10m",
             "options": {
                 "temperature": 0.2,
