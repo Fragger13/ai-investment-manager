@@ -53,6 +53,16 @@ def refresh_all_copy(db: Session = Depends(get_db)) -> list[dict]:
     return hydrate_and_schedule_assets(asset_research(db), force=True)
 
 
+@router.get("/community-sentiment")
+def community_sentiment(name: str = "", assetClass: str = "") -> dict:
+    """On-demand Reddit sentiment for one idea — asset-specific when it's being
+    discussed, else the relevant forum's overall mood. Best-effort: returns {}
+    only when Reddit is unreachable and nothing is cached."""
+    from app.services.research.reddit_research_service import sentiment_for
+
+    return sentiment_for(name, assetClass) or {}
+
+
 @router.get("/{symbol}/research")
 def detail(symbol: str, db: Session = Depends(get_db)) -> dict:
     row = asset_detail(db, symbol)

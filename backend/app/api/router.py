@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import alerts, assets, auth, chat, copilot, documents, drift, holdings, intelligence, llm, market, memory, onboarding, portfolio, recommendations, research, system, validation
+from app.api.routes import alerts, assets, auth, chat, copilot, documents, drift, feedback, holdings, intelligence, llm, market, memory, onboarding, portfolio, recommendations, research, system, validation
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -21,3 +21,4 @@ api_router.include_router(memory.router, prefix="/memory", tags=["memory"])
 api_router.include_router(drift.router, prefix="/drift", tags=["drift"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
 api_router.include_router(llm.router, prefix="/llm", tags=["llm"])
+api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])

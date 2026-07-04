@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { InvestmentLogo } from "@/components/investment-logo";
 import { Badge } from "@/components/ui/badge";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { inr } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
+import { api } from "@/lib/api";
+import { cn, inr } from "@/lib/utils";
 
 export type ActionKind =
   | "fund"            // start/boost an SIP — amount + start + (optional end)
@@ -28,6 +30,12 @@ export type TakeActionPayload = {
   reason?: string;
   expectedReturn?: string;
   risk?: string;
+  /** Known live unit price (e.g. a Discover idea's NAV/LTP). The dialog still
+   *  tries a fresh quote, falling back to this. */
+  livePrice?: number;
+  /** Raw instrument name for pricing (when the display name is a friendly title
+   *  like "Increase ... SIP"). Used to resolve a fund's NAV by name. */
+  quoteName?: string;
   // Hints
   kind?: ActionKind;
   goalName?: string;
@@ -37,7 +45,27 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const recordAction = usePlanActionsStore((state) => state.recordAction);
   const removeAction = usePlanActionsStore((state) => state.removeAction);
   const existing = usePlanActionsStore((state) => state.actionFor(payload.key));
-  const kind: ActionKind = payload.kind || inferKind(payload);
+  const profile = useAuthStore((state) => state.profile);
+  const token = useAuthStore((state) => state.token);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  // An investment can be started either way; the SIP/lump-sum toggle picks which.
+  const baseKind: ActionKind = payload.kind || inferKind(payload);
+  const investable = baseKind === "fund" || baseKind === "lump_sum";
+
+  // The saved goal this recommendation funds (if any) — drives the opt-out
+  // "Add to my {goal} goal" checkbox and the auto-link on submit.
+  const linkGoal = useMemo(() => {
+    if (!payload.goalName || !profile?.goals?.length) return null;
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const target = norm(payload.goalName);
+    if (!target) return null;
+    const index = profile.goals.findIndex((g) => {
+      const name = norm((g.type === "Other" ? g.customName : g.type) || "");
+      return Boolean(name) && (name === target || name.includes(target) || target.includes(name));
+    });
+    return index >= 0 ? { index, name: payload.goalName } : null;
+  }, [payload.goalName, profile]);
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(existing?.amount || payload.suggestedMonthlyAmount || 0);
@@ -45,8 +73,19 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   const [endDate, setEndDate] = useState(existing?.endDate || "");
   const [notes, setNotes] = useState(existing?.notes || "");
   const [commit, setCommit] = useState<string[]>([]);
+  const [linkToGoal, setLinkToGoal] = useState(true);
+  const [mode, setMode] = useState<"sip" | "lumpsum">(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
   const [submitted, setSubmitted] = useState(false);
+  // Live unit price → default purchase price (editable). priceTouched stops us
+  // from overwriting a price the user has typed.
+  const [livePrice, setLivePrice] = useState<number | null>(payload.livePrice ?? null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [purchasePrice, setPurchasePrice] = useState<number>(existing?.purchasePrice ?? payload.livePrice ?? 0);
+  const [priceTouched, setPriceTouched] = useState(false);
 
+  // Effective kind: a chosen lump sum behaves like a one-time contribution, a
+  // chosen SIP like a recurring fund. Non-investment actions keep their kind.
+  const kind: ActionKind = investable ? (mode === "lumpsum" ? "lump_sum" : "fund") : baseKind;
   const fields = useMemo(() => fieldsFor(kind), [kind]);
 
   useEffect(() => {
@@ -60,10 +99,33 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       setEndDate(existing?.endDate || "");
       setNotes(existing?.notes || "");
       setCommit([]);
+      setLinkToGoal(true);
+      setMode(existing?.cadence === "one_time" || baseKind === "lump_sum" ? "lumpsum" : "sip");
       setSubmitted(false);
+      setLivePrice(payload.livePrice ?? null);
+      setPurchasePrice(existing?.purchasePrice ?? payload.livePrice ?? 0);
+      setPriceTouched(false);
     }
     onOpenChange?.(open);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch a fresh live unit price when the dialog opens for an investment. Funds
+  // resolve by name when there's no ticker, so this runs even without one.
+  useEffect(() => {
+    if (!open || !investable) return;
+    let active = true;
+    setPriceLoading(true);
+    api.quoteUnitPrice(payload.ticker || "", assetClassFromCategory(payload.category), payload.quoteName || payload.instrumentName)
+      .then((res) => { if (active && res.price != null) setLivePrice(res.price); })
+      .catch(() => { /* keep any passed-in price */ })
+      .finally(() => { if (active) setPriceLoading(false); });
+    return () => { active = false; };
+  }, [open, investable, payload.ticker, payload.category, payload.quoteName, payload.instrumentName]);
+
+  // Default the purchase price to the live price until the user edits it.
+  useEffect(() => {
+    if (livePrice != null && !priceTouched && !purchasePrice) setPurchasePrice(livePrice);
+  }, [livePrice, priceTouched, purchasePrice]);
 
   function toggleCommit(value: string) {
     setCommit((current) => current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]);
@@ -82,7 +144,25 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
       endDate: fields.showEnd ? endDate : "",
       actionType: payload.actionLabel.toLowerCase().includes("watch") ? "watching" : "took_action",
       notes: composedNotes,
+      cadence: kind === "lump_sum" ? "one_time" : "monthly",
+      purchasePrice: fields.showAmount && purchasePrice > 0 ? purchasePrice : undefined,
+      livePrice: livePrice ?? undefined,
+      goalName: payload.goalName,
     });
+    // Auto-link the resulting holding to its goal (unless the user opted out).
+    // Holding id mirrors the backend's synthesized `action-{key}` so it resolves
+    // in the goal's linked holdings + the backend goal credit.
+    if (linkGoal && linkToGoal && fields.showAmount && amount > 0 && profile) {
+      const holdingId = `action-${payload.key}`;
+      const goals = [...(profile.goals || [])];
+      const target = goals[linkGoal.index];
+      if (target && !(target.linkedHoldingIds || []).includes(holdingId)) {
+        goals[linkGoal.index] = { ...target, linkedHoldingIds: [...(target.linkedHoldingIds || []), holdingId] };
+        const next = { ...profile, goals };
+        saveProfile(next, onboardingComplete);
+        api.saveOnboarding(next, token, { partial: true }).catch(() => null);
+      }
+    }
     setSubmitted(true);
   }
 
@@ -96,7 +176,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-h-[90vh] w-[min(620px,94vw)] overflow-y-auto p-0">
+      <DialogContent data-tour="takeaction-detail" className="max-h-[90vh] w-[min(620px,94vw)] overflow-y-auto p-0">
         <div className="border-b border-border px-6 py-5 pr-12">
           <div className="flex items-center gap-3">
             <InvestmentLogo name={payload.instrumentName} category={payload.category} ticker={payload.ticker} size="md" />
@@ -115,11 +195,16 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <p className="mt-1 text-sm text-muted-foreground">We&apos;ll track this in your plan and let you know if anything changes that affects this decision.</p>
             </div>
             {fields.showAmount ? (
-              <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                <Summary label={amountLabel(kind, true)} value={inr(amount)} />
-                <Summary label={fields.showStart ? "Start" : "Date"} value={formatDate(startDate)} />
-                <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} />
-              </div>
+              <>
+                <div className={cn("mt-4 grid gap-3 text-sm", kind === "lump_sum" ? "grid-cols-2" : "grid-cols-3")}>
+                  <Summary label={kind === "lump_sum" ? "Amount (one-time)" : amountLabel(kind, true)} value={inr(amount)} />
+                  <Summary label={kind === "lump_sum" ? "Date" : "Start"} value={formatDate(startDate)} />
+                  {kind !== "lump_sum" ? <Summary label="End" value={endDate ? formatDate(endDate) : "Open-ended"} /> : null}
+                </div>
+                {purchasePrice > 0 ? (
+                  <p className="mt-3 text-center text-[13px] text-muted-foreground">Recorded buy price <span className="font-semibold text-foreground">{formatUnitPrice(purchasePrice)}</span> / unit</p>
+                ) : null}
+              </>
             ) : kind === "habit" ? (
               <div className="mt-4 rounded-xl bg-surface-soft p-3 text-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Committed to</p>
@@ -137,7 +222,7 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {payload.expectedReturn ? (
                   <div className="rounded-xl border border-border bg-surface-soft p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expected Return</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Est. return</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">{payload.expectedReturn}</p>
                   </div>
                 ) : null}
@@ -151,6 +236,33 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
             ) : null}
 
             <div className="mt-5 space-y-4">
+              {investable ? (
+                <div>
+                  <Label className="text-sm font-medium text-foreground">How do you want to invest?</Label>
+                  <div className="mt-1.5 flex gap-1 rounded-lg border border-input bg-surface-soft p-1">
+                    <button
+                      type="button"
+                      onClick={() => setMode("sip")}
+                      aria-pressed={mode === "sip"}
+                      className={cn("flex-1 rounded-md px-3 py-2 text-sm font-semibold transition", mode === "sip" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      Monthly SIP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("lumpsum")}
+                      aria-pressed={mode === "lumpsum"}
+                      className={cn("flex-1 rounded-md px-3 py-2 text-sm font-semibold transition", mode === "lumpsum" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      One-time lump sum
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {mode === "lumpsum" ? "A single one-time investment — it won't reduce your monthly budget." : "A fixed amount invested automatically every month."}
+                  </p>
+                </div>
+              ) : null}
+
               {fields.showAmount ? (
                 <div>
                   <Label htmlFor="ta-amount" className="text-sm font-medium text-foreground">{amountLabel(kind)}</Label>
@@ -169,6 +281,31 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                   {payload.suggestedMonthlyAmount ? (
                     <p className="mt-1 text-xs text-muted-foreground">Suggested: {inr(payload.suggestedMonthlyAmount)}{kind === "lump_sum" ? " one-time" : "/month"}</p>
                   ) : null}
+                </div>
+              ) : null}
+
+              {fields.showAmount ? (
+                <div>
+                  <Label htmlFor="ta-price" className="text-sm font-medium text-foreground">Purchase price (per unit)</Label>
+                  <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-input bg-surface px-3">
+                    <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="ta-price"
+                      type="number"
+                      value={purchasePrice || ""}
+                      placeholder={livePrice != null ? String(livePrice) : "Market price"}
+                      onChange={(event) => { setPriceTouched(true); setPurchasePrice(Number(event.target.value || 0)); }}
+                      className="border-0 px-0 focus-visible:ring-0"
+                    />
+                    <span className="text-xs text-muted-foreground">/ unit</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {priceLoading
+                      ? "Fetching today's market price…"
+                      : livePrice != null
+                        ? <>Live price <span className="font-semibold text-foreground">{formatUnitPrice(livePrice)}</span> — pre-filled. Edit if your buy price differs.</>
+                        : "Live price unavailable — enter your purchase price if you know it."}
+                  </p>
                 </div>
               ) : null}
 
@@ -193,6 +330,21 @@ export function TakeActionDialog({ payload, trigger, autoOpen, onOpenChange }: {
                     </div>
                   ) : null}
                 </div>
+              ) : null}
+
+              {linkGoal && fields.showAmount ? (
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-surface-soft p-3">
+                  <input
+                    type="checkbox"
+                    checked={linkToGoal}
+                    onChange={(event) => setLinkToGoal(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-foreground">Add to my {linkGoal.name} goal</span>
+                    <span className="mt-0.5 block text-[13px] text-muted-foreground">Counts this investment toward {linkGoal.name}. Untick to leave it unlinked — you can link it to another goal later from that goal&apos;s &ldquo;Manage links&rdquo;.</span>
+                  </span>
+                </label>
               ) : null}
 
               {kind === "habit" || kind === "debt" ? (
@@ -359,6 +511,23 @@ function inferKind(payload: TakeActionPayload): ActionKind {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Map a card's friendly category to the pricing service's asset-class hint.
+function assetClassFromCategory(category: string): string {
+  const t = (category || "").toLowerCase();
+  if (t.includes("etf")) return "etf";
+  if (t.includes("crypto")) return "crypto";
+  if (t.includes("gold")) return "gold";
+  if (t.includes("silver")) return "silver";
+  if (t.includes("stock") || t.includes("equity") || t.includes("share")) return "stock";
+  if (t.includes("fund") || t.includes("mutual") || t.includes("index") || t.includes("sip")) return "mutualFund";
+  return "";
+}
+
+// Unit prices (NAV/LTP) can be fractional, so keep up to 2 decimals.
+function formatUnitPrice(value: number): string {
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value: string) {

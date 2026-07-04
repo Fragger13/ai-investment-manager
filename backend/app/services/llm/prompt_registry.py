@@ -98,6 +98,15 @@ def chat_prompt(message: str, context: dict[str, Any], fallback_answer: str) -> 
         "- If data is missing, say so plainly ('I don't know your wedding budget yet — tell me').\n"
         "- Never guarantee returns. Be real about uncertainty without sounding like a disclaimer.\n"
         "- Currency is INR. Use 'Rs' or '₹' with Indian number format.\n\n"
+        "CONVERSATION CONSISTENCY (critical — read the recent conversation first):\n"
+        "- Stay consistent with what you already told the user. NEVER reverse your stance between turns. "
+        "  If you just said they can buy something, do not now say they shouldn't — instead help them do it "
+        "  sensibly, or spell out the trade-off (e.g. 'spend it all on the phone and there's nothing left to "
+        "  invest that month — so split it, or buy outright and keep the SIP going').\n"
+        "- A follow-up belongs to the SAME thread. 'it', 'that', 'the phone', 'then' refer to what was just "
+        "  discussed — answer the actual question asked, don't restart on a new topic.\n"
+        "- If the user asks a 'what if I do X' question, answer the consequence of X honestly; don't lecture "
+        "  them out of a decision you already endorsed.\n\n"
         "EXAMPLES OF GOOD PAPA REPLIES (match the tone, don't copy):\n"
         "- 'Six months for a wedding is tight but doable. A simple Indian wedding lands "
         "  around Rs 8-15 lakhs. You would need to set aside about Rs 1.5L a month from somewhere — "
@@ -112,9 +121,11 @@ def chat_prompt(message: str, context: dict[str, Any], fallback_answer: str) -> 
         f"{_history_block(context.get('conversationHistory') or [])}"
         f"User just asked: \"{message}\"\n\n"
         f"Their financial context:\n{_json(compact)}\n\n"
-        f"Deterministic baseline (use as a factual reference, but rewrite in your own voice): {fallback_answer}\n\n"
+        f"Single-message draft (the numbers in it are reliable, but it was written WITHOUT seeing the "
+        f"conversation above — so borrow its figures and IGNORE its stance if that stance would contradict "
+        f"what you already told the user): {fallback_answer}\n\n"
         "Reply as Papa. Natural, varied, real. Under 4 sentences. "
-        "If this is a follow-up to something said earlier, build on it instead of restarting. "
+        "Build on the conversation above and never contradict your earlier advice. "
         "Return only the spoken reply — no preamble, no labels, no quotes."
     )
 
@@ -149,6 +160,13 @@ def recommendation_explanation_prompt(recommendation: dict[str, Any], cards: lis
         "contradictorySignals": recommendation.get("contradictorySignals", [])[:2],
         "risk": recommendation.get("risks") or recommendation.get("primaryRisk") or recommendation.get("whatCanGoWrong"),
         "validation": recommendation.get("validation"),
+        # Quant factor facts (funds) — already-computed numbers for the model to
+        # phrase. The safety rule forbids inventing any figures beyond these.
+        "fundFactors": _compact_fund_factors(recommendation.get("factorInsights", {})),
+        "factorDrivers": recommendation.get("factorDrivers", [])[:3],
+        "marketReasoning": recommendation.get("currentMarketReasoning"),
+        "goalFunding": _compact_goal_funding(recommendation.get("goalFunding", {})),
+        "communitySentiment": _compact_community((recommendation.get("sentimentSignal") or {}).get("community", {})),
         "fallbackCards": _compact_cards(cards),
     }
     return (
@@ -267,6 +285,38 @@ def _compact_rec(rec: dict[str, Any]) -> dict[str, Any]:
         "reason": rec.get("conciseReason") or rec.get("userSpecificReasoning"),
         "risk": rec.get("primaryRisk") or rec.get("whatCanGoWrong"),
         "portfolioImpact": rec.get("allocationImpact"),
+    }
+
+
+def _compact_fund_factors(insights: dict[str, Any]) -> dict[str, Any]:
+    """Only the headline factor numbers, for the LLM to phrase (never invent)."""
+    if not insights:
+        return {}
+    keys = ("sortino", "calmar", "maxDrawdown3y", "downCapture", "alpha", "volatility", "sortinoPercentile", "drawdownPercentile")
+    return {k: insights[k] for k in keys if insights.get(k) is not None}
+
+
+def _compact_goal_funding(funding: dict[str, Any]) -> dict[str, Any]:
+    if not funding:
+        return {}
+    return {
+        "fundingPercent": funding.get("fundingPercent"),
+        "requiredMonthly": funding.get("requiredMonthlyInvestment"),
+        "gap": funding.get("gap"),
+        "fix": funding.get("fix"),
+    }
+
+
+def _compact_community(community: dict[str, Any]) -> dict[str, Any]:
+    """Reddit community sentiment facts for the model to phrase (never invent).
+    Empty when the asset is not being discussed."""
+    if not community or not community.get("mentionCount"):
+        return {}
+    return {
+        "sentiment": community.get("sentiment"),
+        "mentions": community.get("mentionCount"),
+        "subreddits": community.get("subreddits", [])[:3],
+        "note": "social chatter, noisy and not advice",
     }
 
 
@@ -435,3 +485,72 @@ def _trim(value: Any, limit: int) -> str:
         return window[: sentence_end + 1].strip()
     words = window.split()
     return " ".join(words[:-1]).strip()
+
+
+def goal_estimate_prompt(
+    goal_type: str,
+    answers: dict[str, Any],
+    profile_ctx: dict[str, Any],
+    baseline: dict[str, Any],
+) -> str:
+    """Ask the model to refine a deterministic goal-cost baseline into a single
+    realistic India figure. The baseline is the anchor; the model nudges it using
+    the user's specifics and stays close to it."""
+    description = str((answers or {}).get("description") or "").strip()
+    payload = {
+        "goalType": goal_type,
+        "goalDescription": description or None,
+        "answers": answers,
+        "user": {
+            "city": profile_ctx.get("city"),
+            "occupation": profile_ctx.get("occupation"),
+            "monthlyIncome": profile_ctx.get("monthlyIncome"),
+        },
+        "baselineEstimate": {
+            "amount": baseline.get("amount"),
+            "low": baseline.get("low"),
+            "high": baseline.get("high"),
+        },
+    }
+    if description:
+        anchor = (
+            "'goalDescription' is exactly what the user is saving for. Estimate its realistic current cost in "
+            "India from your own knowledge, taking the clarifying answers into account. Some goals are small "
+            "(a gadget can be well under ₹1,00,000) and some are large — give the true figure, not a rounded-up "
+            "one. The baseline is only a rough hint, not a constraint; ignore it if it looks off. "
+        )
+    else:
+        anchor = (
+            "A baseline estimate has already been computed from Indian cost tables and goal inflation — treat it "
+            "as your anchor. Adjust the figure only if the user's specifics clearly warrant it, and keep it "
+            "realistic for India and close to the baseline (within roughly its low–high range). "
+        )
+    return (
+        "You are a practical Indian financial coach helping a first-time investor put a realistic number "
+        "on a money goal. " + anchor +
+        "All amounts are Indian rupees as whole numbers — no commas, no currency symbol, no text inside numbers.\n"
+        "Return ONLY a JSON object, nothing else, in exactly this shape:\n"
+        '{"amount": <int>, "low": <int>, "high": <int>, "rationale": "<one short plain-English sentence>"}\n\n'
+        f"Context:\n{json.dumps(payload, ensure_ascii=False, default=str)}"
+    )
+
+
+def goal_clarify_prompt(description: str, profile_ctx: dict[str, Any]) -> str:
+    """Given a free-form goal description, ask the model for ONE short clarifying
+    question (with concrete chip options) that most affects its cost in India.
+    One question keeps the onboarding round-trip fast."""
+    payload = {
+        "goalDescription": description,
+        "user": {"city": profile_ctx.get("city"), "occupation": profile_ctx.get("occupation")},
+    }
+    return (
+        "A first-time Indian investor wants to save up for the goal described below but isn't sure how much it costs. "
+        "Ask exactly ONE short clarifying question whose answer most changes the price in India (e.g. for 'Apple Watch': "
+        "which model; for 'a vacation': domestic or international). The question must have 2 to 4 concrete quick-reply "
+        "options. Do NOT ask the user how much it costs — that's the whole point, they don't know. "
+        "Keep the prompt under 12 words and option labels under 5 words. Use a short snake_case key.\n"
+        "Return ONLY a JSON object with exactly ONE question, nothing else, in this shape:\n"
+        '{"questions": [{"key": "<snake_case>", "prompt": "<question>", '
+        '"options": [{"value": "<short_code>", "label": "<short label>"}]}]}\n\n'
+        f"Context:\n{json.dumps(payload, ensure_ascii=False, default=str)}"
+    )

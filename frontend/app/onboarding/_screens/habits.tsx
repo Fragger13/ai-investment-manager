@@ -1,13 +1,15 @@
 "use client";
 
 import { OptionPill } from "../_components/choice-card";
+import { fieldError } from "../_lib/field-helpers";
 import { ScreenWrap } from "./about";
+import { AnsweredBadge, scrollToNextUnanswered, useScrollToFirstError } from "./risk";
 import { ScreenContext } from "../_flow/types";
 import { OnboardingProfile } from "@/types";
 
 type HabitField = keyof Pick<
   OnboardingProfile,
-  "spendingDiscipline" | "emotionalSpendingTendency" | "riskReaction" | "tracksExpenses" | "investsMonthly" | "investingBlocker"
+  "spendingDiscipline" | "emotionalSpendingTendency" | "tracksExpenses" | "investsMonthly" | "investingBlocker"
 >;
 
 type Option = { value: string; title: string; emoji: string };
@@ -46,16 +48,7 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
     options: [
       { value: "Rarely", title: "Rarely", emoji: "🌪️" },
       { value: "Sometimes", title: "Sometimes", emoji: "🌤️" },
-      { value: "Often", title: "Like clockwork", emoji: "📆" }
-    ]
-  },
-  {
-    field: "riskReaction",
-    question: "Markets fall 10% in one week. Your move?",
-    options: [
-      { value: "I stay calm", title: "Stay calm", emoji: "😌" },
-      { value: "I get worried", title: "Get worried", emoji: "😟" },
-      { value: "I may sell", title: "Might sell", emoji: "😰" }
+      { value: "Often", title: "Regularly", emoji: "📆" }
     ]
   },
   {
@@ -64,42 +57,57 @@ const HABIT_QUESTIONS: { field: HabitField; question: string; options: Option[] 
     options: [
       { value: "Nothing right now", title: "Nothing right now", emoji: "🌈" },
       { value: "Irregular income", title: "Irregular income", emoji: "📉" },
+      { value: "Fear of losses", title: "Fear of losses", emoji: "😨" },
       { value: "Unexpected expenses", title: "Surprise expenses", emoji: "🛠️" },
       { value: "I forget or delay", title: "I forget or delay", emoji: "🕒" },
-      { value: "Fear of losses", title: "Fear of losses", emoji: "😨" },
       { value: "Too many choices", title: "Too many choices", emoji: "🤯" }
     ]
   }
 ];
 
 export function HabitsScreen(ctx: ScreenContext) {
+  const { errors } = ctx.form.formState;
+  const erroredFields = HABIT_QUESTIONS
+    .map((q) => q.field)
+    .filter((field) => Boolean(fieldError(errors as Record<string, unknown>, field)));
+  useScrollToFirstError(erroredFields);
+  const answered = HABIT_QUESTIONS.filter((q) => Boolean(ctx.values[q.field])).length;
+  const selectAnswer = (field: HabitField, value: string) => {
+    ctx.form.setValue(field, value, { shouldValidate: true });
+    scrollToNextUnanswered(HABIT_QUESTIONS.map((q) => q.field), field, (f) => f === field ? value : String(ctx.values[f as HabitField] || ""));
+  };
   return (
     <ScreenWrap
       papa="Let's find out if you're Warren Buffett or 'Add to Cart' Buffett."
       headline="Your money habits"
       sub="Pick the option closest to how you usually act."
       mood="laugh"
+      badge={<AnsweredBadge answered={answered} total={HABIT_QUESTIONS.length} />}
     >
       <div className="grid min-h-0 flex-1 gap-x-10 gap-y-5 lg:grid-cols-2">
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {HABIT_QUESTIONS.slice(0, 3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              error={erroredFields.includes(q.field)}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
         </div>
-        <div className="flex flex-col gap-[calc(1.5rem+0.7cm)]">
+        <div className="flex flex-col gap-12">
           {HABIT_QUESTIONS.slice(3).map((q) => (
             <QuestionRow
               key={q.field}
+              field={q.field}
               question={q.question}
               options={q.options}
               value={ctx.values[q.field] as string | undefined}
-              onSelect={(value) => ctx.form.setValue(q.field, value, { shouldValidate: true })}
+              error={erroredFields.includes(q.field)}
+              onSelect={(value) => selectAnswer(q.field, value)}
             />
           ))}
         </div>
@@ -109,19 +117,25 @@ export function HabitsScreen(ctx: ScreenContext) {
 }
 
 function QuestionRow({
+  field,
   question,
   options,
   value,
+  error = false,
   onSelect
 }: {
+  field: string;
   question: string;
   options: Option[];
   value?: string;
+  error?: boolean;
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2.5">
-      <p className="text-base font-medium text-[#0F172A]">{question}<span className="ml-1 text-red-500" aria-hidden>*</span></p>
+    <div id={`question-${field}`} className={`space-y-2.5 rounded-xl transition ${error ? "-m-2 bg-red-50/60 p-2 ring-1 ring-red-300" : ""}`}>
+      <p className={`text-base font-medium ${error ? "text-red-600" : "text-[#0F172A]"}`}>
+        {question}<span className="ml-1 text-red-500" aria-hidden>*</span>
+      </p>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
           <OptionPill
@@ -133,6 +147,7 @@ function QuestionRow({
           />
         ))}
       </div>
+      {error ? <p className="text-[13px] font-medium text-red-600">Pick one to continue</p> : null}
     </div>
   );
 }

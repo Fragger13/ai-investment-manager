@@ -1,5 +1,38 @@
 import { DashboardData, EmiLoan, Holding, HoldingAssetClass, Investment, OnboardingProfile } from "@/types";
 
+// IST wall-clock month (YYYY-MM), matching the backend's stamp in
+// save_onboarding / intelligence.current_ist_month. Used to decide whether the
+// "invest this month" override still applies to the current month.
+export function currentBudgetMonth(): string {
+  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 7);
+}
+
+export function monthlyCommitments(profile?: OnboardingProfile | null): number {
+  if (!profile) return 0;
+  // Keep in lockstep with backend intelligence.monthly_commitments():
+  // rent + everyday expenses + subscriptions (legacy field) + EMIs.
+  return Number(profile.rent || 0) + Number(profile.monthlyExpenses || 0) + Number(profile.subscriptions || 0) + totalMonthlyEmi(profile.emiLoans, profile.emi);
+}
+
+// The single source of truth for "what can I invest this month". Respects the
+// user's explicit per-month override (investableThisMonth) when it applies to
+// the current IST budget month; otherwise falls back to income − commitments.
+// Used by the dashboard hero, the Plan (to size every action to this budget),
+// and the Portfolio "available to invest" — so all three always agree.
+export function availableToInvest(profile?: OnboardingProfile | null, monthlyIncome?: number, committedMonthly = 0): number {
+  if (!profile) return 0;
+  const overrideActive = Number(profile.investableThisMonth || 0) > 0 && profile.investableThisMonthMonth === currentBudgetMonth();
+  const base = overrideActive
+    ? Number(profile.investableThisMonth || 0)
+    : Math.max(
+        (monthlyIncome ?? (Number(profile.monthlyCashInflow || 0) || Number(profile.monthlySalary || 0) + Number(profile.otherIncome || 0)))
+          - monthlyCommitments(profile),
+        0,
+      );
+  // Money already committed to taken actions is no longer "available" this month.
+  return Math.max(base - Math.max(committedMonthly, 0), 0);
+}
+
 export const blankProfile: OnboardingProfile = {
   name: "",
   dateOfBirth: "",
@@ -13,6 +46,9 @@ export const blankProfile: OnboardingProfile = {
   otherIncome: 0,
   monthlyCashInflow: 0,
   incomeStructureVersion: 2,
+  investableThisMonth: 0,
+  investableThisMonthMonth: "",
+  salaryDay: "",
   rent: 0,
   emi: 0,
   loans: 0,
@@ -26,6 +62,7 @@ export const blankProfile: OnboardingProfile = {
   cryptoValue: 0,
   goldValue: 0,
   epfPpfValue: 0,
+  epfPpfMonthly: 0,
   realEstateValue: 0,
   cashBalance: 0,
   additionalInvestments: [],
@@ -68,7 +105,6 @@ export const blankProfile: OnboardingProfile = {
   spendingDiscipline: "",
   emotionalSpendingTendency: "",
   investmentPsychology: "",
-  riskReaction: "",
   tracksExpenses: "",
   investsMonthly: "",
   panicSellRisk: "",
@@ -244,7 +280,6 @@ function legacyEmiLoan(monthlyEmiAmount: number, principalAmount = 0): EmiLoan {
 export const behavioralProfileFields: (keyof OnboardingProfile)[] = [
   "spendingDiscipline",
   "emotionalSpendingTendency",
-  "riskReaction",
   "tracksExpenses",
   "investsMonthly",
   "investmentPsychology",
@@ -275,7 +310,6 @@ export function profileCompletionPercent(profile?: OnboardingProfile | null): nu
     Number(profile.retirementAge || 0) > 0,
     Boolean(profile.spendingDiscipline),
     Boolean(profile.emotionalSpendingTendency),
-    Boolean(profile.riskReaction),
     Boolean(profile.tracksExpenses),
     Boolean(profile.investsMonthly),
     Boolean(profile.investingBlocker),

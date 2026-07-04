@@ -17,7 +17,7 @@ from app.models.recommendation_reassessment_log import RecommendationReassessmen
 from app.models.recommendation_version import RecommendationVersion
 from app.models.user_action_event import UserActionEvent
 from app.schemas.financial import OnboardingProfile
-from app.services.intelligence import calculated_goal_target, monthly_income, months_until, net_worth, now_iso, profile_to_dict, total_emi_payments
+from app.services.intelligence import calculated_goal_target, computed_monthly_surplus, monthly_income, months_until, net_worth, now_iso, profile_to_dict, total_emi_payments
 from app.services.market.signal_intelligence_service import latest_market_regime
 from app.services.optimization.portfolio_optimizer import latest_optimization, optimize_portfolio
 
@@ -202,11 +202,12 @@ def recommendation_versions(db: Session, recommendation_key_value: str | None = 
     return [_version_payload(row) for row in rows]
 
 
-def record_user_action(db: Session, action: dict) -> dict:
+def record_user_action(db: Session, action: dict, user_id: int | None = None) -> dict:
     key = action.get("recommendationKey") or action.get("entityId") or ""
     name = action.get("instrumentName") or action.get("entityName") or ""
     action_type = action.get("actionType", "viewed")
     row = UserActionEvent(
+        user_id=user_id,
         action_type=action_type,
         entity_type=action.get("entityType", "recommendation"),
         entity_id=key,
@@ -268,11 +269,19 @@ def adaptive_summary(db: Session) -> dict:
     alerts = db.query(DriftAlert).filter(DriftAlert.status == "open").count()
     latest_event = db.query(FinancialMemoryEvent).order_by(FinancialMemoryEvent.id.desc()).first()
     latest_reassessment = db.query(RecommendationReassessmentLog).order_by(RecommendationReassessmentLog.id.desc()).first()
-    ignored_crypto = (
+    # entity_name is encrypted at rest, so the match runs in Python after the
+    # ORM decrypts it rather than as a SQL ilike.
+    rejected_actions = (
         db.query(UserActionEvent)
         .filter(UserActionEvent.action_type.in_(["rejected", "ignored", "dismissed"]))
-        .filter(UserActionEvent.entity_name.ilike("%bitcoin%") | UserActionEvent.entity_name.ilike("%ethereum%") | UserActionEvent.entity_name.ilike("%crypto%"))
-        .count()
+        .order_by(UserActionEvent.id.desc())
+        .limit(500)
+        .all()
+    )
+    ignored_crypto = sum(
+        1
+        for action in rejected_actions
+        if any(term in (action.entity_name or "").lower() for term in ("bitcoin", "ethereum", "crypto"))
     )
     return {
         "memoryEventCount": db.query(FinancialMemoryEvent).count(),
@@ -311,7 +320,7 @@ def goal_drift(db: Session, profile: OnboardingProfile) -> dict:
     goals = _goal_rows(profile)
     previous = db.query(GoalSnapshot).order_by(GoalSnapshot.id.desc()).offset(1).first()
     previous_goals = {goal.get("name"): goal for goal in _loads(previous.goals_json) if goal.get("name")} if previous else {}
-    surplus = max(monthly_income(profile) - profile.monthlyExpenses - total_emi_payments(profile), 0)
+    surplus = computed_monthly_surplus(profile)
     alerts = []
     for goal in goals:
         required = goal["fundingGap"] / max(goal["monthsLeft"], 1)
@@ -498,7 +507,7 @@ def _goal_rows(profile: OnboardingProfile) -> list[dict]:
 def _behavior_payload(profile: OnboardingProfile) -> dict:
     income = max(monthly_income(profile), 1)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = computed_monthly_surplus(profile)
     savings_rate = round(surplus / income * 100)
     emi_burden = round(emi_total / income * 100)
     risk_text = " ".join([profile.riskReaction, profile.panicSellRisk, profile.opportunityPreference, profile.shortTermVolatilityComfort]).lower()
@@ -531,13 +540,15 @@ def _behavior_payload(profile: OnboardingProfile) -> dict:
 
 def _save_drift_alerts(db: Session, alerts: list[dict]) -> None:
     for alert in alerts:
-        existing = (
+        # title is encrypted at rest, so the dedup match runs on the decrypted
+        # values in Python instead of a SQL equality that ciphertext never hits.
+        open_alerts = (
             db.query(DriftAlert)
             .filter(DriftAlert.drift_type == alert["driftType"])
-            .filter(DriftAlert.title == alert["title"])
             .filter(DriftAlert.status == "open")
-            .first()
+            .all()
         )
+        existing = next((row for row in open_alerts if row.title == alert["title"]), None)
         if existing:
             existing.summary = alert["summary"]
             existing.current_value = str(alert.get("currentValue", ""))

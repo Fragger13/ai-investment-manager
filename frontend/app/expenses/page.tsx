@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { emptyDashboard } from "@/lib/profile";
 import { inr } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth-store";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { DashboardData } from "@/types";
 
 export default function ExpensesPage() {
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
   const [data, setData] = useState<DashboardData>(emptyDashboard);
 
   useEffect(() => {

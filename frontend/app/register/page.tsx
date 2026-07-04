@@ -17,7 +17,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const registerUser = useAuthStore((state) => state.register);
   const [error, setError] = useState("");
-  const { register, handleSubmit } = useForm<FormValues>({ defaultValues: { name: "", email: "", password: "" } });
+  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ defaultValues: { name: "", email: "", password: "" } });
 
   async function onSubmit(values: FormValues) {
     setError("");
@@ -58,7 +58,8 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label>Password</Label>
-              <Input type="password" placeholder="Create a password" {...register("password", { required: true })} />
+              <Input type="password" placeholder="Create a password (8+ characters)" {...register("password", { required: true, minLength: 8 })} />
+              {errors.password ? <p className="text-sm text-negative-foreground">Use at least 8 characters.</p> : null}
             </div>
             {error ? <p className="text-sm text-negative-foreground">{error}</p> : null}
             <Button className="w-full" type="submit">Get Started</Button>

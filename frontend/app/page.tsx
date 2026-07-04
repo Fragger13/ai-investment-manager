@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { ArrowRight, ChartPie, Lightbulb, Play, Plus, Sprout, Target, TrendingUp } from "lucide-react";
-import { caveat, inter, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
+import { ArrowRight, ChartPie, Lightbulb, Plus, Sprout, Target, TrendingUp } from "lucide-react";
+import { caveat, sans, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
+import { OurStoryButton } from "@/components/our-story-button";
 
 const script: React.CSSProperties = { fontFamily: SCRIPT_FAMILY };
 
 export default function LandingPage() {
   return (
     <main
-      className={`${inter.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
-      style={{ fontFamily: "var(--font-inter)" }}
+      className={`${sans.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div className="w-full px-6 py-6 sm:px-10 lg:px-16 lg:py-8 xl:px-20">
         <Header />
@@ -32,18 +33,10 @@ function Header() {
       </Link>
 
       <div className="flex items-center gap-3">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-5 py-2.5 text-sm font-semibold text-[#0F172A] shadow-md ring-1 ring-black/[0.04] transition hover:bg-[#FAFAFA] hover:shadow-lg"
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#138A3C] text-[#138A3C]">
-            <Play className="h-3 w-3 fill-current" />
-          </span>
-          Explore Demo
-        </Link>
+        <OurStoryButton />
         <Link
           href="/register"
-          className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg"
+          className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-bold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg"
         >
           Get Started <ArrowRight className="h-4 w-4" />
         </Link>
@@ -65,7 +58,7 @@ function Hero() {
           </span>
         </span>
 
-        <h1 className="mt-6 text-[64px] font-bold leading-[1.04] tracking-tight md:text-[76px]">
+        <h1 className="mt-6 text-[64px] font-extrabold leading-[1.04] tracking-tight md:text-[76px]">
           Financial advice
           <br />
           you can trust,
@@ -81,7 +74,7 @@ function Hero() {
           <HeartFlourish className="absolute -right-16 top-2 h-16 w-16 text-[#138A3C]" />
         </div>
 
-        <p className="mt-7 max-w-md text-base leading-7 text-[#4B5563]">
+        <p className="mt-7 max-w-md text-base font-medium leading-7 text-[#1F2937]">
           Share your financial details, plan your goals, and get personalized advice from your AI Coach — just like Papa would
           give.
         </p>
@@ -89,7 +82,7 @@ function Hero() {
         <div className="mt-8 flex flex-wrap items-center gap-6">
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-7 py-3.5 text-base font-semibold text-white shadow transition hover:bg-[#107132]"
+            className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-8 py-4 text-base font-bold text-white shadow-lg ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-xl"
           >
             <Plus className="h-5 w-5" /> Add Goal
           </Link>
@@ -152,7 +145,7 @@ function FloatingPill({
         </span>
         <div>
           <p className="text-sm font-bold text-[#0F172A]">{title}</p>
-          <p className="mt-1 text-xs leading-5 text-[#4B5563]">{children}</p>
+          <p className="mt-1 text-xs font-medium leading-5 text-[#1F2937]">{children}</p>
         </div>
       </div>
     </div>
@@ -169,7 +162,7 @@ function QuoteBar() {
           &ldquo;
         </span>
         <div>
-          <p className="text-[30px] leading-[1.2]" style={{ ...script, color: "#0F172A" }}>
+          <p className="text-[30px] leading-[1.2]" style={{ ...script, color: "#0F172A", fontWeight: 600 }}>
             Paise ki value samajh kar chaloge, to zindagi aaram se nikaloge.
             <span className="ml-1 text-4xl leading-none text-[#138A3C] align-bottom" aria-hidden>
               &rdquo;
@@ -266,8 +259,8 @@ function Features() {
           >
             <feature.Icon className={feature.Icon === PapaAvatarIcon ? "h-12 w-12 object-cover" : "h-5 w-5 text-[#138A3C]"} />
           </div>
-          <h3 className="mt-4 text-base font-bold text-[#0F172A]">{feature.title}</h3>
-          <p className="mt-1.5 flex-1 text-sm leading-6 text-[#4B5563]">{feature.text}</p>
+          <h3 className="mt-4 text-lg font-bold text-[#0F172A]">{feature.title}</h3>
+          <p className="mt-1.5 flex-1 text-sm font-medium leading-6 text-[#1F2937]">{feature.text}</p>
           <Link href={feature.href} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#138A3C] hover:underline">
             {feature.cta} <ArrowRight className="h-3.5 w-3.5" />
           </Link>

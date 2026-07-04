@@ -1,0 +1,8 @@
+# AskPapa API — Caddy config (template; deploy/setup-ec2.sh substitutes
+# __API_DOMAIN__ and installs it to /etc/caddy/Caddyfile).
+# Caddy auto-provisions and renews the Let's Encrypt certificate — no SSL
+# certificate to buy or manage.
+__API_DOMAIN__ {
+	reverse_proxy 127.0.0.1:8000
+	encode gzip
+}

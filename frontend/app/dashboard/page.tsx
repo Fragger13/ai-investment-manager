@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, CalendarRange, CheckCircle2, ChevronRight, CircleAlert, CreditCard, Home, Pencil, PiggyBank, Receipt, Repeat, Sprout, Sparkles, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AppShell } from "@/components/app-shell";
@@ -10,22 +11,33 @@ import { InvestmentLogo } from "@/components/investment-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { PapaBubble, type PapaMood } from "@/app/onboarding/_components/papa-bubble";
-import { emptyDashboard, isOnboardingComplete, profileCompletionPercent, totalMonthlyEmi } from "@/lib/profile";
-import { inr } from "@/lib/utils";
+import { availableToInvest, currentBudgetMonth, emptyDashboard, isOnboardingComplete, monthlyCommitments, profileCompletionPercent } from "@/lib/profile";
+import { ActionItem, amountLabel, buildPlan, mergeIntoActionItems, purposeTag } from "@/lib/plan";
+import { cn, inr, inrShort } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
-import { DashboardData, OnboardingProfile } from "@/types";
+import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { AdvancedRecommendation, DashboardData, OnboardingProfile } from "@/types";
 
 export default function DashboardPage() {
   const profile = useAuthStore((state) => state.profile);
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const token = useAuthStore((state) => state.token);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const [data, setData] = useState<DashboardData>(emptyDashboard);
+  const [advRecs, setAdvRecs] = useState<AdvancedRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
 
   useEffect(() => {
+    // Wait for the persisted session to rehydrate before treating a null
+    // profile as "no session". Firing early raced rehydration with token=null,
+    // fetched whatever profile the backend saved last (possibly another
+    // user's) and persisted it into THIS user's session.
+    if (!hasHydrated) return;
     async function load() {
       setLoading(true);
       let activeProfile: OnboardingProfile | null = profile;
@@ -36,16 +48,45 @@ export default function DashboardPage() {
       }
       setData(activeProfile ? await api.dashboard(activeProfile) : emptyDashboard);
       setLoading(false);
+      // Pull the same advanced recommendations the Plan page uses so the home
+      // "next moves" stay in sync. Non-blocking: cached and fast, but never
+      // holds up the rest of the dashboard.
+      if (activeProfile) {
+        api.generateAdvancedRecommendations(activeProfile, false)
+          .then((res) => setAdvRecs(res.recommendations || []))
+          .catch(() => setAdvRecs([]));
+      }
     }
     load();
-  }, [profile, saveProfile, token]);
+  }, [hasHydrated, profile, saveProfile, token]);
 
   const needsProfile = !profile && !data.summary.monthlyIncome;
-  const commitments = (profile?.rent || 0) + (profile?.subscriptions || 0) + totalMonthlyEmi(profile?.emiLoans, profile?.emi);
-  const available = Math.max(data.summary.monthlyIncome - data.summary.monthlyExpenses - commitments, data.summary.investableSurplus, 0);
+  // Total monthly outflow (rent + everyday expenses + EMIs) and what's left to
+  // invest this month — shared helpers so the dashboard, Plan and Portfolio all
+  // agree on the same "available this month" figure.
+  const commitments = monthlyCommitments(profile);
+  // Only recurring (SIP) commitments reduce what's available *each month*; a
+  // one-time lump sum is paid once and doesn't shrink the monthly surplus.
+  const committedMonthly = useMemo(
+    () => actionsTaken.filter((a) => a.cadence !== "one_time").reduce((sum, a) => sum + (a.amount || 0), 0),
+    [actionsTaken]
+  );
+  const available = availableToInvest(profile, data.summary.monthlyIncome, committedMonthly);
   const userHasGoals = (profile?.goals?.length || 0) > 0;
   const topGoals = userHasGoals ? data.goals.slice(0, 3) : [];
-  const topActions = data.recommendations.slice(0, 3);
+  // Same merge + ranking + budget calibration the Plan page runs, so the home
+  // "next moves" are identical to the plan's "Do first" tab — same items AND the
+  // same budget-sized amounts.
+  const takenKeys = useMemo(() => new Set(actionsTaken.map((entry) => entry.key)), [actionsTaken]);
+  // Use the SAME stable-membership plan the Plan page renders (keepTaken=true) so
+  // the home "Do this first" preview matches it exactly: completing one item does
+  // NOT pull a 4th into view. We show only the still-pending members here.
+  const planMustDo = useMemo(
+    () => buildPlan(mergeIntoActionItems(advRecs, data), takenKeys, available, true)["Must Do"],
+    [advRecs, data, takenKeys, available]
+  );
+  const topActions = useMemo(() => planMustDo.filter((item) => !takenKeys.has(item.key)), [planMustDo, takenKeys]);
+  const planDoneCount = useMemo(() => planMustDo.filter((item) => takenKeys.has(item.key)).length, [planMustDo, takenKeys]);
   const status = healthStatus(data.health.score);
   const insight = monthlyInsight(data, commitments);
   const completionPercent = profileCompletionPercent(profile);
@@ -54,7 +95,7 @@ export default function DashboardPage() {
     <AppShell sidebarExtra={completionPercent < 100 ? <ProfileCompletionCard percent={completionPercent} /> : null}>
       <section className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">
             {greeting(profile?.name)} <span aria-hidden="true">👋</span>
           </h1>
           <p className="mt-2 text-base text-muted-foreground">{dashboardSubtitle(data.health.score)}</p>
@@ -81,11 +122,19 @@ export default function DashboardPage() {
       {!needsProfile ? (
         <div className="space-y-6">
           <div className="grid gap-5 xl:grid-cols-[.82fr_1.18fr]">
-            <Card className="overflow-hidden">
+            <Card className="relative overflow-hidden" data-tour="available">
               <CardContent className="p-6">
-                <p className="text-sm text-muted-foreground">Expected available this month</p>
-                <p className="mt-2 text-5xl font-semibold tracking-tight text-positive-foreground md:text-6xl">{inr(available)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Can be invested or saved.</p>
+                <div className="absolute right-4 top-4 z-10">
+                  <EditAvailableDialog />
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available to invest this month</p>
+                    <p className="mt-2 text-5xl font-extrabold tracking-tight text-positive-foreground md:text-6xl tnum">{inrShort(available)}</p>
+                    <p className="mt-2 text-[15px] text-muted-foreground">Can be invested or saved.</p>
+                  </div>
+                  <MoneyJar className="-mt-1 hidden shrink-0 -translate-x-[1.5cm] sm:block" />
+                </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button asChild className="rounded-full"><Link href="/chat">What should I do with it? <Sparkles className="h-4 w-4" /></Link></Button>
                   <Button variant="outline" asChild className="rounded-full"><Link href="/recommendations">View my plan <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -93,20 +142,20 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-tour="health">
               <CardContent className="grid gap-6 p-7 lg:grid-cols-[.85fr_1fr] lg:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-foreground">Financial Health</p>
+                    <p className="ap-eyebrow">Financial health</p>
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </div>
-                  <div className="mt-4 flex items-end gap-2">
-                    <span className="text-5xl font-semibold text-foreground">{data.health.score}</span>
-                    <span className="pb-2 text-lg text-muted-foreground">/ 100</span>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="text-5xl font-extrabold leading-none tracking-tight text-foreground tnum">{data.health.score}</span>
+                    <span className="pb-1.5 text-lg font-semibold text-muted-foreground">/ 100</span>
                   </div>
                   <div className="mt-4 space-y-3">
                     {healthBullets(data, commitments).map((item) => (
-                      <div key={item.text} className="flex items-center gap-2 text-sm text-foreground/85">
+                      <div key={item.text} className="flex items-center gap-2 text-sm font-medium text-foreground">
                         {item.good ? <CheckCircle2 className="h-4 w-4 text-positive-foreground" /> : <CircleAlert className="h-4 w-4 text-warning-foreground" />}
                         {item.text}
                       </div>
@@ -124,20 +173,20 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <section>
-            <h2 className="mb-3 text-lg font-semibold text-foreground">Money Snapshot</h2>
+          <section data-tour="dash-snapshot">
+            <h2 className="ap-section mb-3">Money snapshot</h2>
             <div className="grid gap-4 md:grid-cols-3">
-              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly Income" value={inr(data.summary.monthlyIncome)} detail="Coming in monthly" />
+              <SnapshotCard icon={WalletCards} accent="emerald" label="Monthly income" value={inrShort(data.summary.monthlyIncome)} detail="Coming in monthly" />
               <CommitmentsCard total={commitments} profile={profile} />
-              <SnapshotCard icon={PiggyBank} accent="blue" label="Available To Save" value={inr(available)} detail="Can be invested or saved" />
+              <NetWorthCard value={inrShort(data.summary.netWorth)} />
             </div>
           </section>
 
           <div className="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>Your Goals</CardTitle>
-                <Link href="/goals" className="text-sm font-medium text-primary">View all goals <ArrowRight className="inline h-4 w-4" /></Link>
+                <CardTitle>Your goals</CardTitle>
+                <Link href="/goals" className="text-sm font-bold text-primary hover:underline">View all goals <ArrowRight className="inline h-4 w-4" /></Link>
               </CardHeader>
               <CardContent className="space-y-5">
                 {topGoals.map((goal) => <GoalPreview key={goal.id} goal={goal} />)}
@@ -150,28 +199,22 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : null}
+                {topGoals.length ? <DashboardNudge tone="green" emoji="🎯">Keep going! Small steps today, big freedom tomorrow.</DashboardNudge> : null}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Top 3 Actions This Month</CardTitle>
+            <Card data-tour="dash-actions">
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Do this first</CardTitle>
+                <Link href="/recommendations" className="text-sm font-bold text-primary hover:underline">Full plan <ArrowRight className="inline h-4 w-4" /></Link>
               </CardHeader>
               <CardContent className="space-y-3">
-                {topActions.map((action) => {
-                  const title = simpleActionTitle(action.strategyType, action.assetClass);
-                  return (
-                    <Link key={action.id} href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
-                      <InvestmentLogo name={title} category={action.assetClass} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium text-foreground">{title}</span>
-                        <span className="mt-1 line-clamp-1 block text-sm text-muted-foreground">{action.reasoning}</span>
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </Link>
-                  );
-                })}
-                {!topActions.length ? <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p> : null}
+                {topActions.map((action) => <DashboardActionRow key={action.key} action={action} />)}
+                {!topActions.length ? (
+                  planDoneCount > 0
+                    ? <p className="text-sm text-muted-foreground">All your top steps are done — nice work! 🎉 Open the full plan for what&apos;s next.</p>
+                    : <p className="text-sm text-muted-foreground">Refresh your plan after completing your profile to see your next steps.</p>
+                ) : null}
               </CardContent>
             </Card>
           </div>
@@ -181,8 +224,8 @@ export default function DashboardPage() {
               <div className="flex items-start gap-3">
                 <ColorfulIcon icon={Sparkles} accent="emerald" label="Insight for you" />
                 <div>
-                  <p className="font-semibold text-foreground">Insight for you</p>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{insight}</p>
+                  <p className="font-bold text-foreground">Insight for you</p>
+                  <p className="mt-1 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">{insight}</p>
                 </div>
               </div>
               <Button variant="outline" asChild><Link href="/chat">Explore how <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -194,18 +237,146 @@ export default function DashboardPage() {
   );
 }
 
-function SnapshotCard({ icon, accent, label, value, detail }: { icon: typeof WalletCards; accent: "emerald" | "violet" | "blue"; label: string; value: string; detail: string }) {
+function SnapshotCard({ icon, accent, label, value, detail, highlight }: { icon: typeof WalletCards; accent: "emerald" | "violet" | "blue"; label: string; value: string; detail: string; highlight?: boolean }) {
   return (
-    <Card>
+    <Card className={cn(highlight && "border-2 border-primary/35 bg-primary/[0.06] shadow-pop")}>
       <CardContent className="flex items-center gap-5 p-5">
         <ColorfulIcon icon={icon} accent={accent} label={label} size="lg" />
         <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+          <p className="ap-label flex items-center gap-1.5">
+            {label}
+            {highlight ? <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Total</span> : null}
+          </p>
+          <p className={cn("mt-1 text-2xl font-bold tracking-tight tnum", highlight ? "text-primary" : "text-foreground")}>{value}</p>
+          <p className="ap-help mt-1">{detail}</p>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DashboardActionRow({ action }: { action: ActionItem }) {
+  return (
+    <Link href="/recommendations" className="flex items-center gap-4 rounded-2xl border border-border bg-surface-soft p-4 transition hover:bg-surface-hover">
+      <InvestmentLogo name={action.title} extraHint={action.instrumentName} category={action.category} ticker={action.ticker} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-1 block text-[15px] font-bold text-foreground">{action.title}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px]">
+          <span className="font-bold text-primary tnum">{amountLabel(action)}</span>
+          <span className="text-muted-foreground">· 🎯 {purposeTag(action)}</span>
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
+function MoneyJar({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/money-jar.png"
+      alt="Savings jar with coins and a sprout"
+      width={220}
+      height={417}
+      className={cn("h-[8.4rem] w-auto select-none", className)}
+      priority
+    />
+  );
+}
+
+function EditAvailableDialog() {
+  const profile = useAuthStore((state) => state.profile);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  const token = useAuthStore((state) => state.token);
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setAmount(availableToInvest(profile));
+  }, [open, profile]);
+
+  if (!profile) return null;
+
+  async function save() {
+    if (!profile) return;
+    setSaving(true);
+    const next = { ...profile, investableThisMonth: Math.max(0, Math.round(amount)), investableThisMonthMonth: currentBudgetMonth() };
+    saveProfile(next, onboardingComplete);
+    try {
+      await api.saveOnboarding(next, token, { partial: true });
+    } catch {
+      /* local update already applied; ignore network error */
+    }
+    setSaving(false);
+    setOpen(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" aria-label="Edit available this month" title="Edit available this month" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover hover:text-primary">
+          <Pencil className="h-4 w-4" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="w-[min(440px,94vw)] p-0">
+        <div className="border-b border-border px-6 py-5 pr-12">
+          <DialogTitle className="text-lg font-semibold text-foreground">Available to invest this month</DialogTitle>
+          <DialogDescription className="mt-0.5 text-[13px] text-muted-foreground">Set what you can actually invest this month — your plan resizes to fit it.</DialogDescription>
+        </div>
+        <div className="p-6">
+          <label htmlFor="edit-available" className="text-sm font-semibold text-foreground">Amount this month</label>
+          <div className="mt-1.5 flex items-center gap-2 rounded-xl border-2 border-input bg-surface px-3">
+            <span className="text-base font-semibold text-muted-foreground">₹</span>
+            <Input
+              id="edit-available"
+              type="number"
+              min={0}
+              value={amount || ""}
+              onChange={(event) => setAmount(Number(event.target.value || 0))}
+              className="border-0 px-0 text-lg focus-visible:ring-0"
+              autoFocus
+            />
+            <span className="text-xs text-muted-foreground">/ month</span>
+          </div>
+          <p className="mt-2 text-[13px] text-muted-foreground">This is your income left after rent, EMIs and expenses. Even ₹500 counts — start where you are.</p>
+          <div className="mt-5 flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="flex-1" onClick={save} disabled={saving || amount <= 0}>{saving ? "Saving…" : "Save"}</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NetWorthCard({ value }: { value: string }) {
+  return (
+    <div className="relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[hsl(157_82%_32%)] via-[hsl(162_74%_34%)] to-[hsl(170_70%_36%)] p-5 text-white shadow-pop">
+      <div aria-hidden className="pointer-events-none absolute -right-7 -top-9 h-28 w-28 rounded-full bg-white/10" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-10 right-6 h-24 w-24 rounded-full bg-white/[0.07]" />
+      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30">
+        <PiggyBank className="h-6 w-6 text-white" />
+      </span>
+      <div className="relative min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+          Net worth
+          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Total</span>
+        </p>
+        <p className="mt-1 truncate text-3xl font-extrabold tracking-tight text-white tnum">{value}</p>
+        <p className="mt-0.5 text-sm font-medium text-white/90">Everything you own today</p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardNudge({ tone, emoji, children }: { tone: "green" | "sun"; emoji: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("flex items-center gap-3 rounded-2xl border p-3.5", tone === "green" ? "border-positive/20 bg-positive-soft" : "border-sun/30 bg-sun-soft")}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm" aria-hidden>{emoji}</span>
+      <p className="text-sm font-medium text-foreground">{children}</p>
+    </div>
   );
 }
 
@@ -217,7 +388,7 @@ function GoalPreview({ goal }: { goal: DashboardData["goals"][number] }) {
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-foreground">{goal.name}</p>
-          <p className="text-sm text-muted-foreground">{inr(goal.currentProgress)} / {inr(goal.targetAmount)}</p>
+          <p className="text-sm text-muted-foreground">{inrShort(goal.currentProgress)} / {inrShort(goal.targetAmount)}</p>
         </div>
         <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On Track" : "Off Track"}</Badge>
       </div>
@@ -225,7 +396,7 @@ function GoalPreview({ goal }: { goal: DashboardData["goals"][number] }) {
         <Progress value={progress} className="flex-1" />
         <span className="text-sm font-medium text-foreground">{Math.round(progress)}%</span>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">{onTrack ? "On track to achieve this goal." : `Need ${inr(goal.requiredMonthlyInvestment)}/month.`}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{onTrack ? "On track to achieve this goal." : `Need ${inrShort(goal.requiredMonthlyInvestment)}/month.`}</p>
     </div>
   );
 }
@@ -276,7 +447,7 @@ function healthBullets(data: DashboardData, commitments: number) {
 
 function monthlyInsight(data: DashboardData, commitments: number) {
   if (commitments > data.summary.monthlyIncome * 0.35) {
-    return `You spend ${inr(commitments)} on fixed commitments. Reducing this can quickly increase what you can save or invest.`;
+    return `You spend ${inrShort(commitments)} on fixed commitments. Reducing this can quickly increase what you can save or invest.`;
   }
   if (data.health.emergencyFundMonths < 3) {
     return "Your emergency savings need attention. Building this first can make every other investment decision safer.";
@@ -313,15 +484,16 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
   const trigger = (
     <button
       type="button"
+      data-tour="dash-commitments-open"
       className="flex w-full items-center gap-5 text-left"
       disabled={!canOpen}
       aria-label="Open commitments breakdown"
     >
       <ColorfulIcon icon={CreditCard} accent="violet" label="Monthly Commitments" size="lg" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-muted-foreground">Monthly Commitments</p>
-        <p className="mt-1 text-2xl font-semibold text-foreground">{inr(total)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Rent, EMIs, subscriptions</p>
+        <p className="ap-label">Monthly commitments</p>
+        <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tnum">{inrShort(total)}</p>
+        <p className="ap-help mt-1">Rent, EMIs, monthly expenses</p>
       </div>
       {canOpen ? (
         <span className="shrink-0 text-muted-foreground">
@@ -333,18 +505,18 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
 
   if (!canOpen) {
     return (
-      <Card>
+      <Card data-tour="dash-commitments">
         <CardContent className="p-5">{trigger}</CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="transition hover:border-primary/40">
+    <Card data-tour="dash-commitments" className="transition hover:border-primary/40">
       <CardContent className="p-5">
         <Dialog>
           <DialogTrigger asChild>{trigger}</DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[min(640px,94vw)] overflow-y-auto p-0">
+          <DialogContent data-tour="commitments-detail" className="max-h-[90vh] w-[min(640px,94vw)] overflow-y-auto p-0">
             <div className="border-b border-border px-6 py-5 pr-12">
               <DialogTitle className="text-lg font-semibold text-foreground">Monthly commitments breakdown</DialogTitle>
               <DialogDescription className="mt-1 text-xs text-muted-foreground">
@@ -356,7 +528,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
               <div className="grid gap-3 sm:grid-cols-3">
                 <CommitSummaryTile label="Rent" amount={summary.rent} icon={Home} />
                 <CommitSummaryTile label="Loans / EMIs" amount={summary.totalEmi} icon={Repeat} />
-                <CommitSummaryTile label="Subscriptions" amount={summary.subscriptions} icon={Receipt} />
+                <CommitSummaryTile label="Monthly expenses" amount={summary.monthlyExpenses} icon={Receipt} />
               </div>
 
               {summary.loans.length ? (
@@ -374,12 +546,11 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
                           </div>
                           <p className="shrink-0 text-base font-semibold text-foreground">{inr(loan.monthlyEmi)}<span className="ml-1 text-xs font-normal text-muted-foreground">/mo</span></p>
                         </div>
-                        <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                          <CommitFact label="Principal" value={loan.principal ? inr(loan.principal) : "—"} />
-                          <CommitFact label="Interest" value={loan.totalInterest ? inr(loan.totalInterest) : "—"} />
-                          <CommitFact label="Rate" value={loan.rate ? `${loan.rate.toFixed(1)}%` : "—"} />
-                          <CommitFact label="Window" value={loan.window} icon={CalendarRange} />
-                        </dl>
+                        {loan.window ? (
+                          <dl className="mt-3 grid grid-cols-1 gap-3 text-xs">
+                            <CommitFact label="Window" value={loan.window} icon={CalendarRange} />
+                          </dl>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -406,7 +577,7 @@ function CommitmentsCard({ total, profile }: { total: number; profile: Onboardin
               {summary.legacyEmiOnly > 0 ? (
                 <div className="rounded-xl border border-warning/30 bg-warning-soft/50 p-4 text-sm">
                   <p className="font-semibold text-warning-foreground">EMIs total {inr(summary.legacyEmiOnly)}/mo — not broken down yet</p>
-                  <p className="mt-1 text-foreground/80">Your profile only has a consolidated EMI figure. Add each loan individually to see the per-loan principal, interest, rate and end date here.</p>
+                  <p className="mt-1 text-foreground">Your profile only has a consolidated EMI figure. Add each loan individually to see the per-loan principal, interest, rate and end date here.</p>
                   <Link href="/onboarding?mode=edit" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
                     Add detailed loans <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
@@ -447,7 +618,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
   const empty = {
     rent: 0,
     totalEmi: 0,
-    subscriptions: 0,
+    monthlyExpenses: 0,
     loans: [] as LoanRow[],
     simpleRows: [] as SimpleRow[],
     items: [] as SimpleRow[],
@@ -482,7 +653,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
 
   const simpleRows: SimpleRow[] = [];
   if (profile.rent > 0) simpleRows.push({ id: "rent", name: "Rent", amount: profile.rent, icon: Home });
-  if (profile.subscriptions > 0) simpleRows.push({ id: "subs", name: "Subscriptions", amount: profile.subscriptions, icon: Receipt });
+  if (profile.monthlyExpenses > 0) simpleRows.push({ id: "expenses", name: "Monthly expenses", amount: profile.monthlyExpenses, icon: Receipt });
 
   // Only fall back to the consolidated EMI line when nothing else can be
   // unpacked. The CommitmentsCard renders a hint pointing the user to the
@@ -492,7 +663,7 @@ function commitmentSummary(profile: OnboardingProfile | null) {
   return {
     rent: profile.rent || 0,
     totalEmi,
-    subscriptions: profile.subscriptions || 0,
+    monthlyExpenses: profile.monthlyExpenses || 0,
     loans,
     simpleRows,
     items: simpleRows.length || loans.length || legacyEmiOnly
@@ -530,11 +701,3 @@ function formatLoanDate(value: string) {
   return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
-function simpleActionTitle(strategyType: string, assetClass: string) {
-  const text = `${strategyType} ${assetClass}`.toLowerCase();
-  if (text.includes("emergency")) return "Build Emergency Fund";
-  if (text.includes("debt")) return "Avoid New Debt";
-  if (text.includes("gold")) return "Add Stability With Gold";
-  if (text.includes("sip") || text.includes("equity") || text.includes("fund")) return "Increase SIP";
-  return strategyType || assetClass || "Review Plan";
-}

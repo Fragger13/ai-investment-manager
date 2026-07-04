@@ -2,6 +2,7 @@ from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.encrypted_types import EncryptedText
 
 
 class RecommendationVersion(Base):
@@ -13,7 +14,7 @@ class RecommendationVersion(Base):
     instrument_name: Mapped[str] = mapped_column(String(240), index=True)
     asset_type: Mapped[str] = mapped_column(String(120), default="")
     version_number: Mapped[int] = mapped_column(Integer, default=1)
-    recommendation_json: Mapped[str] = mapped_column(String)
+    recommendation_json: Mapped[str] = mapped_column(EncryptedText(fallback="{}"))
     change_reason: Mapped[str] = mapped_column(String, default="")
     changed_fields_json: Mapped[str] = mapped_column(String, default="[]")
     market_regime: Mapped[str] = mapped_column(String(80), default="")

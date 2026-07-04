@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencyField } from "../_lib/field-helpers";
+import { HelpHint, HintLink } from "../_lib/help-hint";
 import { PapaPeek } from "../_components/papa-peek";
 import { formatIndianCurrencyInput, formatINR, parseIndianCurrencyInput } from "@/lib/currency";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,74 @@ function holdingsForClass(values: OnboardingProfile, assetClasses: HoldingAssetC
   return (values.holdings || []).filter((h) => assetClasses.includes(h.assetClass));
 }
 
+// Live ₹/gram spot for physical metals, used to auto-value gold/silver from
+// grams during onboarding. Cached at module level so the three entry surfaces
+// (single dialog, manual list, upload preview) share one fetch.
+let metalPriceCache: { gold: number; silver: number } | null = null;
+function useMetalPrices(): { gold: number; silver: number } {
+  const [prices, setPrices] = useState<{ gold: number; silver: number }>(metalPriceCache || { gold: 0, silver: 0 });
+  useEffect(() => {
+    if (metalPriceCache) return;
+    let active = true;
+    Promise.all([
+      api.metalPrice("gold").catch(() => ({ inrPerGram: 0 })),
+      api.metalPrice("silver").catch(() => ({ inrPerGram: 0 })),
+    ]).then(([g, s]) => {
+      metalPriceCache = { gold: g.inrPerGram || 0, silver: s.inrPerGram || 0 };
+      if (active) setPrices(metalPriceCache);
+    });
+    return () => { active = false; };
+  }, []);
+  return prices;
+}
+
+function isMetalClass(c: HoldingAssetClass | string): boolean {
+  return c === "gold" || c === "silver";
+}
+
+// EPF/PPF are jargon to most first-timers, so the bucket carries a plain-language
+// explainer plus a link to the EPFO passbook where salaried users can look up
+// their actual balance.
+const EPFO_HINT_LINK: HintLink = {
+  href: "https://passbook.epfindia.gov.in/MemberPassBook/login",
+  label: "Check my EPF balance (EPFO passbook)",
+};
+const EPF_PPF_HINT =
+  "EPF is the retirement fund your employer sets aside from your salary every month. If you draw a salary, you almost certainly have one building up. PPF is a voluntary long term savings account, usually opened at your bank. Not sure of the balance? Log in to the EPFO passbook with your UAN to see it, or check PPF in your bank app.";
+
+// Plain-language explainer for the upload flow: what file to grab, where it
+// lives in common apps, and what it should contain. Shown on the intro + upload
+// screens so amateurs aren't stuck wondering what an "XIRR statement" even is.
+function UploadStatementHelp() {
+  return (
+    <details className="group rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 text-[13px] text-[#374151]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-[#0F172A]">
+        <span aria-hidden>📄</span>
+        <span>New to this? What should I upload, and how do I get it?</span>
+        <span className="ml-auto text-[#9CA3AF] transition group-open:rotate-180" aria-hidden>⌄</span>
+      </summary>
+      <div className="mt-2.5 space-y-2.5 leading-5">
+        <p>
+          You just need a <strong>holdings or portfolio statement</strong>, sometimes called an{" "}
+          <strong>XIRR</strong>, <strong>capital gains</strong>, or <strong>CAS</strong> statement. It&apos;s an
+          Excel or CSV file that lists what you own and what it&apos;s worth today. No need to understand the numbers.
+          Papa reads it for you.
+        </p>
+        <p className="font-semibold text-[#0F172A]">Where to download it:</p>
+        <ul className="list-disc space-y-1 pl-4">
+          <li><strong>Stocks (Zerodha):</strong> Console → Portfolio → Holdings → download as Excel.</li>
+          <li><strong>Groww / Upstox / Angel One:</strong> Profile → Reports or Statements → Holdings statement.</li>
+          <li><strong>Mutual funds (any platform):</strong> get a free <strong>Consolidated Account Statement (CAS)</strong> from <strong>CAMS</strong> or <strong>KFintech</strong>. They email it to you.</li>
+        </ul>
+        <p>
+          Look for a file showing each holding with its <strong>current value</strong>. Have more than one broker?
+          Upload them all and Papa merges everything into one portfolio.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 // ─────────────────────────── Intro ───────────────────────────
 
 export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
@@ -73,7 +142,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
   const totalValue = (values.holdings || []).reduce((sum, h) => sum + Number(h.currentValue || 0), 0);
   const [peekOpen, setPeekOpen] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setPeekOpen(true), 1000);
+    const t = window.setTimeout(() => setPeekOpen(true), 500);
     return () => window.clearTimeout(t);
   }, []);
   const triggerUpload = () => {
@@ -120,10 +189,11 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E9F4EC] text-[#138A3C]"><Pencil className="h-5 w-5" /></span>
             <p className="text-[17px] font-semibold text-[#0F172A]">Add manually</p>
-            <p className="text-[14px] leading-snug text-[#4B5563]">That&apos;s okay. Just enter what you remember. We can always update the details later.</p>
+            <p className="text-[14px] leading-snug text-[#4B5563]">Just enter what you remember. We can always update the details later.</p>
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-800">⚠ No live P&amp;L — refresh values monthly to stay accurate</p>
           </button>
         </div>
+        <UploadStatementHelp />
         <p className="text-[13px] text-[#4B5563]">Hit “Continue” after picking. You can always come back to add more.</p>
       </div>
       <PapaPeek
@@ -131,9 +201,10 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
         onClose={() => setPeekOpen(false)}
         variant="edge"
         imageSrc="/landing/papa-peek-concerned.png"
-        autoDismissMs={7000}
+        autoDismissMs={8000}
       >
         <strong>You don&apos;t have the statement handy, do you? Thought so.</strong>
+        <br />
         <br />
         And somehow this 5-minute onboarding is about to become a 15-minute adventure.
       </PapaPeek>
@@ -144,14 +215,32 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
 // ─────────────────────────── Upload + Preview ───────────────────────────
 
 export function AssetsUploadScreen({ form, values }: ScreenContext) {
+  const intent = typeof window !== "undefined" ? window.localStorage.getItem("askpapa_assets_intent") : null;
+  const skippedFromIntro = intent === "manual";
+  return (
+    <ScreenWrap
+      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
+      headline="Your portfolio"
+      sub="Upload an XIRR statement (XLSX/CSV) to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
+      mood="curious"
+    >
+      <div className="space-y-6">
+        <StatementUploader form={form} />
+        <PortfolioBuckets form={form} values={values} />
+      </div>
+    </ScreenWrap>
+  );
+}
+
+// The statement-upload box + review preview. Extracted so the portfolio edit
+// dialog can offer the same upload flow — a fresh upload, or an updated
+// statement for someone who started out entering holdings by hand.
+export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<OnboardingProfile>; onCommitted?: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState<Holding[] | null>(null);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
-
-  const intent = typeof window !== "undefined" ? window.localStorage.getItem("askpapa_assets_intent") : null;
-  const skippedFromIntro = intent === "manual";
 
   const onPick = () => fileInputRef.current?.click();
 
@@ -200,18 +289,13 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
     if (!preview || preview.length === 0) return;
     writeHoldings(form, [...readHoldings(form), ...preview]);
     setPreview(null);
+    onCommitted?.();
   };
 
   const totalIncoming = preview?.reduce((sum, h) => sum + Number(h.currentValue || 0), 0) || 0;
 
   return (
-    <ScreenWrap
-      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
-      headline="Upload portfolio statement"
-      sub="XLSX or CSV of the XIRR from your DEMAT broker app. Add one file or many — we'll merge them into one portfolio with live P&L."
-      mood="curious"
-    >
-      <div className="space-y-4">
+    <div className="space-y-4">
         {preview ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-2xl border border-[#138A3C]/30 bg-[#E9F4EC] px-4 py-3">
@@ -281,25 +365,24 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
             >
               {parsing ? <Loader2 className="h-7 w-7 animate-spin text-[#138A3C]" /> : <Upload className="h-7 w-7 text-[#138A3C]" />}
               <p className="text-[15px] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more XIRR files"}</p>
-              <p className="text-[12px] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech — select multiple if you have more than one broker</p>
+              <p className="text-[12px] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech, etc. — select multiple if you have more than one broker</p>
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
             {error ? <p className="text-[13px] text-negative-foreground">{error}</p> : null}
-            <p className="text-[12px] text-[#4B5563]">Already added {readHoldings(form).length} holding{readHoldings(form).length === 1 ? "" : "s"}. Tap Continue to keep going manually, or upload to add more.</p>
+            <UploadStatementHelp />
           </div>
         )}
-      </div>
-    </ScreenWrap>
+    </div>
   );
 }
 
 const OTHER_CLASSES: HoldingAssetClass[] = ["gold", "silver", "crypto", "etf", "realEstate", "bond", "nps", "fd", "other"];
 
-// ─────────────────────────── Overview (post-upload single section) ───────────────────────────
+// ─────────────────────────── Portfolio buckets (shown inline under upload) ───────────────────────────
 
 type BucketKey = "stocks" | "mf" | "cash" | "epf" | "others";
 
-export function AssetsOverviewScreen({ form, values }: ScreenContext) {
+export function PortfolioBuckets({ form, values }: { form: UseFormReturn<OnboardingProfile>; values: OnboardingProfile }) {
   const [openBucket, setOpenBucket] = useState<BucketKey | null>(null);
   const stocks = holdingsForClass(values, ["stock", "etf"]);
   const mfs = holdingsForClass(values, ["mutualFund"]);
@@ -322,19 +405,16 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
   const totalHoldings = stocks.length + mfs.length + others.length + (cashValue > 0 ? 1 : 0) + (epfValue > 0 ? 1 : 0);
 
   return (
-    <ScreenWrap
-      papa="Here's everything you own at a glance. Tap any bucket to add or edit."
-      headline="Your portfolio"
-      sub="Green ticks mean we already have it from your upload. Click a bucket to review or top up."
-      mood="proud"
-    >
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <div className="space-y-3">
         {totalHoldings > 0 ? (
           <div className="rounded-2xl border border-[#138A3C]/20 bg-[#E9F4EC] p-4">
             <p className="text-[15px] font-semibold text-[#0F172A]">{totalHoldings} entr{totalHoldings === 1 ? "y" : "ies"} on file · Net assets {formatINR(grandTotal)}</p>
             <p className="mt-1 text-[13px] text-[#4B5563]">Tap any bucket below to add more or edit.</p>
           </div>
-        ) : null}
+        ) : (
+          <p className="text-[13px] text-[#4B5563]">Or add any bucket by hand — tap one below.</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           {buckets.map((b) => (
             <BucketTile key={b.key} bucket={b} onClick={() => setOpenBucket(b.key)} />
@@ -383,9 +463,15 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
         <ScalarBucketDialog
           title="EPF / PPF"
           helper="Latest balance from your last statement. Long-term retirement money."
+          hint={EPF_PPF_HINT}
+          hintLink={EPFO_HINT_LINK}
           fieldName="epfPpfValue"
           form={form}
           initialValue={epfValue}
+          monthlyField="epfPpfMonthly"
+          monthlyLabel="Monthly contribution"
+          monthlyHelper="Amount added every month (your share + employer's, or your PPF deposit)."
+          monthlyInitial={Number(values.epfPpfMonthly || 0)}
           onClose={() => setOpenBucket(null)}
         />
       ) : null}
@@ -396,7 +482,7 @@ export function AssetsOverviewScreen({ form, values }: ScreenContext) {
           onClose={() => setOpenBucket(null)}
         />
       ) : null}
-    </ScreenWrap>
+    </div>
   );
 }
 
@@ -426,33 +512,36 @@ function BucketTile({ bucket, onClick }: { bucket: { key: BucketKey; label: stri
 
 type LumpsumField = keyof Pick<OnboardingProfile, "stocksValue" | "mutualFundsValue" | "cashBalance" | "epfPpfValue">;
 
-const LUMPSUM_TILES: { value: LumpsumField; label: string; emoji: string; placeholder: string; helper: string }[] = [
-  { value: "stocksValue", label: "Direct stocks & ETFs", emoji: "📊", placeholder: "Total value today", helper: "Include any ETFs you hold. Today's value, not cost." },
-  { value: "mutualFundsValue", label: "Mutual funds / SIPs", emoji: "💼", placeholder: "Total MF value", helper: "SIP + lumpsum together." },
-  { value: "cashBalance", label: "Savings & cash", emoji: "🏦", placeholder: "Bank + cash", helper: "Counts toward emergency fund." },
-  { value: "epfPpfValue", label: "EPF / PPF", emoji: "🏛️", placeholder: "Latest balance", helper: "Long-term retirement savings." },
+const LUMPSUM_TILES: { value: LumpsumField; label: string; emoji: string; placeholder: string; helper: string; hint?: string; hintLink?: HintLink }[] = [
+  { value: "stocksValue", label: "Direct stocks & ETFs", emoji: "📊", placeholder: "Total value today", helper: "Include any ETFs you hold. Today's value, not cost.", hint: "Shares of individual companies (like Reliance or TCS) and ETFs you bought directly through a demat account. Enter what they're worth today, not what you paid." },
+  { value: "mutualFundsValue", label: "Mutual funds / SIPs", emoji: "💼", placeholder: "Total MF value", helper: "SIP + lumpsum together.", hint: "Money in mutual funds, whether you invested a lump sum or through a monthly SIP. Add up the current value of all your funds." },
+  { value: "cashBalance", label: "Savings & cash", emoji: "🏦", placeholder: "Bank + cash", helper: "Counts toward emergency fund.", hint: "Money sitting in your savings/current accounts plus cash in hand. This is what Papa counts toward your emergency fund." },
+  { value: "epfPpfValue", label: "EPF / PPF", emoji: "🏛️", placeholder: "Latest balance", helper: "Long-term retirement savings.", hint: EPF_PPF_HINT, hintLink: EPFO_HINT_LINK },
 ];
 
-const ADDITIONAL_TYPES = [
-  "Gold",
-  "Silver",
-  "Crypto",
-  "Real estate",
-  "Bonds",
-  "NPS",
-  "Fixed deposits",
-  "Recurring deposits",
-  "Sovereign gold bonds",
-  "International stocks",
-  "ESOPs",
-  "RSUs",
-  "Insurance-linked investments",
-  "Other",
-];
+// Keep the manual "Other investments" choices identical to the upload-flow
+// "Other investments" list (OTHERS_OPTIONS) so the two paths match.
+const ADDITIONAL_TYPES = OTHERS_OPTIONS.map((o) => o.label);
 
 type AdditionalInvestment = { type: string; value: number; notes?: string };
 
 export function AssetsManualScreen({ form, values }: ScreenContext) {
+  return (
+    <ScreenWrap
+      papa="Quick lumpsum entry — total for each bucket. Update these monthly to stay accurate."
+      headline="What you own"
+      sub="Enter what you have. Leave the rest at zero."
+      mood="proud"
+    >
+      <ManualLumpsumEditor form={form} values={values} />
+    </ScreenWrap>
+  );
+}
+
+// The concise "lumpsum totals" editor. Used in onboarding's manual path and
+// reused by the portfolio edit dialog when the user entered their holdings
+// manually (rather than via an upload).
+export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<OnboardingProfile>; values: OnboardingProfile }) {
   const items = (values.additionalInvestments || []) as AdditionalInvestment[];
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draftList, setDraftList] = useState<AdditionalInvestment[]>([]);
@@ -463,7 +552,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
     // Pull pre-existing scalar values into the editor so users don't lose them
     // when we relocate those buckets into Other investments.
     const goldScalar = Number(values.goldValue || 0);
-    if (goldScalar > 0 && !existingTypes.has("Gold")) seeded.push({ type: "Gold", value: goldScalar, notes: "" });
+    if (goldScalar > 0 && !existingTypes.has("Gold (physical)")) seeded.push({ type: "Gold (physical)", value: goldScalar, notes: "" });
     const cryptoScalar = Number(values.cryptoValue || 0);
     if (cryptoScalar > 0 && !existingTypes.has("Crypto")) seeded.push({ type: "Crypto", value: cryptoScalar, notes: "" });
     const realEstateScalar = Number(values.realEstateValue || 0);
@@ -480,19 +569,14 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
     const sumOfType = (type: string) =>
       cleaned.filter((r) => r.type === type).reduce((sum, r) => sum + Number(r.value || 0), 0);
     form.setValue("additionalInvestments", cleaned, { shouldValidate: true, shouldDirty: true });
-    form.setValue("goldValue", sumOfType("Gold") + sumOfType("Sovereign gold bonds"), { shouldDirty: true });
+    form.setValue("goldValue", sumOfType("Gold (physical)"), { shouldDirty: true });
     form.setValue("cryptoValue", sumOfType("Crypto"), { shouldDirty: true });
     form.setValue("realEstateValue", sumOfType("Real estate"), { shouldDirty: true });
     setDialogOpen(false);
   };
 
   return (
-    <ScreenWrap
-      papa="Quick lumpsum entry — total for each bucket. Update these monthly to stay accurate."
-      headline="What you own"
-      sub="Enter what you have. Leave the rest at zero."
-      mood="proud"
-    >
+    <>
       <div className="space-y-4">
         <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
           <strong>Heads up:</strong> live portfolio P&amp;L and live valuation are only available with the XIRR upload option. Since you&apos;re entering manually, please refresh these values once a month so your plan stays accurate.
@@ -503,6 +587,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
               <div className="flex items-center gap-2">
                 <span className="text-xl" aria-hidden>{tile.emoji}</span>
                 <p className="text-base font-semibold text-[#0F172A]">{tile.label}</p>
+                {tile.hint ? <HelpHint text={tile.hint} link={tile.hintLink} label={tile.label} /> : null}
               </div>
               <p className="mt-1 text-[13px] leading-snug text-[#4B5563]">{tile.helper}</p>
               <div className="mt-3">
@@ -537,7 +622,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
             {draftList.map((row, index) => (
               <div key={index} className="grid gap-2 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                 <div className="space-y-1">
-                  <Label className="text-xs">Type</Label>
+                  <Label className="text-[13px]">Type</Label>
                   <Select value={row.type || ""} onValueChange={(v) => setDraftList(draftList.map((r, i) => i === index ? { ...r, type: v } : r))}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -546,14 +631,14 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Value today</Label>
+                  <Label className="text-[13px]">Value today</Label>
                   <div className="relative">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                     <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.value || 0) ? formatIndianCurrencyInput(Number(row.value)) : ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, value: parseIndianCurrencyInput(e.target.value) } : r))} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Notes</Label>
+                  <Label className="text-[13px]">Notes</Label>
                   <Input placeholder="Optional" value={row.notes || ""} onChange={(e) => setDraftList(draftList.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} />
                 </div>
                 <div className="flex items-end">
@@ -571,7 +656,7 @@ export function AssetsManualScreen({ form, values }: ScreenContext) {
           </div>
         </DialogContent>
       </Dialog>
-    </ScreenWrap>
+    </>
   );
 }
 
@@ -630,7 +715,7 @@ function HoldingsBucketDialog({
                 <div key={h.id} className="flex items-start justify-between gap-3 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-[#0F172A] truncate">{h.name}</p>
-                    <p className="mt-0.5 text-[11px] text-[#4B5563]">
+                    <p className="mt-0.5 text-[12px] text-[#4B5563]">
                       {formatINR(h.currentValue)}
                       {h.units ? ` · ${h.units} units` : ""}
                       {h.symbol ? ` · ${h.symbol}` : ""}
@@ -670,6 +755,7 @@ function HoldingsBucketDialog({
 
 function ScalarBucketDialog({
   title, helper, fieldName, form, initialValue, onClose,
+  monthlyField, monthlyLabel, monthlyHelper, monthlyInitial = 0, hint, hintLink,
 }: {
   title: string;
   helper: string;
@@ -677,24 +763,45 @@ function ScalarBucketDialog({
   form: UseFormReturn<OnboardingProfile>;
   initialValue: number;
   onClose: () => void;
+  monthlyField?: "epfPpfMonthly";
+  monthlyLabel?: string;
+  monthlyHelper?: string;
+  monthlyInitial?: number;
+  hint?: React.ReactNode;
+  hintLink?: HintLink;
 }) {
   const [value, setValue] = useState(initialValue);
+  const [monthly, setMonthly] = useState(monthlyInitial);
   const save = () => {
     form.setValue(fieldName, value, { shouldValidate: false, shouldDirty: true });
+    if (monthlyField) form.setValue(monthlyField, monthly, { shouldValidate: false, shouldDirty: true });
     onClose();
   };
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
-        <DialogTitle className="text-lg font-semibold text-[#0F172A]">{title}</DialogTitle>
+        <DialogTitle className="flex items-center gap-1.5 text-lg font-semibold text-[#0F172A]">
+          <span>{title}</span>
+          {hint ? <HelpHint text={hint} link={hintLink} label={title} /> : null}
+        </DialogTitle>
         <p className="mt-1 text-[13px] text-[#4B5563]">{helper}</p>
         <div className="mt-4 space-y-1.5">
-          <Label className="text-[13px]">Amount</Label>
+          <Label className="text-[13px]">Current balance</Label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
             <Input className="pl-7" inputMode="numeric" autoFocus value={formatIndianCurrencyInput(Number(value || 0))} onChange={(e) => setValue(parseIndianCurrencyInput(e.target.value))} />
           </div>
         </div>
+        {monthlyField ? (
+          <div className="mt-4 space-y-1.5">
+            <Label className="text-[13px] text-[#6B7280]">{monthlyLabel || "Monthly contribution"} <span className="font-normal">(optional)</span></Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+              <Input className="pl-7" inputMode="numeric" placeholder="e.g., 12,000" value={Number(monthly || 0) === 0 ? "" : formatIndianCurrencyInput(Number(monthly))} onChange={(e) => setMonthly(parseIndianCurrencyInput(e.target.value))} />
+            </div>
+            {monthlyHelper ? <p className="text-[12px] text-[#4B5563]">{monthlyHelper}</p> : null}
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="button" className="bg-[#138A3C] text-white hover:bg-[#107132]" onClick={save}>Save</Button>
@@ -734,12 +841,36 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
     return seeded.length ? seeded : [{ id: uid("h"), assetClass: "", currentValue: 0, notes: "" }];
   });
 
+  const metalPrices = useMetalPrices();
+
   const updateRow = (index: number, patch: Partial<OtherDraft>) => {
     setDraftList((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
+  // For physical metals, grams drive the value: recompute currentValue from the
+  // live ₹/gram whenever grams or the fetched price change.
+  const setRowGrams = (index: number, assetClass: HoldingAssetClass | "", grams: number) => {
+    const perGram = isMetalClass(assetClass) ? metalPrices[assetClass as "gold" | "silver"] : 0;
+    const patch: Partial<OtherDraft> = { units: grams };
+    if (perGram > 0) patch.currentValue = Math.round(perGram * grams);
+    updateRow(index, patch);
+  };
+
+  useEffect(() => {
+    setDraftList((prev) => prev.map((r) => {
+      if (isMetalClass(r.assetClass) && Number(r.units) > 0) {
+        const perGram = metalPrices[r.assetClass as "gold" | "silver"];
+        if (perGram > 0) {
+          const cv = Math.round(perGram * Number(r.units));
+          if (cv !== r.currentValue) return { ...r, currentValue: cv };
+        }
+      }
+      return r;
+    }));
+  }, [metalPrices]);
+
   const commit = () => {
-    const cleaned = draftList.filter((r) => r.assetClass && Number(r.currentValue) > 0);
+    const cleaned = draftList.filter((r) => r.assetClass && (isMetalClass(r.assetClass) ? Number(r.units) > 0 : Number(r.currentValue) > 0));
     const all = readHoldings(form);
     const otherIds = new Set(existing.map((h) => h.id));
     const kept = all.filter((h) => !otherIds.has(h.id));
@@ -778,6 +909,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
             const unitLbl = unitLabelFor(row.assetClass);
             const showExtras = Boolean(row.assetClass);
             const isCrypto = row.assetClass === "crypto";
+            const isMetal = isMetalClass(row.assetClass);
             const nameLabel = (() => {
               switch (row.assetClass) {
                 case "crypto": return "Name (e.g., Bitcoin)";
@@ -802,7 +934,7 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
               <div key={row.id} className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
                 <div className="grid gap-2 sm:grid-cols-[1.1fr_1fr_1.4fr_auto]">
                   <div className="space-y-1">
-                    <Label className="text-xs">Type</Label>
+                    <Label className="text-[13px]">Type</Label>
                     <Select value={row.assetClass || ""} onValueChange={(v) => updateRow(index, { assetClass: v as HoldingAssetClass })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
@@ -811,14 +943,20 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Value today</Label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
-                      <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.currentValue || 0) ? formatIndianCurrencyInput(Number(row.currentValue)) : ""} onChange={(e) => updateRow(index, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
-                    </div>
+                    <Label className="text-[13px]">Value today{isMetalClass(row.assetClass) ? <span className="ml-1 font-normal text-[#6B7280]">(auto)</span> : null}</Label>
+                    {isMetalClass(row.assetClass) ? (
+                      <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
+                        {metalPrices[row.assetClass as "gold" | "silver"] > 0 ? formatINR(Number(row.currentValue || 0)) : "Awaiting price…"}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
+                        <Input className="pl-7" inputMode="numeric" placeholder="Amount" value={Number(row.currentValue || 0) ? formatIndianCurrencyInput(Number(row.currentValue)) : ""} onChange={(e) => updateRow(index, { currentValue: parseIndianCurrencyInput(e.target.value) })} />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">{nameLabel}</Label>
+                    <Label className="text-[13px]">{nameLabel}</Label>
                     <Input placeholder={namePlaceholder} value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} />
                   </div>
                   <div className="flex items-end">
@@ -828,7 +966,10 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                 {showExtras ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label className="text-xs text-[#6B7280]">Value at cost (optional)</Label>
+                      <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                        <span>Value at cost (optional)</span>
+                        <HelpHint label="value at cost" text="What you originally paid for this, the total you invested. Add it and Papa can show your profit or loss. Leave it blank if you don't remember." />
+                      </Label>
                       <div className="relative">
                         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
                         <Input className="pl-7" inputMode="numeric" placeholder="For P&L" value={Number(row.valueAtCost || 0) ? formatIndianCurrencyInput(Number(row.valueAtCost)) : ""} onChange={(e) => updateRow(index, { valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
@@ -836,24 +977,41 @@ function OthersBucketDialog({ form, values, onClose }: { form: UseFormReturn<Onb
                     </div>
                     {unitLbl ? (
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#6B7280]">{unitLbl} (optional)</Label>
-                        <Input type="number" inputMode="decimal" placeholder="e.g., 25" value={Number(row.units || 0) === 0 ? "" : Number(row.units)} onChange={(e) => updateRow(index, { units: Number(e.target.value || 0) })} />
+                        <Label className="inline-flex items-center gap-1 text-[13px] text-[#6B7280]">
+                          <span>{unitLbl}{isMetalClass(row.assetClass) ? <span className="ml-1 text-red-500" aria-hidden>*</span> : " (optional)"}</span>
+                          <HelpHint label={unitLbl} text={isMetalClass(row.assetClass) ? "How many grams you own. Papa multiplies it by today's market rate to value your holding automatically, so you don't have to." : "How many units or coins you hold. Optional, it helps Papa track the live value."} />
+                        </Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="e.g., 25"
+                          value={Number(row.units || 0) === 0 ? "" : Number(row.units)}
+                          onChange={(e) => isMetalClass(row.assetClass)
+                            ? setRowGrams(index, row.assetClass, Number(e.target.value || 0))
+                            : updateRow(index, { units: Number(e.target.value || 0) })}
+                        />
                       </div>
                     ) : null}
                     {isCrypto ? (
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#6B7280]">Symbol (optional)</Label>
+                        <Label className="text-[13px] text-[#6B7280]">Symbol (optional)</Label>
                         <Input placeholder="BTC, ETH" value={row.symbol || ""} onChange={(e) => updateRow(index, { symbol: e.target.value.toUpperCase() })} />
                       </div>
                     ) : null}
                   </div>
                 ) : null}
-                {isCrypto ? (
+                {isCrypto || isMetal ? (
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-[#4B5563]">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input type="checkbox" checked={Boolean(row.hasSip)} onChange={(e) => updateRow(index, { hasSip: e.target.checked, sipAmount: e.target.checked ? row.sipAmount || 0 : 0 })} className="h-3.5 w-3.5 rounded border-[#138A3C] text-[#138A3C] focus:ring-[#138A3C]" />
-                      Monthly SIP
+                      I have a monthly SIP
                     </label>
+                    {isMetal ? (
+                      <HelpHint
+                        label="gold or silver SIP"
+                        text={`A monthly plan that buys a fixed amount of ${row.assetClass} every month. For example a digital gold SIP, a jewellers' monthly scheme, or buying coins regularly. Tick this and tell Papa the monthly amount.`}
+                      />
+                    ) : null}
                     {row.hasSip ? (
                       <div className="relative w-32">
                         <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[12px] text-muted-foreground">₹</span>
@@ -899,9 +1057,22 @@ function HoldingEditorDialog({
   symbolPlaceholder?: string;
   symbolField?: "symbol" | "schemeCode";
 }) {
-  const isUnitClass = ["stock", "etf", "mutualFund", "crypto", "gold", "silver"].includes(holding.assetClass);
+  const isMetal = isMetalClass(holding.assetClass);
+  const isUnitClass = ["stock", "etf", "mutualFund", "crypto"].includes(holding.assetClass);
   const canSip = ["stock", "etf", "mutualFund", "crypto"].includes(holding.assetClass);
-  const canSave = holding.name.trim().length > 0 && holding.currentValue > 0;
+  const metalPrices = useMetalPrices();
+  const perGram = isMetal ? metalPrices[holding.assetClass as "gold" | "silver"] : 0;
+  useEffect(() => {
+    if (isMetal && perGram > 0 && Number(holding.units) > 0) {
+      const cv = Math.round(perGram * Number(holding.units));
+      if (cv !== holding.currentValue) onChange({ ...holding, currentValue: cv });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perGram, holding.units]);
+  const cost = Number(holding.valueAtCost || 0);
+  const pl = cost > 0 ? holding.currentValue - cost : 0;
+  const plPct = cost > 0 ? (pl / cost) * 100 : 0;
+  const canSave = holding.name.trim().length > 0 && (isMetal ? Number(holding.units) > 0 : holding.currentValue > 0);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -920,31 +1091,55 @@ function HoldingEditorDialog({
                 onChange={(e) => onChange(symbolField === "schemeCode" ? { ...holding, schemeCode: e.target.value } : { ...holding, symbol: e.target.value.toUpperCase() })}
                 placeholder={symbolPlaceholder}
               />
-              <p className="text-[11px] text-[#4B5563]">Lets us refresh prices live later.</p>
+              <p className="text-[12px] text-[#4B5563]">Helps us refresh prices live later.</p>
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Current value</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
-                <Input className="pl-7" inputMode="numeric" value={formatIndianCurrencyInput(Number(holding.currentValue || 0))} onChange={(e) => onChange({ ...holding, currentValue: parseIndianCurrencyInput(e.target.value) })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
-                <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
-              </div>
-            </div>
-            {isUnitClass ? (
+          {isMetal ? (
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">{unitFieldLabel(holding.assetClass)}</Label>
-                <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="Optional" />
+                <Label className="text-[13px]">Grams<span className="ml-1 text-red-500" aria-hidden>*</span></Label>
+                <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="e.g., 50" autoFocus />
               </div>
-            ) : null}
-          </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Current value <span className="text-[#4B5563] font-normal">(auto)</span></Label>
+                <div className="flex h-10 items-center rounded-md border border-border bg-surface-hover px-3 text-sm text-foreground">
+                  {perGram > 0 ? formatINR(holding.currentValue) : "Awaiting live price…"}
+                </div>
+                <p className="text-[12px] text-[#4B5563]">{perGram > 0 ? `Live ₹${formatIndianCurrencyInput(Math.round(perGram))}/g — updates with the market.` : "We'll value this on the next price refresh."}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(optional)</span></Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+                {cost > 0 ? <p className={cn("text-[12px] font-medium", pl >= 0 ? "text-positive-foreground" : "text-negative-foreground")}>P&L {formatINR(pl)} ({plPct.toFixed(1)}%)</p> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Current value</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" value={formatIndianCurrencyInput(Number(holding.currentValue || 0))} onChange={(e) => onChange({ ...holding, currentValue: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Value at cost <span className="text-[#4B5563] font-normal">(invested)</span></Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[14px] text-muted-foreground">₹</span>
+                  <Input className="pl-7" inputMode="numeric" placeholder="Optional — enables P&L" value={Number(holding.valueAtCost || 0) === 0 ? "" : formatIndianCurrencyInput(Number(holding.valueAtCost))} onChange={(e) => onChange({ ...holding, valueAtCost: parseIndianCurrencyInput(e.target.value) })} />
+                </div>
+              </div>
+              {isUnitClass ? (
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">{unitFieldLabel(holding.assetClass)}</Label>
+                  <Input type="number" inputMode="decimal" value={Number(holding.units || 0) === 0 ? "" : Number(holding.units)} onChange={(e) => onChange({ ...holding, units: Number(e.target.value || 0) })} placeholder="Optional" />
+                </div>
+              ) : null}
+            </div>
+          )}
           {canSip ? (
             <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
               <label className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]">

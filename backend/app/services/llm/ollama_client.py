@@ -66,13 +66,20 @@ class OllamaClient(BaseLLMClient):
         request = Request(
             f"{self.base_url}{path}",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **self._auth_headers()},
             method="POST",
         )
         with urlopen(request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
 
     def _get_json(self, path: str, timeout_seconds: int) -> dict:
-        request = Request(f"{self.base_url}{path}", method="GET")
+        request = Request(f"{self.base_url}{path}", headers=self._auth_headers(), method="GET")
         with urlopen(request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    @staticmethod
+    def _auth_headers() -> dict[str, str]:
+        # Ollama Cloud (https://ollama.com) authenticates with an API key;
+        # a local Ollama ignores the header entirely.
+        key = (settings.ollama_api_key or "").strip()
+        return {"Authorization": f"Bearer {key}"} if key else {}

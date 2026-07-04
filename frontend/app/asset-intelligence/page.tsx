@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, Filter, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
+import { Bookmark, Check, Copy, RefreshCw, Search, Send, Shield, Sparkles, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ColorfulIcon } from "@/components/colorful-icon";
 import { InvestmentLogo } from "@/components/investment-logo";
@@ -11,9 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { cn, inr } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth-store";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { usePlanActionsStore } from "@/store/plan-actions-store";
-import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, CryptoOpportunity, OnboardingProfile } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, CommunitySentiment, CryptoOpportunity, OnboardingProfile } from "@/types";
 
 export type InvestmentIdea = {
   id: string;
@@ -34,6 +34,8 @@ export type InvestmentIdea = {
   livePrice?: { value: number; unit: string; asOf?: string } | null;
   buyRange?: string;
   sellRange?: string;
+  /** Reddit-derived community sentiment, when the research layer found chatter. */
+  community?: CommunitySentiment | null;
   raw?: AssetIntelligence | AlphaOpportunity | CryptoOpportunity | AdvancedRecommendation;
 };
 
@@ -50,7 +52,8 @@ const emptyAdvanced: AdvancedRecommendationResponse = {
 const tabs: InvestmentIdea["tab"][] = ["Recommended For You", "Trending", "Safe Options", "High Growth", "Under The Radar"];
 
 export default function AssetIntelligencePage() {
-  const profile = useAuthStore((state) => state.profile);
+  const profile = useEnsureProfile();
+  const savedCount = usePlanActionsStore((state) => state.planItems.length);
   const [assets, setAssets] = useState<AssetIntelligence[]>([]);
   const [alpha, setAlpha] = useState<AlphaOpportunity[]>([]);
   const [crypto, setCrypto] = useState<CryptoOpportunity[]>([]);
@@ -68,19 +71,22 @@ export default function AssetIntelligencePage() {
     setLoading(true);
     try {
       if (refresh) await api.refreshAssetResearch().catch(() => null);
-      const [nextRecommendations, nextAssets, nextAlpha, nextCrypto] = await Promise.all([
-        api.generateAdvancedRecommendations(profile, false),
-        api.assetIntelligence(),
-        api.alphaOpportunities(),
-        api.cryptoOpportunities()
+      // Render the fast Discover data immediately — do NOT block it on the slow
+      // advanced-recommendation pipeline (which can take minutes when live market
+      // data is throttled).
+      const [nextAssets, nextAlpha, nextCrypto] = await Promise.all([
+        api.assetIntelligence().catch(() => []),
+        api.alphaOpportunities().catch(() => []),
+        api.cryptoOpportunities().catch(() => [])
       ]);
-      setRecommendations(nextRecommendations);
       setAssets(nextAssets);
       setAlpha(nextAlpha);
       setCrypto(nextCrypto);
     } finally {
       setLoading(false);
     }
+    // Personalized recommendations stream in separately when ready.
+    api.generateAdvancedRecommendations(profile, false).then(setRecommendations).catch(() => null);
   }, [profile]);
 
   useEffect(() => { load(false); }, [load]);
@@ -110,7 +116,7 @@ export default function AssetIntelligencePage() {
   const visible = ideas
     .filter((idea) => idea.tab === activeTab || (activeTab === "Recommended For You" && scoreIdea(idea) >= 60))
     .filter((idea) => !query || `${idea.name} ${idea.ticker} ${idea.category}`.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 12);
+    .slice(0, 5);
 
   // Store ideas in sessionStorage so the detail page can read them
   useEffect(() => {
@@ -122,19 +128,29 @@ export default function AssetIntelligencePage() {
     <AppShell sidebarExtra={<InviteWidget />}>
       <div className="mb-7 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Discover Investments</h1>
-          <p className="mt-2 text-base text-muted-foreground">Curated investment options that match your goals and risk profile.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Discover 🔍</h1>
+          <p className="mt-2 text-base text-muted-foreground">Hand-picked ideas that fit your goals and risk level. Tap any to learn more, then save the ones you like to your plan.</p>
         </div>
         <div className="flex w-full gap-3 xl:w-auto">
           <div className="relative w-full min-w-[260px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search investments, funds..." className="pl-9" />
           </div>
-          <Button variant="outline" onClick={() => load(true)} disabled={loading}><Filter className="h-4 w-4" /> Filters</Button>
+          <Button variant="outline" onClick={() => load(true)} disabled={loading}><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> {loading ? "Refreshing..." : "Refresh"}</Button>
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2">
+      {savedCount > 0 ? (
+        <Link href="/recommendations" className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 transition hover:bg-primary/10">
+          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Bookmark className="h-4 w-4 fill-current text-primary" />
+            {savedCount} idea{savedCount === 1 ? "" : "s"} saved — they&apos;re in your plan under &ldquo;Saved by you&rdquo;
+          </span>
+          <span className="shrink-0 text-sm font-bold text-primary">View in plan →</span>
+        </Link>
+      ) : null}
+
+      <div className="mb-5 flex flex-wrap gap-2" data-tour="discover-tabs">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -146,12 +162,12 @@ export default function AssetIntelligencePage() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {visible.map((idea) => <InvestmentCard key={idea.id} idea={idea} />)}
+      <div className="space-y-4" data-tour="discover">
+        {visible.map((idea, index) => <InvestmentCard key={idea.id} idea={idea} topPick={index === 0} tour={index === 0} />)}
       </div>
       {!visible.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">No ideas match this view yet. Try another tab or refresh investment ideas.</CardContent></Card> : null}
 
-      <Card className="mt-6 border-positive-soft bg-positive-soft/40">
+      <Card className="mt-6 border-positive-soft bg-positive-soft/40" data-tour="discover-coach">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <ColorfulIcon icon={Sparkles} accent="emerald" label="Coach" />
@@ -163,12 +179,12 @@ export default function AssetIntelligencePage() {
           <Button variant="outline" asChild><Link href="/chat">Ask AI Coach <Send className="h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
-      <p className="mt-4 text-xs text-muted-foreground">All investments are subject to market risks. Read scheme-related documents carefully.</p>
+      <p className="mt-4 text-[13px] text-muted-foreground">Returns shown are long-term, category-based estimates — not per-fund figures or guarantees. All investments are subject to market risks; read scheme-related documents carefully.</p>
     </AppShell>
   );
 }
 
-function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
+function InvestmentCard({ idea, topPick, tour }: { idea: InvestmentIdea; topPick?: boolean; tour?: boolean }) {
   const inPlan = usePlanActionsStore((state) => state.planItems.some((entry) => entry.key === idea.id));
   const addToPlan = usePlanActionsStore((state) => state.addToPlan);
   const removeFromPlan = usePlanActionsStore((state) => state.removeFromPlan);
@@ -194,17 +210,22 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
 
   return (
     <Link href={`/asset-intelligence/${encodeURIComponent(idea.slug)}`} className="block">
-      <Card className="transition hover:border-primary/40 hover:shadow-md">
+      <Card data-tour={tour ? "discover-pick" : undefined} className={cn("relative transition hover:border-primary/40 hover:shadow-md", topPick && "border-primary/50 shadow-sm")}>
+        {topPick ? (
+          <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-primary-foreground shadow-sm">
+            <Sparkles className="h-3 w-3" /> Papa&apos;s pick
+          </span>
+        ) : null}
         <CardContent className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,.8fr)_auto] lg:items-center">
           {/* Left: logo + name + 3 checkmark bullets */}
           <div className="flex min-w-0 gap-4">
             <InvestmentLogo name={idea.name} category={idea.category} ticker={idea.ticker} size="lg" />
             <div className="min-w-0">
-              <h3 className="line-clamp-1 text-lg font-semibold text-foreground">{idea.name}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
+              <h3 className="line-clamp-1 text-lg font-bold tracking-tight text-foreground">{idea.name}</h3>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">{idea.category}{idea.ticker ? ` · ${idea.ticker}` : ""}</p>
               <ul className="mt-2 space-y-1">
                 {idea.bullets.slice(0, 3).map((bullet) => (
-                  <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground/85">
+                  <li key={bullet} className="flex items-start gap-1.5 text-sm text-foreground">
                     <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive-foreground" />
                     <span className="line-clamp-1">{bullet}</span>
                   </li>
@@ -220,37 +241,37 @@ function InvestmentCard({ idea }: { idea: InvestmentIdea }) {
               {idea.risk} Risk
             </span>
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expected Return</p>
-              <p className="text-[15px] font-semibold text-foreground">{idea.expectedReturn}</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Est. return</p>
+              <p className="text-[15px] font-bold text-foreground">{idea.expectedReturn}</p>
             </div>
             {idea.livePrice ? (
-              <p className="text-[11px] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
+              <p className="text-[13px] text-muted-foreground">{priceLabel(idea)} <span className="font-semibold text-foreground">{formatPrice(idea.livePrice)}</span></p>
             ) : null}
           </div>
 
-          {/* Suggested SIP — its own column */}
+          {/* Suggested starting SIP — its own column */}
           <div className="text-left lg:text-center">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{idea.category.toLowerCase().includes("stock") || idea.category === "Crypto" ? "Suggested allocation" : "Suggested SIP"}</p>
-            <p className="mt-0.5 text-[15px] font-semibold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / month` : "Review first"}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Start with</p>
+            <p className="mt-0.5 text-[15px] font-bold text-foreground">{idea.suggestedAmount ? `${inr(idea.suggestedAmount)} / mo` : "Review first"}</p>
           </div>
 
-          {/* Right: save bookmark + View Details */}
-          <div className="flex items-center gap-3 justify-self-end">
-            <button
+          {/* Right: save-to-plan + View Details */}
+          <div className="flex items-center gap-2 justify-self-end">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={toggleSave}
               aria-label={inPlan ? "Remove from plan" : "Save to plan"}
               aria-pressed={inPlan}
               className={cn(
-                "hidden h-9 w-9 items-center justify-center rounded-full border transition lg:inline-flex",
-                inPlan
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+                "gap-1.5",
+                inPlan ? "border-primary bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground hover:text-primary"
               )}
             >
-              <Bookmark className={cn("h-4 w-4", inPlan && "fill-current")} />
-            </button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">View Details</Button>
+              <Bookmark className={cn("h-4 w-4", inPlan && "fill-current")} /> {inPlan ? "Saved" : "Save"}
+            </Button>
+            <Button data-tour={tour ? "discover-details" : undefined} className="bg-primary text-primary-foreground hover:bg-primary/90">View Details</Button>
           </div>
         </CardContent>
       </Card>
@@ -279,6 +300,16 @@ function formatPrice(price: { value: number; unit: string }) {
 }
 
 function InviteWidget() {
+  const [copied, setCopied] = useState(false);
+  function shareLink() {
+    const link = "https://askpapa.in";
+    const done = () => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(() => done());
+    } else {
+      done();
+    }
+  }
   return (
     <div className="rounded-2xl border border-positive-soft bg-positive-soft/60 p-4">
       <div className="flex items-center gap-2">
@@ -287,8 +318,15 @@ function InviteWidget() {
         </span>
         <p className="text-sm font-semibold text-foreground">Invite a friend</p>
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">Help your friends get started with their financial plan.</p>
-      <Link href="/chat" className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">Learn more →</Link>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Share AskPapa so your friends can start their money plan too.</p>
+      <button
+        type="button"
+        onClick={shareLink}
+        aria-live="polite"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground transition hover:bg-primary/90"
+      >
+        {copied ? (<><Check className="h-3.5 w-3.5" /> Link copied!</>) : (<><Copy className="h-3.5 w-3.5" /> Share askpapa.in</>)}
+      </button>
     </div>
   );
 }
@@ -323,6 +361,7 @@ function mapRecommendation(rec: AdvancedRecommendation, profile: OnboardingProfi
     livePrice: null,
     buyRange: rec.buyRange || "",
     sellRange: rec.sellRange || "",
+    community: (rec.sentimentSignal as { community?: CommunitySentiment } | undefined)?.community || null,
     raw: rec,
   };
 }
@@ -362,7 +401,7 @@ function mapAsset(asset: AssetIntelligence, profile: OnboardingProfile | null): 
     tab: tabFor(category, risk, evidence, asset.alpha?.bucket),
     risk,
     action: friendlyAction(asset.alpha?.suggestedAction || asset.crypto?.recommendedAction || "Consider"),
-    expectedReturn: expectedReturn(category, risk),
+    expectedReturn: returnFromObject(asset.expectedReturn) || expectedReturn(category, risk),
     suggestedAmount: suggestedAmount(profile, risk, category),
     bullets: bulletsForAsset(asset).slice(0, 3),
     summary: concise(asset.summary || asset.why_this_matters || "This idea is being reviewed using available investment data."),
@@ -414,7 +453,7 @@ function mapAlpha(alpha: AlphaOpportunity, profile: OnboardingProfile | null): I
     tab: alpha.bucket === "underdog" || alpha.bucket === "contrarian" ? "Under The Radar" : "Trending",
     risk,
     action: friendlyAction(alpha.suggestedAction),
-    expectedReturn: risk === "High" ? "Wide range" : "Estimate pending",
+    expectedReturn: returnFromObject(alpha.expectedReturn) || (risk === "High" ? "Wide range" : "Estimate pending"),
     suggestedAmount: suggestedAmount(profile, risk, alpha.assetType),
     bullets: [alpha.nonObviousReason, alpha.keySignal, alpha.supportingSignals[0]].filter(Boolean).map((value) => brief(value)),
     summary: concise(alpha.nonObviousReason),
@@ -448,12 +487,22 @@ function mapCrypto(crypto: CryptoOpportunity, profile: OnboardingProfile | null)
   };
 }
 
+/** Real, data-derived return estimate (recommendations + Discover funds share this
+ *  shape) → display string; null when the backend didn't supply one. */
+function returnFromObject(er?: { label?: string; cagrRange?: string; expectedCagr?: number } | null): string | null {
+  if (!er) return null;
+  if (er.label) return er.label.replace(/CAGR/gi, "p.a.");
+  if (er.cagrRange) return `${er.cagrRange} p.a.`;
+  if (typeof er.expectedCagr === "number") return `${er.expectedCagr}% p.a.`;
+  return null;
+}
+
 function recommendationReturn(rec: AdvancedRecommendation) {
-  if (rec.expectedReturn?.label) return rec.expectedReturn.label.replace(/CAGR/gi, "p.a.");
-  if (rec.expectedReturn?.cagrRange) return `${rec.expectedReturn.cagrRange} p.a.`;
-  if (typeof rec.expectedReturn?.expectedCagr === "number") return `${rec.expectedReturn.expectedCagr}% p.a.`;
-  if (rec.expectedReturnRange) return rec.expectedReturnRange;
-  return expectedReturn(friendlyCategory(rec.assetType || rec.assetClass || ""), rec.riskLevel);
+  return (
+    returnFromObject(rec.expectedReturn) ||
+    rec.expectedReturnRange ||
+    expectedReturn(friendlyCategory(rec.assetType || rec.assetClass || ""), rec.riskLevel)
+  );
 }
 
 function tabFor(category: string, risk: string, evidence: number, bucket?: string): InvestmentIdea["tab"] {
@@ -475,18 +524,28 @@ function friendlyCategory(value: string) {
   return value || "Investment";
 }
 
+// Long-term, category-based return *estimates* (not per-fund precise figures and
+// not guarantees). Differentiated by asset class + risk so cards don't all read
+// an identical "8-12%". The "~" + the page footnote make the estimate explicit.
 function expectedReturn(category: string, risk: string) {
   const text = category.toLowerCase();
-  if (text.includes("debt") || text.includes("cash")) return "5-7% p.a.";
-  if (text.includes("gold")) return "5-8% p.a.";
-  if (risk === "High") return "Wide range";
-  return "8-12% p.a.";
+  if (text.includes("debt") || text.includes("cash") || text.includes("bond")) return "~6–7% p.a.";
+  if (text.includes("gold")) return "~6–8% p.a.";
+  if (text.includes("crypto")) return "Highly variable";
+  if (risk === "High") return "~12–16% p.a.";
+  if (risk === "Low") return "~8–10% p.a.";
+  return "~10–12% p.a.";
 }
 
 function suggestedAmount(profile: OnboardingProfile | null, risk: string, category: string) {
   const surplus = Number(profile?.monthlyCashInflow || 0) - Number(profile?.monthlyExpenses || 0) - Number(profile?.emi || 0);
-  const base = Math.max(Math.round((surplus || 20000) * (risk === "High" || category === "Crypto" ? 0.08 : risk === "Low" ? 0.18 : 0.14) / 500) * 500, 0);
-  return base;
+  // A gentle *starter* SIP for browsing — not a full allocation. The real,
+  // goal-based sizing happens in the Plan once an idea is saved. Keeping this a
+  // small slice of surplus (floored at ₹500, capped low) avoids showing an
+  // alarming, identical ₹50k on every card to a beginner.
+  const mult = risk === "High" || category === "Crypto" ? 0.03 : risk === "Low" ? 0.07 : 0.05;
+  const raw = Math.round(((surplus > 0 ? surplus : 20000) * mult) / 500) * 500;
+  return Math.min(Math.max(raw, 500), 5000);
 }
 
 function normalizeRisk(value: string) {

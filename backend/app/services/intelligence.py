@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from math import ceil
 
 from app.schemas.financial import OnboardingProfile
+
+# India Standard Time offset — used to decide which calendar month the
+# user's "invest this month" override currently applies to.
+IST = timedelta(hours=5, minutes=30)
+
+
+def current_ist_month() -> str:
+    return (datetime.now(UTC) + IST).strftime("%Y-%m")
 
 
 DISCLAIMER = (
@@ -35,6 +43,19 @@ def monthly_income(profile: OnboardingProfile) -> int:
     return int(profile.monthlySalary + profile.otherIncome)
 
 
+def investable_surplus(profile: OnboardingProfile, computed_surplus: int) -> int:
+    """This month's investable amount.
+
+    If the user gave an explicit "how much can I invest this month" figure and
+    it was stamped for the current calendar month, use it. Otherwise (and
+    automatically once the month rolls over) fall back to the computed surplus
+    of income minus expenses and EMIs.
+    """
+    if profile.investableThisMonth > 0 and profile.investableThisMonthMonth == current_ist_month():
+        return int(profile.investableThisMonth)
+    return int(computed_surplus)
+
+
 def total_emi_payments(profile: OnboardingProfile) -> int:
     if profile.emiLoans:
         return int(sum(item.monthlyEmiAmount for item in profile.emiLoans))
@@ -43,6 +64,28 @@ def total_emi_payments(profile: OnboardingProfile) -> int:
 
 def recurring_liabilities(profile: OnboardingProfile) -> int:
     return int(profile.rent + profile.subscriptions + total_emi_payments(profile))
+
+
+def monthly_commitments(profile: OnboardingProfile) -> int:
+    """Total fixed monthly outflow: rent + everyday expenses + subscriptions + EMIs.
+
+    The onboarding UI collects rent and "other monthly expenses" as separate,
+    additive fields ("Don't include rent or EMIs" on the expenses screen), and
+    the frontend's lib/profile.ts monthlyCommitments() sums them the same way.
+    Every backend surplus calculation must go through this helper so "available
+    to invest" means the same thing everywhere (dashboard, engine, chat, memory).
+    """
+    return int(profile.rent + profile.monthlyExpenses + profile.subscriptions + total_emi_payments(profile))
+
+
+def computed_monthly_surplus(profile: OnboardingProfile) -> int:
+    """Income minus all fixed commitments, floored at zero."""
+    return max(monthly_income(profile) - monthly_commitments(profile), 0)
+
+
+def emergency_target_base(profile: OnboardingProfile) -> int:
+    """Default emergency-fund target: six months of total fixed commitments."""
+    return int(monthly_commitments(profile) * 6)
 
 
 def net_worth(profile: OnboardingProfile) -> int:
@@ -122,11 +165,11 @@ def health_agent(profile: OnboardingProfile) -> dict:
     income = monthly_income(profile)
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     savings_rate = (surplus / income * 100) if income else 0
-    expense_burden = (profile.monthlyExpenses / income * 100) if income else 0
+    expense_burden = ((profile.rent + profile.monthlyExpenses + profile.subscriptions) / income * 100) if income else 0
     debt_burden = (emi_total / income * 100) if income else 0
-    months_of_buffer = profile.cashBalance / max(profile.monthlyExpenses + emi_total, 1)
+    months_of_buffer = profile.cashBalance / max(monthly_commitments(profile), 1)
     score = 50 + min(savings_rate, 40) * 0.65 + min(months_of_buffer, 12) * 1.4 - min(debt_burden, 45) * 0.45
     if profile.investsMonthly.lower() in {"yes", "always"}:
         score += 4
@@ -243,11 +286,36 @@ def research_agent(profile: OnboardingProfile) -> list[dict]:
     ]
 
 
+def _named_funds(category_key: str, limit: int = 3) -> list[dict]:
+    """Resolve specific funds for a category, degrading to [] on any failure.
+
+    Imported lazily to avoid a circular import (fund_picker -> fund_research ->
+    intelligence) at module load time.
+    """
+    try:
+        from app.services.research.fund_picker_service import pick_funds
+
+        return pick_funds(category_key, limit=limit)
+    except Exception:  # noqa: BLE001 — pricing/network must never break the dashboard
+        return []
+
+
+def _fund_phrase(funds: list[dict]) -> str:
+    """A short 'e.g. <fund> (<rank>% <basis> return)' clause for reasoning text."""
+    if not funds:
+        return ""
+    top = funds[0]
+    basis = top.get("rankBasis") or ""
+    ret = top.get("rankReturn")
+    perf = f" ({ret:.0f}% {basis} return)" if isinstance(ret, (int, float)) and basis else ""
+    return f" A specific low-cost Direct-plan option today is {top['name']}{perf}."
+
+
 def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     income = monthly_income(profile)
-    surplus = max(income - profile.monthlyExpenses - total_emi_payments(profile), 0)
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     emergency_goal = next((goal for goal in profile.goals if goal.type == "Emergency fund"), None)
-    emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or profile.monthlyExpenses * 6, profile.monthlyExpenses * 6)
+    emergency_needed = max((emergency_goal.targetAmount if emergency_goal else profile.emergencyFundTarget) or emergency_target_base(profile), emergency_target_base(profile))
     emergency_gap = max(emergency_needed - profile.cashBalance, 0)
     high_long_term_risk = profile.volatilityComfort == "High" or profile.investmentHorizon in {"7-10 years", "10+ years"}
     short_term_ok = profile.shortTermVolatilityComfort == "High" and profile.shortTermLossTolerance in {"10-15%", "15%+"}
@@ -268,10 +336,15 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     tactical_percent = round(tactical_allocation * scale)
     gold_percent = max(0, 100 - equity_percent - debt_percent - tactical_percent)
 
+    equity_funds = _named_funds("large_cap_index")
+    debt_funds = _named_funds("liquid")
+    gold_funds = _named_funds("gold")
+
     recommendations = [
         {
             "id": "rec-nifty50-index",
             "assetClass": "Nifty 50 index fund or Nifty 50 ETF",
+            "specificFunds": equity_funds,
             "suggestedAllocation": equity_percent,
             "suggestedMonthlyAmount": amount(equity_percent),
             "strategyType": "Long-term growth",
@@ -279,7 +352,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Review yearly or if your goal timeline changes.",
             "confidenceScore": 84 if high_long_term_risk else 74,
             "riskLevel": "Medium",
-            "reasoning": "This gives diversified exposure to large Indian companies and fits a long-term wealth goal better than picking individual stocks as a beginner.",
+            "reasoning": "This gives diversified exposure to large Indian companies and fits a long-term wealth goal better than picking individual stocks as a beginner." + _fund_phrase(equity_funds),
             "whatCanGoWrong": "Equity markets can fall sharply for months or years. Do not use this for money needed soon.",
             "suitableFor": "Long-term goals such as retirement, financial freedom, or a goal more than 7 years away.",
             "timeHorizon": "7+ years",
@@ -294,6 +367,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
         {
             "id": "rec-liquid-debt",
             "assetClass": "Liquid fund or short-duration debt fund",
+            "specificFunds": debt_funds,
             "suggestedAllocation": debt_percent,
             "suggestedMonthlyAmount": amount(debt_percent),
             "strategyType": "Stability and emergency money",
@@ -301,7 +375,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Use this money for emergencies or short-term planned expenses.",
             "confidenceScore": 90 if emergency_gap else 78,
             "riskLevel": "Low",
-            "reasoning": "You need money that is easier to access and moves less before taking more investment risk.",
+            "reasoning": "You need money that is easier to access and moves less before taking more investment risk." + _fund_phrase(debt_funds),
             "whatCanGoWrong": "Returns can be modest and may change with interest rates. Credit risk depends on the fund.",
             "suitableFor": "Emergency fund, near-term goals, or users uncomfortable with market swings.",
             "timeHorizon": "0-3 years",
@@ -316,6 +390,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
         {
             "id": "rec-gold-sgb",
             "assetClass": "Gold ETF or Sovereign Gold Bond",
+            "specificFunds": gold_funds,
             "suggestedAllocation": gold_percent,
             "suggestedMonthlyAmount": amount(gold_percent),
             "strategyType": "Diversification",
@@ -323,7 +398,7 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
             "exitTiming": "Review if gold crosses 15% of total net worth.",
             "confidenceScore": 72,
             "riskLevel": "Medium",
-            "reasoning": "A small gold investment can reduce dependence on only shares and mutual funds.",
+            "reasoning": "A small gold investment can reduce dependence on only shares and mutual funds." + _fund_phrase(gold_funds),
             "whatCanGoWrong": "Gold can remain flat for long periods and does not create business earnings.",
             "suitableFor": "Users who want some protection from currency and market stress.",
             "timeHorizon": "3+ years",
@@ -364,7 +439,28 @@ def recommendation_agent(profile: OnboardingProfile) -> list[dict]:
     return recommendations
 
 
-def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dict]:
+def _linked_credit(goal, current: int, required: int, surplus: int, holdings_by_id: dict | None) -> tuple[int, int, int]:
+    """Credit the holdings linked to this goal toward it: raise progress to the
+    linked total and shrink the remaining monthly need by the linked SIPs, then
+    recompute feasibility. ``holdings_by_id`` (manual holdings incl. cash/EPF +
+    virtual action holdings) and ``linkedHoldingIds`` are the single source of
+    truth, so linking at take-action time and linking later behave identically.
+    Returns (current, required, feasibility)."""
+    linked_ids = set(goal.linkedHoldingIds or [])
+    hmap = holdings_by_id or {}
+    if not linked_ids or not hmap:
+        feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 75
+        return current, required, feasibility
+    linked = [hmap[i] for i in linked_ids if i in hmap]
+    linked_value = sum(int(v.get("value") or 0) for v in linked)
+    linked_monthly = sum(int(v.get("monthly") or 0) for v in linked)
+    current = max(current, linked_value)
+    required = max(required - linked_monthly, 0)
+    feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 95
+    return current, required, feasibility
+
+
+def goal_agent(profile: OnboardingProfile, worth: int, surplus: int, holdings_by_id: dict | None = None) -> list[dict]:
     if profile.goals:
         income = monthly_income(profile)
         planned_goals = []
@@ -378,7 +474,7 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
             warning = ""
             if estimated_goal_emi and income and ((total_emi_payments(profile) + estimated_goal_emi) / income) > 0.35:
                 warning = "This EMI may take too much of your monthly income and reduce your ability to save for other goals."
-            feasibility = min(95, max(10, round((surplus / max(required, 1)) * 70))) if required else 75
+            current, required, feasibility = _linked_credit(goal, current, required, surplus, holdings_by_id)
             slug = goal_display_name(goal).lower().replace("/", "-").replace(" ", "-")
             planned_goals.append(
                 {
@@ -424,9 +520,9 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
         {
             "id": "goal-emergency",
             "name": "Emergency fund",
-            "targetAmount": max(profile.emergencyFundTarget, profile.monthlyExpenses * 6),
+            "targetAmount": max(profile.emergencyFundTarget, emergency_target_base(profile)),
             "currentProgress": profile.cashBalance,
-            "requiredMonthlyInvestment": ceil(max(max(profile.emergencyFundTarget, profile.monthlyExpenses * 6) - profile.cashBalance, 0) / 6),
+            "requiredMonthlyInvestment": ceil(max(max(profile.emergencyFundTarget, emergency_target_base(profile)) - profile.cashBalance, 0) / 6),
             "feasibilityScore": min(96, round((surplus / max(profile.monthlyExpenses, 1)) * 60)),
             "timelineProjection": "6 months target",
             "explanation": "Emergency money protects you from job loss, medical costs, or sudden expenses.",
@@ -480,11 +576,16 @@ def goal_agent(profile: OnboardingProfile, worth: int, surplus: int) -> list[dic
 
 def allocation(profile: OnboardingProfile) -> list[dict]:
     colors = ["#2ac8b0", "#5fb0ff", "#f6c85f", "#f28b82", "#9b8cff", "#71d083", "#c7d2fe", "#f59e0b", "#34d399", "#a78bfa"]
+    # goldValue lumps gold + silver (see profile aggregation), so split silver back
+    # out for display — a silver holding must not be charted as gold.
+    silver_value = sum(int(h.currentValue or 0) for h in (profile.holdings or []) if getattr(h, "assetClass", "") == "silver")
+    gold_value = max(int(profile.goldValue) - silver_value, 0)
     items = [
         ("Direct stocks", profile.stocksValue),
         ("Mutual funds", profile.mutualFundsValue),
         ("Crypto", profile.cryptoValue),
-        ("Gold", profile.goldValue),
+        ("Gold", gold_value),
+        ("Silver", silver_value),
         ("EPF/PPF", profile.epfPpfValue),
         ("Real estate", profile.realEstateValue),
         ("Cash", profile.cashBalance),
@@ -493,18 +594,18 @@ def allocation(profile: OnboardingProfile) -> list[dict]:
     return [{"name": name, "value": value, "color": colors[index % len(colors)]} for index, (name, value) in enumerate(items) if value > 0]
 
 
-def build_dashboard(profile: OnboardingProfile) -> dict:
+def build_dashboard(profile: OnboardingProfile, holdings_by_id: dict | None = None) -> dict:
     profile.age = calculate_age(profile.dateOfBirth, profile.age)
     income = monthly_income(profile)
     profile.monthlyCashInflow = income
     worth = net_worth(profile)
     emi_total = total_emi_payments(profile)
-    surplus = max(income - profile.monthlyExpenses - emi_total, 0)
+    surplus = investable_surplus(profile, computed_monthly_surplus(profile))
     savings_rate = (surplus / income * 100) if income else 0
     risk_profile = "Higher growth comfort" if profile.volatilityComfort == "High" else "More stability preferred" if profile.volatilityComfort == "Low" else "Balanced growth"
     health = health_agent(profile)
     recommendations = recommendation_agent(profile)
-    goals = goal_agent(profile, worth, surplus)
+    goals = goal_agent(profile, worth, surplus, holdings_by_id)
     market = research_agent(profile)
     behavior = behavior_agent(profile)
 
@@ -525,7 +626,7 @@ def build_dashboard(profile: OnboardingProfile) -> dict:
             {"name": "Housing", "value": profile.rent},
             {"name": "EMI and loans", "value": emi_total},
             {"name": "Subscriptions", "value": profile.subscriptions},
-            {"name": "Other spends", "value": max(profile.monthlyExpenses - profile.rent - profile.subscriptions, 0)},
+            {"name": "Other spends", "value": profile.monthlyExpenses},
         ],
         "alerts": [
             alert

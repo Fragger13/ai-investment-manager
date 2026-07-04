@@ -2,130 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Friendly & Bright — a warm, approachable palette for first-time investors.
+   Money-green primary with coral / sun / grape accents. Big radii, soft shadows,
+   a rounded friendly typeface (Plus Jakarta Sans). Both light + dark supported.
+   ─────────────────────────────────────────────────────────────────────────── */
+
 :root {
   color-scheme: light;
-  --background: 210 20% 98%;
+  --background: 36 100% 97%;        /* warm cream */
   --surface: 0 0% 100%;
   --surface-elevated: 0 0% 100%;
-  --surface-soft: 210 18% 96%;
-  --surface-hover: 210 16% 92%;
-  --foreground: 215 28% 17%;
-  --text-primary: 215 28% 17%;
-  --text-secondary: 215 12% 45%;
+  /* Soft in-card surfaces use a cool slate (not peach) so panels, chips and the
+     "do this first" rows read clearly against both the warm page and white cards. */
+  --surface-soft: 220 24% 95%;
+  --surface-hover: 220 20% 90%;
+  --foreground: 222 28% 13%;        /* soft ink, not pure black */
+  --text-primary: 222 28% 13%;
+  --text-secondary: 222 20% 30%;    /* firmer slate — readable secondary text */
   --card: 0 0% 100%;
-  --card-foreground: 215 28% 17%;
+  --card-foreground: 222 28% 13%;
   --popover: 0 0% 100%;
-  --popover-foreground: 215 28% 17%;
-  --primary: 142 71% 38%;
+  --popover-foreground: 222 28% 13%;
+  --primary: 157 84% 31%;           /* money green — deepened for legible text/links */
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 18% 94%;
-  --secondary-foreground: 215 28% 17%;
-  --muted: 210 18% 95%;
-  --muted-foreground: 215 12% 45%;
-  --accent: 142 60% 94%;
-  --accent-foreground: 142 71% 22%;
-  --destructive: 0 72% 54%;
+  --secondary: 220 22% 94%;
+  --secondary-foreground: 222 28% 13%;
+  --muted: 220 24% 95%;
+  --muted-foreground: 222 20% 30%;  /* darkened from 38% — helper/label text now reads clearly on cream */
+  --accent: 157 60% 92%;            /* mint tint */
+  --accent-foreground: 158 78% 23%;
+  --destructive: 6 88% 61%;
   --destructive-foreground: 0 0% 100%;
-  --border: 214 18% 89%;
-  --input: 214 16% 86%;
-  --ring: 142 71% 38%;
-  --positive: 153 62% 34%;
-  --positive-foreground: 152 76% 23%;
-  --positive-soft: 145 60% 95%;
-  --warning: 38 92% 46%;
-  --warning-foreground: 32 82% 27%;
-  --warning-soft: 44 95% 93%;
-  --negative: 0 72% 54%;
-  --negative-foreground: 0 69% 39%;
-  --negative-soft: 0 86% 96%;
-  --info: 211 78% 52%;
-  --info-foreground: 213 70% 36%;
-  --info-soft: 214 95% 95%;
-  --overlay: 215 32% 16%;
-  --chart-grid: 214 16% 90%;
-  --chart-axis: 215 12% 45%;
-  --chart-primary: 142 71% 38%;
-  --chart-secondary: 211 78% 52%;
-  --chart-tertiary: 262 69% 58%;
-  --chart-quaternary: 38 92% 46%;
-  --chart-series-1: 142 71% 38%;
-  --chart-series-2: 211 78% 52%;
-  --chart-series-3: 43 89% 48%;
-  --chart-series-4: 292 72% 52%;
-  --chart-series-5: 24 91% 54%;
-  --chart-series-6: 262 69% 58%;
-  --chart-series-7: 215 16% 55%;
+  --border: 36 30% 86%;
+  --input: 36 28% 82%;
+  --ring: 157 84% 31%;
+
+  --positive: 157 62% 37%;
+  --positive-foreground: 158 70% 23%;
+  --positive-soft: 157 60% 92%;
+  --warning: 38 96% 50%;
+  --warning-foreground: 30 84% 30%;
+  --warning-soft: 44 100% 90%;
+  --negative: 6 88% 61%;
+  --negative-foreground: 4 74% 42%;
+  --negative-soft: 8 100% 95%;
+  --info: 252 92% 67%;
+  --info-foreground: 252 58% 45%;
+  --info-soft: 252 100% 96%;
+
+  /* Playful accents */
+  --coral: 11 100% 68%;
+  --coral-foreground: 0 0% 100%;
+  --coral-soft: 11 100% 94%;
+  --sun: 43 100% 58%;
+  --sun-foreground: 32 86% 27%;
+  --sun-soft: 44 100% 90%;
+  --grape: 252 100% 68%;
+  --grape-foreground: 0 0% 100%;
+  --grape-soft: 252 100% 96%;
+
+  --overlay: 222 32% 14%;
+  --chart-grid: 36 24% 90%;
+  --chart-axis: 222 13% 46%;
+  --chart-primary: 157 74% 40%;
+  --chart-secondary: 252 92% 67%;
+  --chart-tertiary: 11 100% 68%;
+  --chart-quaternary: 43 100% 58%;
+  --chart-series-1: 157 74% 40%;
+  --chart-series-2: 252 92% 67%;
+  --chart-series-3: 11 100% 68%;
+  --chart-series-4: 43 100% 58%;
+  --chart-series-5: 199 89% 55%;
+  --chart-series-6: 322 84% 64%;
+  --chart-series-7: 222 14% 56%;
+
   --sidebar-bg: 0 0% 100%;
-  --sidebar-border: 214 18% 91%;
-  --body-background: hsl(210 20% 98%);
+  --sidebar-border: 36 30% 90%;
+  --body-background: linear-gradient(180deg, hsl(38 100% 97%) 0%, hsl(36 100% 98%) 100%);
   --glass-background: #ffffff;
-  --glass-border: hsl(214 18% 91%);
-  --glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --grid-line: rgba(15, 23, 42, 0.045);
-  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --glass-border: hsl(36 30% 90%);
+  --glass-shadow: 0 2px 6px rgba(124, 92, 40, 0.05);
+  --grid-line: rgba(124, 92, 40, 0.04);
+  --radius: 1rem;
+  --card-shadow: 0 1px 2px rgba(124, 92, 40, 0.04), 0 8px 20px -10px rgba(124, 92, 40, 0.12);
+  --shadow-pop: 0 10px 30px -12px rgba(124, 92, 40, 0.22);
 }
 
 .dark {
   color-scheme: dark;
-  --background: 210 38% 5%;
-  --surface: 211 35% 9%;
-  --surface-elevated: 211 31% 12%;
-  --surface-soft: 210 24% 14%;
-  --surface-hover: 210 22% 18%;
-  --foreground: 180 20% 96%;
-  --text-primary: 180 20% 96%;
-  --text-secondary: 202 14% 68%;
-  --card: 211 35% 9%;
-  --card-foreground: 180 20% 96%;
-  --popover: 211 35% 9%;
-  --popover-foreground: 180 20% 96%;
-  --primary: 142 65% 50%;
-  --primary-foreground: 202 44% 7%;
-  --secondary: 210 24% 14%;
-  --secondary-foreground: 180 20% 96%;
-  --muted: 211 26% 16%;
-  --muted-foreground: 202 14% 68%;
-  --accent: 142 40% 18%;
-  --accent-foreground: 142 65% 70%;
-  --destructive: 0 72% 54%;
+  --background: 230 24% 9%;
+  --surface: 228 18% 13%;
+  --surface-elevated: 228 16% 16%;
+  --surface-soft: 228 15% 17%;
+  --surface-hover: 228 14% 22%;
+  --foreground: 40 32% 96%;
+  --text-primary: 40 32% 96%;
+  --text-secondary: 225 15% 71%;
+  --card: 228 18% 13%;
+  --card-foreground: 40 32% 96%;
+  --popover: 228 18% 13%;
+  --popover-foreground: 40 32% 96%;
+  --primary: 157 66% 50%;
+  --primary-foreground: 228 32% 8%;
+  --secondary: 228 15% 18%;
+  --secondary-foreground: 40 32% 96%;
+  --muted: 228 15% 18%;
+  --muted-foreground: 225 15% 71%;
+  --accent: 157 42% 20%;
+  --accent-foreground: 157 66% 72%;
+  --destructive: 6 84% 64%;
   --destructive-foreground: 0 0% 100%;
-  --border: 204 24% 20%;
-  --input: 204 24% 20%;
-  --ring: 142 65% 50%;
-  --positive: 156 72% 48%;
-  --positive-foreground: 152 68% 74%;
-  --positive-soft: 155 55% 13%;
-  --warning: 42 92% 56%;
-  --warning-foreground: 45 93% 76%;
-  --warning-soft: 38 54% 15%;
-  --negative: 0 78% 61%;
-  --negative-foreground: 0 91% 79%;
-  --negative-soft: 0 48% 16%;
-  --info: 199 88% 58%;
-  --info-foreground: 197 91% 75%;
-  --info-soft: 203 56% 16%;
-  --overlay: 210 38% 3%;
-  --chart-grid: 204 24% 20%;
-  --chart-axis: 202 14% 68%;
-  --chart-primary: 142 65% 50%;
-  --chart-secondary: 199 88% 58%;
-  --chart-tertiary: 262 83% 70%;
-  --chart-quaternary: 42 92% 56%;
-  --chart-series-1: 142 65% 50%;
-  --chart-series-2: 211 90% 68%;
-  --chart-series-3: 43 89% 64%;
-  --chart-series-4: 292 84% 72%;
-  --chart-series-5: 24 94% 62%;
-  --chart-series-6: 262 83% 70%;
-  --chart-series-7: 215 16% 67%;
-  --sidebar-bg: 211 35% 9%;
-  --sidebar-border: 204 24% 18%;
-  --body-background: hsl(210 38% 5%);
-  --glass-background: hsl(211 35% 9%);
-  --glass-border: hsl(204 24% 18%);
-  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --border: 228 15% 23%;
+  --input: 228 15% 23%;
+  --ring: 157 66% 50%;
+
+  --positive: 157 62% 52%;
+  --positive-foreground: 157 60% 77%;
+  --positive-soft: 157 45% 15%;
+  --warning: 42 96% 60%;
+  --warning-foreground: 44 92% 78%;
+  --warning-soft: 38 52% 16%;
+  --negative: 6 84% 66%;
+  --negative-foreground: 6 90% 81%;
+  --negative-soft: 6 46% 18%;
+  --info: 252 95% 78%;
+  --info-foreground: 252 92% 85%;
+  --info-soft: 252 42% 22%;
+
+  --coral: 11 100% 72%;
+  --coral-foreground: 228 32% 8%;
+  --coral-soft: 11 46% 19%;
+  --sun: 43 100% 64%;
+  --sun-foreground: 228 32% 8%;
+  --sun-soft: 40 52% 17%;
+  --grape: 252 100% 78%;
+  --grape-foreground: 228 32% 8%;
+  --grape-soft: 252 42% 22%;
+
+  --overlay: 230 30% 4%;
+  --chart-grid: 228 15% 23%;
+  --chart-axis: 225 15% 71%;
+  --chart-primary: 157 66% 52%;
+  --chart-secondary: 252 95% 78%;
+  --chart-tertiary: 11 100% 72%;
+  --chart-quaternary: 43 100% 64%;
+  --chart-series-1: 157 66% 52%;
+  --chart-series-2: 252 95% 78%;
+  --chart-series-3: 11 100% 72%;
+  --chart-series-4: 43 100% 64%;
+  --chart-series-5: 199 90% 66%;
+  --chart-series-6: 322 84% 70%;
+  --chart-series-7: 225 16% 68%;
+
+  --sidebar-bg: 228 19% 11%;
+  --sidebar-border: 228 15% 20%;
+  --body-background: hsl(230 24% 9%);
+  --glass-background: hsl(228 18% 13%);
+  --glass-border: hsl(228 15% 20%);
+  --glass-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   --grid-line: rgba(255, 255, 255, 0.035);
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -14px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 14px 34px -14px rgba(0, 0, 0, 0.7);
 }
 
 * {
@@ -140,12 +178,61 @@ html {
 body {
   min-height: 100vh;
   background: var(--body-background);
+  background-attachment: fixed;
   color: hsl(var(--foreground));
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   transition: background-color 200ms ease, color 200ms ease;
 }
 
 ::selection {
-  background: hsl(var(--primary) / 0.32);
+  background: hsl(var(--primary) / 0.28);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   AskPapa type scale — one consistent hierarchy across every screen.
+   Use these so headings, values and labels never compete or drift.
+
+     page title   .ap-title        text-3xl/4xl  · 800   (greeting, page H1)
+     section      .ap-section      text-xl/2xl   · 700   (card-group headings)
+     card title   CardTitle        text-lg       · 700
+     hero number  .ap-stat-xl      text-4xl/5xl  · 800   (the ONE key value)
+     big number   .ap-stat         text-2xl/3xl  · 700   (snapshot values)
+     body         text-[15px]/base · 400-500
+     label        .ap-label        text-sm       · 600   (slate, sits ABOVE a value)
+     helper       .ap-help         text-[13px]   · 500   (muted, still readable)
+     eyebrow      .ap-eyebrow      text-xs       · 700   (tiny uppercase tag only)
+   Financial numbers use tabular figures so columns line up.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .ap-title {
+    @apply text-3xl font-extrabold leading-tight tracking-tight text-foreground md:text-4xl;
+  }
+  .ap-section {
+    @apply text-xl font-bold leading-snug tracking-tight text-foreground md:text-2xl;
+  }
+  .ap-stat-xl {
+    @apply text-4xl font-extrabold leading-none tracking-tight md:text-5xl;
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-stat {
+    @apply text-2xl font-bold leading-tight tracking-tight md:text-3xl;
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-label {
+    @apply text-sm font-semibold text-muted-foreground;
+  }
+  .ap-help {
+    @apply text-sm font-medium leading-relaxed text-muted-foreground;
+  }
+  .ap-eyebrow {
+    @apply text-xs font-bold uppercase tracking-wide text-muted-foreground;
+  }
+  /* Tabular figures for any inline number that should align in a column. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .glass {
@@ -159,10 +246,56 @@ body {
   border-right: 1px solid hsl(var(--sidebar-border));
 }
 
+/* Friendly micro-interactions */
+.card-pop {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.card-pop:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+}
+
 .grid-bg {
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent 78%);
+}
+
+/* Hide the Next.js dev indicator that overlaps content in the corner */
+[data-nextjs-dev-indicator],
+#__next-build-watcher {
+  display: none !important;
+}
+
+/* Make user-entered values inside any popup/dialog bold for legibility. */
+[role="dialog"] input,
+[role="dialog"] textarea {
+  font-weight: 600;
+}
+
+/* Onboarding is a light-only funnel; force every field's typed value to pure
+   black for maximum legibility. Scoped via the data-onboarding marker set by
+   the ThemeProvider so it reaches inputs inside popups that portal to <body>,
+   yet never touches the rest of the app. Placeholders keep their own muted
+   color (set explicitly via placeholder:text-* utilities). */
+html[data-onboarding="true"] input,
+html[data-onboarding="true"] textarea,
+html[data-onboarding="true"] [role="combobox"] {
+  color: #000;
+}
+
+/* Onboarding: render the entered value in bold for legibility. Placeholders
+   stay normal weight so an empty field still reads as a hint, not an answer.
+   A select shows its placeholder while it carries data-placeholder, so bold
+   only kicks in once a real value is chosen. */
+html[data-onboarding="true"] input,
+html[data-onboarding="true"] textarea,
+html[data-onboarding="true"] [role="combobox"]:not([data-placeholder]) {
+  font-weight: 600;
+}
+html[data-onboarding="true"] input::placeholder,
+html[data-onboarding="true"] textarea::placeholder {
+  font-weight: 400;
 }

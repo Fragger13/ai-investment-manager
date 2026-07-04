@@ -8,12 +8,12 @@ export function MetricCard({ label, value, detail, icon, accent = "cyan" }: { la
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-            <p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>
+            <p className="ap-eyebrow">{label}</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-foreground tnum">{value}</p>
           </div>
           <ColorfulIcon icon={icon} accent={accent} label={label} />
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">{detail}</p>
+        <p className="ap-help mt-2">{detail}</p>
       </CardContent>
     </Card>
   );

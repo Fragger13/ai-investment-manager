@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { api, ApiError } from "@/lib/api";
 import { onboardingSchema } from "@/lib/schemas";
-import { ageFromDob, normalizeProfileForForm, totalMonthlyEmi } from "@/lib/profile";
+import { ageFromDob, currentBudgetMonth, normalizeProfileForForm, totalMonthlyEmi } from "@/lib/profile";
 import { useAuthStore } from "@/store/auth-store";
 import { OnboardingProfile } from "@/types";
 import { OnboardingShell } from "./_components/onboarding-shell";
@@ -53,6 +53,20 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [stepError, setStepError] = useState("");
   const initializedFromQuery = useRef(false);
+  const stepErrorRef = useRef<HTMLParagraphElement | null>(null);
+
+  // Start each screen at the top — on mobile the user is usually scrolled to
+  // the bottom (where Continue lives) when the next screen mounts.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [screenIndex]);
+
+  // Surface validation errors even when the card is taller than the viewport.
+  useEffect(() => {
+    if (stepError) {
+      stepErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [stepError]);
 
   const form = useForm<OnboardingProfile>({
     resolver: zodResolver(onboardingSchema),
@@ -116,13 +130,16 @@ export default function OnboardingPage() {
       "10-15%": "Balanced",
       "15%+": "Higher growth with more ups and downs"
     };
-    const reactionToPanic: Record<string, string> = {
-      "I stay calm": "Rarely", "I get worried": "Sometimes", "I may sell": "Often"
+    // Panic-sell tendency is inferred from how big a long-term drawdown the user
+    // can sit through (Risk section) — the "markets fall 10%" habit question was
+    // removed as a duplicate of this signal.
+    const drawdownToPanic: Record<string, string> = {
+      "0-10%": "Often", "10-25%": "Sometimes", "25%+": "Rarely"
     };
     const loss = values.shortTermLossTolerance || "";
     const vol = lossToVolatility[loss] || values.shortTermVolatilityComfort || "";
     const psych = lossToPsychology[loss] || values.investmentPsychology || "";
-    const panic = reactionToPanic[values.riskReaction || ""] || values.panicSellRisk || "";
+    const panic = drawdownToPanic[values.drawdownTolerance || ""] || values.panicSellRisk || "";
     if (vol && vol !== values.shortTermVolatilityComfort) {
       form.setValue("shortTermVolatilityComfort", vol, { shouldValidate: false });
     }
@@ -132,7 +149,7 @@ export default function OnboardingPage() {
     if (panic && panic !== values.panicSellRisk) {
       form.setValue("panicSellRisk", panic, { shouldValidate: false });
     }
-  }, [values.shortTermLossTolerance, values.riskReaction, values.shortTermVolatilityComfort, values.investmentPsychology, values.panicSellRisk, form]);
+  }, [values.shortTermLossTolerance, values.drawdownTolerance, values.shortTermVolatilityComfort, values.investmentPsychology, values.panicSellRisk, form]);
 
   // Handle query-param entrypoints
   useEffect(() => {
@@ -211,7 +228,10 @@ export default function OnboardingPage() {
         monthlyCashInflow: valuesToSubmit.monthlySalary + valuesToSubmit.otherIncome,
         incomeStructureVersion: 2,
         emi: totalMonthlyEmi(valuesToSubmit.emiLoans),
-        volatilityComfort: valuesToSubmit.shortTermVolatilityComfort
+        volatilityComfort: valuesToSubmit.shortTermVolatilityComfort,
+        // Stamp the "invest this month" override with the current month so the
+        // dashboard applies it right away (the backend stamps the same way).
+        investableThisMonthMonth: Number(valuesToSubmit.investableThisMonth || 0) > 0 ? currentBudgetMonth() : ""
       };
       await api.saveOnboarding(normalized, token);
       saveProfile(normalized, true);
@@ -277,6 +297,14 @@ export default function OnboardingPage() {
     if (flowMode === "default" && isLastDataScreen) {
       const success = await finalSubmit();
       if (success) {
+        // Kick off the slow post-onboarding work NOW (recommendations + their LLM
+        // summaries, asset research) so it completes in the background while the
+        // celebrate screen + Papa's tour play — Plan/Discover are warm by the
+        // time the tour walks the user there. Fire-and-forget, never blocks.
+        const submitted = form.getValues();
+        void api.generateAdvancedRecommendations(submitted, false).catch(() => {});
+        void api.dashboard(submitted).catch(() => {});
+        void api.assetIntelligence().catch(() => {});
         setDirection(1);
         setScreenIndex(safeIndex + 1); // advance to celebrate
       }
@@ -321,6 +349,27 @@ export default function OnboardingPage() {
     }
   }
 
+  // Enter advances the flow, so keyboard users never have to reach for the
+  // Continue button. Skipped inside dialogs/popovers and on focused buttons
+  // (where Enter already has its own meaning).
+  const goNextRef = useRef<() => Promise<void>>(async () => {});
+  goNextRef.current = goNext;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A" || tag === "SELECT") return;
+        if (target.closest('[role="dialog"],[role="listbox"],[role="menu"],[role="combobox"]')) return;
+      }
+      event.preventDefault();
+      void goNextRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   if (!current) return null;
 
   return (
@@ -345,7 +394,7 @@ export default function OnboardingPage() {
             return <ScreenRenderer form={form} values={values} next={goNext} back={goBack} />;
           })()}
         </ScreenFrame>
-        {stepError ? <p className="mt-5 text-sm font-medium text-negative-foreground">{stepError}</p> : null}
+        {stepError ? <p ref={stepErrorRef} className="mt-5 text-sm font-medium text-negative-foreground">{stepError}</p> : null}
       </OnboardingShell>
     </FormProvider>
   );

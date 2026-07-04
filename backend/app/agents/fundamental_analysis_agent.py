@@ -6,16 +6,11 @@ import re
 from app.services.recommendations.asset_screening_service import ResearchAsset
 
 
-FUNDAMENTAL_HINTS = {
-    "HDFC Bank Ltd": ("Large private bank with durable deposit franchise; near-term monitor is credit growth and margins.", 74),
-    "ICICI Bank Ltd": ("Large private bank with improving profitability profile; monitor asset quality and deposit competition.", 75),
-    "Reliance Industries Ltd": ("Diversified earnings base across energy, telecom, retail, and digital; monitor capex and commodity cycle.", 70),
-    "Infosys Ltd": ("Export-oriented IT services exposure; monitor US/Europe technology spending and margins.", 68),
-    "Bharat Electronics Ltd": ("Defence electronics beneficiary with policy/capex tailwind; monitor order execution and valuation risk.", 73),
-    "Larsen & Toubro Ltd": ("Capital-goods and infrastructure execution proxy; monitor order inflow and working capital.", 74),
-    "Kaynes Technology India Ltd": ("Electronics manufacturing growth candidate; monitor margin durability and valuation.", 64),
-    "KPIT Technologies Ltd": ("Auto software and EV transition exposure; monitor client concentration and growth normalization.", 65),
-}
+# No hardcoded per-stock fundamentals. Real fundamentals (revenue/margins/ROE/
+# valuation) require a dedicated data source; until that exists, stock selection
+# rests on the quantitative factor engine (price-based, risk-adjusted) plus the
+# news-derived sector sentiment below — never on fabricated per-name scores.
+FUNDAMENTAL_HINTS: dict[str, tuple[str, int]] = {}
 
 
 def analyze_fundamentals(asset: ResearchAsset) -> dict:

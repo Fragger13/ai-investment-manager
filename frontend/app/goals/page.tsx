@@ -8,30 +8,68 @@ import { ColorfulIcon } from "@/components/colorful-icon";
 import { GoalEditDialog } from "@/components/goal-edit-dialog";
 import { InvestmentLogo } from "@/components/investment-logo";
 import { LinkHoldingsDialog } from "@/components/link-holdings-dialog";
+import { TakeActionDialog } from "@/components/take-action-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { goalIconSpec } from "@/lib/icon-maps";
-import { emptyDashboard } from "@/lib/profile";
-import { inr } from "@/lib/utils";
+import { availableToInvest, emptyDashboard } from "@/lib/profile";
+import { ActionItem, buildPlan, mergeIntoActionItems } from "@/lib/plan";
+import { cn, inr } from "@/lib/utils";
+import { useEnsureProfile } from "@/lib/use-ensure-profile";
 import { useAuthStore } from "@/store/auth-store";
-import { DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
+import { usePlanActionsStore } from "@/store/plan-actions-store";
+import { AdvancedRecommendation, AssetIntelligence, DashboardData, PortfolioHolding, PortfolioSummary, ProfileGoal } from "@/types";
 
 export default function GoalsPage() {
-  const profile = useAuthStore((state) => state.profile);
+  // Recover the profile from the backend if the store is empty (deep load /
+  // pre-rehydration), so goals + funding figures match the other tabs.
+  const profile = useEnsureProfile();
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
+  const [rawRecs, setRawRecs] = useState<AdvancedRecommendation[]>([]);
+  const [assets, setAssets] = useState<AssetIntelligence[]>([]);
 
   useEffect(() => {
     if (profile) {
       api.dashboard(profile).then(setData);
-      api.portfolioSummary(profile).then(setPortfolio).catch(() => setPortfolio(null));
+      api.portfolioSummary(profile, useAuthStore.getState().token).then(setPortfolio).catch(() => setPortfolio(null));
+      // Pull the same plan recommendations so each goal's "Save more" fix can
+      // offer the user's goal-linked picks to act on (amount pre-filled).
+      api.generateAdvancedRecommendations(profile, false).then((res) => setRawRecs(res.recommendations || [])).catch(() => setRawRecs([]));
+      // Real fund universe — used to offer genuine moderate-risk picks (with
+      // their own return estimate) for the "Accept moderate risk" fix.
+      api.assetIntelligence().then(setAssets).catch(() => setAssets([]));
     }
   }, [profile]);
 
   const holdings = portfolio?.holdings ?? [];
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
+  const recItems = useMemo(() => mergeIntoActionItems(rawRecs, data), [rawRecs, data]);
+  // The exact list the money plan is showing right now (top-3 pending + completed),
+  // so each goal's "Save more" fix only offers items that are actually in the plan.
+  const takenKeys = useMemo(() => new Set(actionsTaken.map((a) => a.key)), [actionsTaken]);
+  const committedMonthly = useMemo(() => actionsTaken.filter((a) => a.cadence !== "one_time").reduce((s, a) => s + (a.amount || 0), 0), [actionsTaken]);
+  const available = availableToInvest(profile, data.summary.monthlyIncome, committedMonthly);
+  const planVisible = useMemo(() => buildPlan(recItems, takenKeys, available, true)["Must Do"], [recItems, takenKeys, available]);
+  // Genuine moderate-risk funds (real name + real return), for the "Accept
+  // moderate risk" fix — no fabricated instruments.
+  const moderateFunds = useMemo<ModerateFund[]>(
+    () => assets
+      .map((a) => ({
+        key: `asset-${a.assetName}-${a.ticker}`,
+        name: a.assetName,
+        category: a.normalizedAssetClass || a.assetType || a.category || "Fund",
+        ticker: a.ticker || "",
+        risk: normRisk(a.risk?.riskCategory || a.assetType || ""),
+        expectedReturn: returnString(a.expectedReturn),
+      }))
+      .filter((o) => o.risk === "Medium" && Boolean(o.expectedReturn))
+      .slice(0, 4),
+    [assets],
+  );
 
   // Build a quick index from goal display name → original ProfileGoal so we can edit
   function findProfileGoal(dashboardGoalName: string): { goal: ProfileGoal; index: number } | null {
@@ -51,19 +89,19 @@ export default function GoalsPage() {
     <AppShell>
       <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Your Goals</h1>
-          <p className="mt-2 text-base text-muted-foreground">Track progress and stay on course.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">Your goals 🎯</h1>
+          <p className="mt-2 text-base text-muted-foreground">Each goal, where it stands, and exactly what it takes to get there.</p>
         </div>
         <GoalEditDialog
           mode={{ kind: "add" }}
-          trigger={<Button className="rounded-full px-5"><Plus className="h-4 w-4" /> Add Goal</Button>}
+          trigger={<Button data-tour="goal-add" className="rounded-full px-5"><Plus className="h-4 w-4" /> Add Goal</Button>}
         />
       </div>
 
       <div className="space-y-5">
-        {data.goals.map((goal) => {
+        {data.goals.map((goal, i) => {
           const match = findProfileGoal(goal.name);
-          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} />;
+          return <GoalCard key={goal.id} goal={goal} profileGoal={match} holdings={holdings} planItems={planVisible} moderateFunds={moderateFunds} tour={i === 0} />;
         })}
       </div>
 
@@ -86,7 +124,7 @@ export default function GoalsPage() {
   );
 }
 
-function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[] }) {
+function GoalCard({ goal, profileGoal, holdings, planItems, moderateFunds, tour }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; holdings: PortfolioHolding[]; planItems: ActionItem[]; moderateFunds: ModerateFund[]; tour?: boolean }) {
   const linkedIds = profileGoal?.goal.linkedHoldingIds || [];
   const linkedHoldings = useMemo(
     () => holdings.filter((h) => linkedIds.includes(h.id)),
@@ -95,28 +133,28 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
   const linkedValue = linkedHoldings.reduce((sum, h) => sum + h.value, 0);
   const linkedMonthly = linkedHoldings.reduce((sum, h) => sum + (h.source === "action" ? (h.monthlyContribution || 0) : 0), 0);
 
-  const effectiveCurrent = Math.max(goal.currentProgress, goal.currentProgress + linkedValue - (profileGoal?.goal.currentAmount || 0));
-  const blendedCurrent = linkedHoldings.length > 0 ? effectiveCurrent : goal.currentProgress;
-  const progress = goal.targetAmount ? Math.min(blendedCurrent / goal.targetAmount * 100, 100) : 0;
-  const remaining = Math.max(goal.targetAmount - blendedCurrent, 0);
-  const onTrack = goal.feasibilityScore >= 70 || (goal.targetAmount > 0 && blendedCurrent / goal.targetAmount >= 0.85);
+  // Linked-holding funding is credited into goal.currentProgress by the backend
+  // (single source of truth), so read it directly — no separate frontend blend.
+  const progress = goal.targetAmount ? Math.min(goal.currentProgress / goal.targetAmount * 100, 100) : 0;
+  const remaining = Math.max(goal.targetAmount - goal.currentProgress, 0);
+  const onTrack = goal.feasibilityScore >= 70 || (goal.targetAmount > 0 && goal.currentProgress / goal.targetAmount >= 0.85);
   const icon = goalIconSpec(goal.name);
 
   return (
-    <Card>
+    <Card data-tour={tour ? "goal-card" : undefined}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <ColorfulIcon icon={icon.icon} accent={icon.accent} label={icon.label} size="md" />
-            <h2 className="text-xl font-semibold text-foreground">{goal.name}</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">{goal.name}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On Track" : "Off Track"}</Badge>
+            <Badge tone={onTrack ? "good" : "danger"}>{onTrack ? "On track" : "Off track"}</Badge>
             {profileGoal ? (
               <GoalEditDialog
                 mode={{ kind: "edit", index: profileGoal.index, goal: profileGoal.goal }}
                 trigger={
-                  <button aria-label="Edit goal" className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground">
+                  <button aria-label="Edit goal" title="Edit goal" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover hover:text-primary">
                     <Pencil className="h-4 w-4" />
                   </button>
                 }
@@ -127,7 +165,7 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
 
         <div className="mt-6 grid grid-cols-2 gap-y-5 md:grid-cols-4">
           <Stat label="Target" value={inr(goal.targetAmount)} />
-          <Stat label="Current" value={inr(blendedCurrent)} />
+          <Stat label="Current" value={inr(goal.currentProgress)} />
           <Stat label="Remaining" value={inr(remaining)} />
           <Stat label="Time Left" value={goal.timelineProjection || "Update date"} />
         </div>
@@ -147,27 +185,21 @@ function GoalCard({ goal, profileGoal, holdings }: { goal: DashboardData["goals"
           />
         ) : null}
 
-        <div className={`mt-5 flex flex-col gap-2 rounded-xl px-4 py-3 md:flex-row md:items-center md:justify-between ${onTrack ? "bg-positive-soft/60" : "bg-negative-soft/60"}`}>
+        <div className={`mt-5 flex flex-col gap-3 rounded-xl px-4 py-3.5 md:flex-row md:items-center md:justify-between ${onTrack ? "bg-positive-soft/60" : "bg-negative-soft/60"}`}>
           <div className="flex items-start gap-2.5">
-            {onTrack ? <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-positive-foreground" /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-negative-foreground" />}
+            {onTrack ? <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-positive-foreground" /> : <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-negative-foreground" />}
             <div>
-              <p className={`text-sm font-semibold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Reality Check</p>
-              <p className="mt-0.5 text-sm text-foreground/80">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
+              <p className={`text-sm font-bold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Reality check</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-foreground">{onTrack ? "You're on track to achieve this goal." : "At your current pace, the goal will be missed."}</p>
             </div>
           </div>
-          <p className={`shrink-0 text-sm font-semibold ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>Need {inr(goal.requiredMonthlyInvestment)}/month</p>
+          <div className="shrink-0 md:text-right">
+            <p className="ap-eyebrow">Need / month</p>
+            <p className={`text-xl font-extrabold tracking-tight tnum ${onTrack ? "text-positive-foreground" : "text-negative-foreground"}`}>{inr(goal.requiredMonthlyInvestment)}</p>
+          </div>
         </div>
 
-        {!onTrack ? (
-          <>
-            <p className="mt-5 text-sm font-semibold text-foreground">Fix Options</p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <FixPill icon={ArrowUp} accent="green" title="Increase savings by" value={`${inr(Math.max(Math.round((goal.requiredMonthlyInvestment || 0) * 0.2 / 500) * 500, 500))}/month`} />
-              <FixPill icon={CalendarClock} accent="violet" title="Extend timeline by" value={timelineFix(goal)} />
-              <FixPill icon={TimerReset} accent="teal" title="Accept moderate" value="investment risk" />
-            </div>
-          </>
-        ) : null}
+        {!onTrack ? <PickAFix goal={goal} profileGoal={profileGoal} planItems={planItems} moderateFunds={moderateFunds} /> : null}
       </CardContent>
     </Card>
   );
@@ -197,12 +229,12 @@ function LinkedHoldingsRow({
             {hasLinks ? <Badge tone="primary">{linkedHoldings.length}</Badge> : null}
           </div>
           {hasLinks ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Tracking {inr(linkedValue)}
               {linkedMonthly > 0 ? ` · ${inr(linkedMonthly)}/mo flowing in` : ""}
             </p>
           ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Connect investments from your portfolio so this goal updates automatically.
             </p>
           )}
@@ -211,7 +243,7 @@ function LinkedHoldingsRow({
           mode={{ index: profileGoal.index, goal: profileGoal.goal }}
           holdings={holdings}
           trigger={
-            <Button size="sm" variant={hasLinks ? "outline" : "default"} className="shrink-0">
+            <Button size="sm" variant={hasLinks ? "outline" : "default"} className="shrink-0" data-tour="goal-link">
               <Link2 className="h-3.5 w-3.5" /> {hasLinks ? "Manage links" : "Link holdings"}
             </Button>
           }
@@ -235,28 +267,197 @@ function LinkedHoldingsRow({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-base font-semibold text-foreground">{value}</p>
+      <p className="ap-eyebrow">{label}</p>
+      <p className="mt-1 text-lg font-bold tracking-tight text-foreground tnum">{value}</p>
     </div>
   );
 }
 
-function FixPill({ icon: Icon, accent, title, value }: { icon: typeof ArrowUp; accent: "green" | "violet" | "teal"; title: string; value: string }) {
-  const accentClasses = {
-    green: "bg-positive-soft text-positive-foreground",
-    violet: "bg-[hsl(262_70%_94%)] text-[hsl(262_50%_38%)] dark:bg-[hsl(262_40%_18%)] dark:text-[hsl(262_70%_78%)]",
-    teal: "bg-info-soft text-info-foreground",
-  };
-  return (
-    <button className="group inline-flex items-center gap-2.5 rounded-full border border-border bg-surface py-2 pl-2 pr-4 text-left transition hover:border-primary hover:bg-surface-hover">
-      <span className={`flex h-7 w-7 items-center justify-center rounded-full ${accentClasses[accent]}`}>
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-sm text-foreground">
-        {title} <span className="font-semibold">{value}</span>
-      </span>
-    </button>
+// "Pick a fix — see what happens": three concrete ways to rescue an off-track
+// goal. The recommended one is highlighted; clicking any reveals the actual
+// action (start an SIP / take a moderate-risk fund / push the deadline) so the
+// user can act on it right there.
+function PickAFix({ goal, profileGoal, planItems, moderateFunds }: { goal: DashboardData["goals"][number]; profileGoal: { goal: ProfileGoal; index: number } | null; planItems: ActionItem[]; moderateFunds: ModerateFund[] }) {
+  const profile = useAuthStore((state) => state.profile);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
+  const token = useAuthStore((state) => state.token);
+  const onboardingComplete = useAuthStore((state) => state.onboardingComplete);
+  const actionsTaken = usePlanActionsStore((state) => state.actionsTaken);
+  const [selected, setSelected] = useState<"save" | "extend" | "risk" | null>(null);
+  const [extended, setExtended] = useState(false);
+
+  const saveMore = Math.max(Math.round((goal.requiredMonthlyInvestment || 0) / 500) * 500, 500);
+  // Plan picks (pending or already-started) that fund THIS goal — the user picks
+  // one and acts with the "save more" amount pre-filled.
+  const goalKey = normKey(goal.name);
+  // Only what the money plan is currently showing for THIS goal (pending or
+  // already-started) — not every recommendation in the catalogue.
+  const linkedOptions = useMemo(
+    () => planItems
+      .filter((it) => it.goalName && normKey(it.goalName) === goalKey)
+      .map((it) => ({ key: it.key, name: it.title, category: it.category, ticker: it.ticker, expectedReturn: it.expectedReturn, risk: it.risk, completed: actionsTaken.some((a) => a.key === it.key) })),
+    [planItems, actionsTaken, goalKey],
   );
+  const extendMonths = goal.feasibilityScore >= 45 ? 4 : 8;
+  const newTargetDate = useMemo(() => {
+    const base = profileGoal?.goal.targetDate ? new Date(profileGoal.goal.targetDate) : new Date();
+    if (Number.isNaN(base.getTime())) return null;
+    base.setMonth(base.getMonth() + extendMonths);
+    return base;
+  }, [profileGoal, extendMonths]);
+
+  const fixes = [
+    { key: "save" as const, rec: true, icon: ArrowUp, label: `Save ${inr(saveMore)}/mo more`, outcome: `Gets ${goal.name} back on track to finish on time.` },
+    { key: "extend" as const, rec: false, icon: CalendarClock, label: `Extend by ${extendMonths} months`, outcome: "Keep your current pace and finish a little later." },
+    { key: "risk" as const, rec: false, icon: TimerReset, label: "Accept moderate risk", outcome: "~10–12% returns could get you there sooner." },
+  ];
+
+  function applyExtend() {
+    if (!profile || !profileGoal || !newTargetDate) return;
+    const goals = [...(profile.goals || [])];
+    goals[profileGoal.index] = { ...profileGoal.goal, targetDate: newTargetDate.toISOString().slice(0, 10) };
+    const next = { ...profile, goals };
+    saveProfile(next, onboardingComplete); // re-fetches the dashboard via the profile dep
+    api.saveOnboarding(next, token, { partial: true }).catch(() => null);
+    setExtended(true);
+  }
+
+  const savePayload = {
+    key: `goal-fix-save-${goal.id}`,
+    instrumentName: `Extra SIP for ${goal.name}`,
+    category: goal.name,
+    ticker: "",
+    suggestedMonthlyAmount: saveMore,
+    actionLabel: "Start SIP",
+    reason: `Adds ${inr(saveMore)}/mo so ${goal.name} reaches its target on time.`,
+    kind: "fund" as const,
+    goalName: goal.name,
+  };
+
+  return (
+    <div className="mt-5">
+      <p className="text-[13px] font-bold uppercase tracking-wide text-muted-foreground">Pick a fix — see what happens</p>
+      <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
+        {fixes.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setSelected(f.key)}
+            aria-pressed={selected === f.key}
+            className={cn(
+              "relative rounded-2xl border p-4 text-left transition",
+              f.rec ? "border-primary bg-positive-soft/40" : "border-border bg-surface hover:border-primary/50",
+              selected === f.key && "ring-2 ring-primary/40",
+            )}
+          >
+            {f.rec ? (
+              <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-primary-foreground">Recommended</span>
+            ) : null}
+            <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", f.rec ? "bg-positive-soft text-positive-foreground" : "bg-surface-soft text-muted-foreground")}>
+              <f.icon className="h-4 w-4" />
+            </span>
+            <p className="mt-3 text-sm font-bold text-foreground">{f.label}</p>
+            <p className={cn("mt-1 text-[13px] leading-snug", f.rec ? "text-positive-foreground" : "text-muted-foreground")}>{f.outcome}</p>
+          </button>
+        ))}
+      </div>
+
+      {selected === "save" ? (
+        <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm font-bold text-foreground">Put {inr(saveMore)}/mo toward {goal.name}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {linkedOptions.length ? "Pick one of your plan picks linked to this goal — the amount is pre-filled when you take action." : "Start a fresh contribution toward this goal."}
+          </p>
+          <div className="mt-3 space-y-2">
+            {linkedOptions.length ? linkedOptions.map((opt) => (
+              <div key={opt.key} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
+                <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
+                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.completed ? " · already started" : ""}</p>
+                </div>
+                <TakeActionDialog
+                  payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: opt.completed ? "Top up" : "Start SIP", expectedReturn: opt.expectedReturn, risk: opt.risk, kind: "fund" as const, goalName: goal.name }}
+                  trigger={<Button size="sm" variant={opt.completed ? "outline" : "default"} className="shrink-0">{opt.completed ? "Top up" : "Take action"}</Button>}
+                />
+              </div>
+            )) : (
+              <TakeActionDialog payload={savePayload} trigger={<Button className="w-full sm:w-auto">Start a contribution</Button>} />
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {selected === "risk" ? (
+        <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm font-bold text-foreground">Grow {goal.name} with a moderate-risk fund</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {moderateFunds.length ? "Real moderate-risk funds, each with its own return estimate — the amount is pre-filled when you take action." : "No moderate-risk funds available right now."}
+          </p>
+          <div className="mt-3 space-y-2">
+            {moderateFunds.length ? moderateFunds.map((opt) => (
+              <div key={opt.key} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
+                <InvestmentLogo name={opt.name} category={opt.category} ticker={opt.ticker} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-semibold text-foreground">{opt.name}</p>
+                  <p className="text-[12px] text-muted-foreground">{opt.category}{opt.expectedReturn ? ` · ~${opt.expectedReturn}` : ""}</p>
+                </div>
+                <TakeActionDialog
+                  payload={{ key: opt.key, instrumentName: opt.name, category: opt.category, ticker: opt.ticker, suggestedMonthlyAmount: saveMore, actionLabel: "Start SIP", expectedReturn: opt.expectedReturn, risk: "Medium", kind: "fund" as const, goalName: goal.name }}
+                  trigger={<Button size="sm" className="shrink-0">Take action</Button>}
+                />
+              </div>
+            )) : (
+              <Link href="/asset-intelligence" className="inline-flex text-sm font-semibold text-primary hover:underline">Browse moderate-risk options in Discover →</Link>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {selected === "extend" ? (
+        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            {!profileGoal ? (
+              <p className="text-sm text-muted-foreground">Add this goal to your profile to adjust its timeline.</p>
+            ) : extended ? (
+              <p className="text-sm font-bold text-positive-foreground">Timeline extended to {newTargetDate ? formatMonthYear(newTargetDate) : "a later date"} — your monthly need will drop.</p>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-foreground">Push the target to {newTargetDate ? formatMonthYear(newTargetDate) : "later"}</p>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">Keeps your current saving pace — the required monthly drops as the deadline moves out.</p>
+              </>
+            )}
+          </div>
+          {profileGoal && !extended ? <Button className="shrink-0" onClick={applyExtend}>Apply</Button> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatMonthYear(date: Date) {
+  return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
+function normKey(value: string) {
+  return (value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+type ModerateFund = { key: string; name: string; category: string; ticker: string; risk: string; expectedReturn: string };
+
+function normRisk(value: string) {
+  const t = (value || "").toLowerCase();
+  if (t.includes("low")) return "Low";
+  if (t.includes("high") || t.includes("extreme") || t.includes("very")) return "High";
+  return "Medium";
+}
+
+function returnString(er?: { label?: string; cagrRange?: string; expectedCagr?: number } | null): string {
+  if (!er) return "";
+  if (er.label) return er.label.replace(/CAGR/gi, "p.a.");
+  if (er.cagrRange) return `${er.cagrRange} p.a.`;
+  if (typeof er.expectedCagr === "number") return `${er.expectedCagr}% p.a.`;
+  return "";
 }
 
 function EmptyState({ text, href, cta, useDialog }: { text: string; href?: string; cta: string; useDialog: boolean }) {
@@ -277,8 +478,3 @@ function EmptyState({ text, href, cta, useDialog }: { text: string; href?: strin
   );
 }
 
-function timelineFix(goal: DashboardData["goals"][number]) {
-  if (goal.feasibilityScore >= 70) return "not needed";
-  if (goal.feasibilityScore >= 45) return "4 months";
-  return "8 months";
-}

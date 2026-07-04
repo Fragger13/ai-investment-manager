@@ -6,7 +6,8 @@ import { PapaAvatar } from "../_components/papa-bubble";
 import { SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
 import { ScreenContext } from "../_flow/types";
 
-export function CelebrateScreen(_ctx: ScreenContext) {
+export function CelebrateScreen({ values }: ScreenContext) {
+  const firstName = (values.name || "").trim().split(/\s+/)[0] || "";
   return (
     <div className="relative">
       <Confetti />
@@ -26,7 +27,7 @@ export function CelebrateScreen(_ctx: ScreenContext) {
           That&apos;s My Kid!
         </h1>
         <p className="mt-3 max-w-xl text-base leading-7 text-[#4B5563]">
-          There. A proper plan. Now try not to ignore it for six months.
+          There{firstName ? `, ${firstName}` : ""}. A proper plan. Now try not to ignore it for six months.
         </p>
         <div className="mt-6 grid w-full max-w-md grid-cols-3 gap-3">
           <Pill icon="📊" label="Your dashboard" />

@@ -1,12 +1,20 @@
 "use client";
 
+import { ChoiceCard } from "../_components/choice-card";
 import { CurrencyField } from "../_lib/field-helpers";
 import { formatINR } from "@/lib/currency";
 import { ScreenWrap } from "./about";
 import { ScreenContext } from "../_flow/types";
 
-export function IncomeScreen({ values }: ScreenContext) {
+const SALARY_DAY_OPTIONS = [
+  { value: "Last working day", emoji: "📅", helper: "End of every month" },
+  { value: "1st of the month", emoji: "🗓️", helper: "Start of every month" },
+  { value: "Variable", emoji: "🔀", helper: "Not fixed / irregular" }
+];
+
+export function IncomeScreen({ form, values }: ScreenContext) {
   const inflow = Number(values.monthlySalary || 0) + Number(values.otherIncome || 0);
+  const salaryDay = values.salaryDay || "";
   return (
     <ScreenWrap
       papa="Don't round up too much. Your bank account knows the truth."
@@ -16,14 +24,41 @@ export function IncomeScreen({ values }: ScreenContext) {
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <CurrencyField name="monthlySalary" label="In-hand salary" placeholder="e.g., 1,50,000" autoFocus />
-          <CurrencyField name="otherIncome" label="Other income" placeholder="Rent, freelance, dividends…" optional />
+          <CurrencyField name="monthlySalary" label="In-hand salary" placeholder="e.g., 1,50,000" autoFocus hint="The pay that actually reaches your bank each month, after tax and PF deductions. Not your CTC or gross figure." />
+          <CurrencyField name="otherIncome" label="Other income" placeholder="Rent, freelance, dividends…" optional hint="Any regular extra money: rent you receive, freelance or side income, dividends, and so on. Leave it blank if you don't have any." />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
           <Tile label="Salary" value={formatINR(values.monthlySalary || 0)} />
           <Tile label="Other income" value={formatINR(values.otherIncome || 0)} />
           <Tile label="Total inflow" value={formatINR(inflow)} highlight />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CurrencyField
+            name="investableThisMonth"
+            label="How much can you invest this month?"
+            placeholder="e.g., 30,000"
+            helper="Just for this month — later months auto-use income minus expenses."
+            optional
+            hint="Spare money you could put into investments right now, on top of your normal spending. A rough estimate is fine. From next month, Papa works it out as income minus expenses."
+          />
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-medium text-[#0F172A]">When do you usually get your salary?<span className="ml-1 text-red-500" aria-hidden>*</span></p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {SALARY_DAY_OPTIONS.map((option) => (
+              <ChoiceCard
+                key={option.value}
+                title={option.value}
+                helper={option.helper}
+                emoji={option.emoji}
+                selected={salaryDay === option.value}
+                onSelect={() => form.setValue("salaryDay", option.value, { shouldValidate: true })}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </ScreenWrap>

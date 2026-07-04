@@ -1,12 +1,14 @@
-"""Email verification — generate, send, validate 6-digit OTP codes.
+"""Deferred registration via 6-digit OTP email codes.
 
-Flow:
-  1. On register, `generate_and_send_code(db, user)` mints a 6-digit code,
-     stores it on the user row (10-minute expiry), sends the email.
-  2. User submits the code via the verify-email endpoint.
-  3. `verify_code(db, user, code)` checks expiry + match, marks
-     `email_verified = True`, clears the code fields.
-  4. `resend_code(db, user)` rate-limits resends to once per 60s.
+A sign-up does NOT create a `users` row. Instead:
+  1. `start_registration(db, name, email, password_hash)` stores a
+     PendingRegistration (name + hashed password + a 6-digit code, 10-minute
+     expiry) and emails the code. No account exists yet.
+  2. The user submits the code via the verify-email endpoint.
+  3. `verify_and_create_user(db, email, code)` checks expiry + match, then
+     creates the real (verified) User, deletes the pending row, returns the user.
+  4. `resend_code(db, email)` mints a fresh code on the pending row,
+     rate-limited to once per 60s.
 """
 
 from __future__ import annotations
@@ -17,7 +19,10 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.data_encryption import unwrap_key_with_server, wrap_key_with_recovery
+from app.models.pending_registration import PendingRegistration
 from app.models.user import User
+from app.repositories.user_repository import UserRepository
 from app.services.email.resend_client import EmailResult, send_email
 
 logger = logging.getLogger(__name__)
@@ -42,64 +47,131 @@ def _expires_at(now: datetime | None = None) -> datetime:
     return (now or _now()) + timedelta(minutes=CODE_TTL_MINUTES)
 
 
-def generate_and_send_code(db: Session, user: User, *, force: bool = False) -> EmailResult:
-    """Mint a fresh code, persist on user, send via email."""
-    if not force and user.email_verified:
-        # Already verified — no-op.
-        return EmailResult(ok=True, provider="noop")
-    if not force and _is_in_cooldown(user):
-        raise VerificationError("Please wait a minute before requesting a new code.")
+def _get_pending(db: Session, email: str) -> PendingRegistration | None:
+    return db.query(PendingRegistration).filter(PendingRegistration.email == email).first()
+
+
+def start_registration(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    password_hash: str,
+    dek_wrapped_password: str = "",
+    dek_salt: str = "",
+    dek_wrapped_server: str = "",
+) -> EmailResult:
+    """Create or refresh a pending registration and email a fresh code.
+
+    If a pending row already exists for this email (a repeat sign-up before
+    verifying), it is updated in place with a new code — subject to the resend
+    cooldown so codes can't be spammed.
+    """
+    email = email.strip().lower()
+    now = _now()
+    pending = _get_pending(db, email)
     code = _generate_code()
-    user.verification_code = code
-    user.verification_code_expires = _expires_at().isoformat()
+    if pending is None:
+        pending = PendingRegistration(
+            email=email,
+            name=name,
+            password_hash=password_hash,
+            verification_code=code,
+            verification_code_expires=_expires_at(now).isoformat(),
+            created_at=now.isoformat(),
+            code_issued_at=now.isoformat(),
+            dek_wrapped_password=dek_wrapped_password,
+            dek_salt=dek_salt,
+            dek_wrapped_server=dek_wrapped_server,
+        )
+        db.add(pending)
+    else:
+        if _is_in_cooldown(pending, now):
+            raise VerificationError("Please wait a minute before requesting a new code.")
+        pending.name = name
+        pending.password_hash = password_hash
+        pending.verification_code = code
+        pending.verification_code_expires = _expires_at(now).isoformat()
+        pending.code_issued_at = now.isoformat()
+        pending.dek_wrapped_password = dek_wrapped_password
+        pending.dek_salt = dek_salt
+        pending.dek_wrapped_server = dek_wrapped_server
     db.commit()
-    result = _send_verification_email(user.email, user.name, code)
+    result = _send_verification_email(email, name, code)
     if not result.ok:
-        logger.error("[verification] failed to send verification email to %s: %s", user.email, result.error)
+        logger.error("[verification] failed to send verification email to %s: %s", email, result.error)
     return result
 
 
-def resend_code(db: Session, user: User) -> EmailResult:
-    return generate_and_send_code(db, user)
+def resend_code(db: Session, email: str) -> EmailResult:
+    """Mint a fresh code on an existing pending registration and email it."""
+    email = email.strip().lower()
+    pending = _get_pending(db, email)
+    if pending is None:
+        raise VerificationError("No pending registration found. Please sign up again.")
+    now = _now()
+    if _is_in_cooldown(pending, now):
+        raise VerificationError("Please wait a minute before requesting a new code.")
+    pending.verification_code = _generate_code()
+    pending.verification_code_expires = _expires_at(now).isoformat()
+    pending.code_issued_at = now.isoformat()
+    db.commit()
+    result = _send_verification_email(email, pending.name, pending.verification_code)
+    if not result.ok:
+        logger.error("[verification] failed to resend verification email to %s: %s", email, result.error)
+    return result
 
 
-def verify_code(db: Session, user: User, submitted: str) -> bool:
-    """Validate the submitted code; mark verified on success."""
-    if user.email_verified:
-        return True
-    code = (user.verification_code or "").strip()
+def verify_and_create_user(db: Session, email: str, submitted: str) -> tuple[User, bytes | None]:
+    """Validate the submitted code and promote the pending row into a real User.
+
+    Returns the user plus their unwrapped data encryption key (for the login
+    token). The server-wrapped DEK copy is deleted along with the pending row,
+    so after this moment only the password can unlock the account's data.
+    """
+    email = email.strip().lower()
+    pending = _get_pending(db, email)
+    if pending is None:
+        raise VerificationError("No active code on file. Request a new one.")
     submitted = (submitted or "").strip()
+    code = (pending.verification_code or "").strip()
     if not code or not submitted:
         raise VerificationError("No active code on file. Request a new one.")
-    if user.verification_code_expires:
+    if pending.verification_code_expires:
         try:
-            expires = datetime.fromisoformat(user.verification_code_expires)
+            expires = datetime.fromisoformat(pending.verification_code_expires)
         except ValueError:
             expires = _now() - timedelta(seconds=1)
         if expires < _now():
             raise VerificationError("Code expired. Please request a new one.")
-    if secrets.compare_digest(code, submitted):
-        user.email_verified = True
-        user.verification_code = None
-        user.verification_code_expires = None
-        db.commit()
-        return True
-    raise VerificationError("That code doesn't match. Check your inbox or request a new one.")
+    if not secrets.compare_digest(code, submitted):
+        raise VerificationError("That code doesn't match. Check your inbox or request a new one.")
+
+    dek = unwrap_key_with_server(pending.dek_wrapped_server) if pending.dek_wrapped_server else None
+    user = UserRepository(db).create(
+        name=pending.name,
+        email=pending.email,
+        password_hash=pending.password_hash,
+        dek_wrapped=pending.dek_wrapped_password or "",
+        dek_salt=pending.dek_salt or "",
+        dek_wrapped_recovery=wrap_key_with_recovery(dek) if dek else "",
+    )
+    db.delete(pending)
+    db.commit()
+    return user, dek
 
 
-def _is_in_cooldown(user: User) -> bool:
+def _is_in_cooldown(pending: PendingRegistration, now: datetime | None = None) -> bool:
     """Throttle resends so users can't spam emails."""
-    if not user.verification_code or not user.verification_code_expires:
+    now = now or _now()
+    issued_raw = pending.code_issued_at or pending.created_at
+    if not issued_raw:
         return False
     try:
-        expires = datetime.fromisoformat(user.verification_code_expires)
+        issued = datetime.fromisoformat(issued_raw)
     except ValueError:
         return False
-    # The code was issued (TTL ago). If the new request is within the cooldown
-    # window from the last issue time, throttle it.
-    issued = expires - timedelta(minutes=CODE_TTL_MINUTES)
-    age = (_now() - issued).total_seconds()
-    return age < RESEND_COOLDOWN_SECONDS
+    return (now - issued).total_seconds() < RESEND_COOLDOWN_SECONDS
 
 
 def _send_verification_email(to: str, name: str, code: str) -> EmailResult:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -13,6 +14,8 @@ from app.services.llm.ollama_client import OllamaClient
 from app.services.llm.prompt_registry import (
     asset_explanation_prompt,
     chat_prompt,
+    goal_clarify_prompt,
+    goal_estimate_prompt,
     market_explanation_prompt,
     market_signal_copy_prompt,
     recommendation_explanation_prompt,
@@ -23,6 +26,36 @@ from app.services.llm.schemas import LLMRequest, LLMTask
 def generate_chat_answer(message: str, context: dict[str, Any], fallback_answer: str) -> str:
     prompt = chat_prompt(message, context, fallback_answer)
     return _complete_text("chat", prompt, fallback_answer)
+
+
+def refine_goal_estimate(
+    goal_type: str,
+    answers: dict[str, Any],
+    profile_ctx: dict[str, Any],
+    baseline: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Refine a deterministic goal-cost baseline with the LLM. Returns
+    (payload, metadata); payload is the deterministic baseline when the model is
+    unavailable, so callers can read metadata["llm_enhanced"] for the source."""
+    prompt = goal_estimate_prompt(goal_type, answers, profile_ctx, baseline)
+    payload, metadata = _complete_json_with_metadata("goal_estimate", prompt, baseline)
+    if not isinstance(payload, dict):
+        return baseline, metadata
+    return payload, metadata
+
+
+def generate_goal_clarify(
+    description: str,
+    profile_ctx: dict[str, Any],
+    fallback: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Ask the LLM for clarifying questions tailored to a free-form goal. Returns
+    (payload, metadata); payload is the fallback when the model is unavailable."""
+    prompt = goal_clarify_prompt(description, profile_ctx)
+    payload, metadata = _complete_json_with_metadata("goal_clarify", prompt, fallback)
+    if not isinstance(payload, dict):
+        return fallback, metadata
+    return payload, metadata
 
 
 def summarize_text(text: str, max_words: int = 30, fallback: str | None = None) -> str:
@@ -149,6 +182,11 @@ def ollama_reachable() -> bool:
 def ollama_model_available(model: str | None = None) -> bool:
     if settings.llm_provider.lower() != "ollama":
         return False
+    if settings.ollama_api_key:
+        # Ollama Cloud: /api/tags reflects the account's local pushes, not the
+        # hosted catalog, so trust the configured model (reachability is
+        # checked separately and generate errors degrade to fallbacks).
+        return True
     configured_model = model or settings.llm_model_fast or settings.llm_model
     return OllamaClient().has_model(configured_model)
 
@@ -215,14 +253,58 @@ def _enabled() -> bool:
     return bool(settings.llm_enabled) and settings.llm_provider.lower() == "ollama"
 
 
+_MODEL_CACHE: dict[str, Any] = {"ts": 0.0, "models": set()}
+
+
+def _available_models() -> set[str]:
+    """Installed Ollama model names (lowercased), cached for 5 minutes."""
+    now = time.time()
+    cached = _MODEL_CACHE.get("models")
+    if cached and now - float(_MODEL_CACHE.get("ts", 0.0)) < 300:
+        return cached  # type: ignore[return-value]
+    try:
+        payload = OllamaClient()._get_json("/api/tags", timeout_seconds=2)  # noqa: SLF001
+        models = {
+            str(entry.get("name") or entry.get("model") or "").strip().lower()
+            for entry in payload.get("models", [])
+            if isinstance(entry, dict)
+        }
+    except Exception:  # noqa: BLE001 — never let availability checks break a call
+        models = set()
+    if models:
+        _MODEL_CACHE.update(ts=now, models=models)
+    return _MODEL_CACHE.get("models") or set()  # type: ignore[return-value]
+
+
+def _resolve_model(model: str) -> str:
+    """Return ``model`` if Ollama has it installed; otherwise substitute a
+    configured model that IS installed. This keeps the LLM working when a config
+    or .env points at a model that was never pulled (e.g. summarize → qwen2.5:7b),
+    instead of silently failing to the deterministic baseline every time."""
+    if settings.ollama_api_key:
+        # Ollama Cloud hosts the model catalog server-side; never substitute.
+        return model
+    available = _available_models()
+    if not available:  # can't verify (offline / unreachable) — trust the config
+        return model
+    if model.strip().lower() in available:
+        return model
+    for candidate in (settings.llm_model_reasoning, settings.llm_model_fast, settings.llm_model):
+        if candidate and candidate.strip().lower() in available:
+            return candidate
+    return sorted(available)[0]
+
+
 def _model_for_task(task: LLMTask) -> str:
     if task in {"chat", "recommendation_explanation", "market_explanation"}:
-        return settings.llm_model_reasoning or settings.llm_model or "llama3.1:8b"
-    if task in {"asset_explanation", "market_signal_copy"}:
-        return settings.llm_model_fast or settings.llm_model or "qwen2.5:7b"
-    if task == "summarize":
-        return settings.llm_model_summarize or settings.llm_model_fast or settings.llm_model or "qwen2.5:7b"
-    return settings.llm_model_extraction or settings.llm_model or "qwen2.5:7b"
+        configured = settings.llm_model_reasoning or settings.llm_model or "qwen3:8b"
+    elif task in {"asset_explanation", "market_signal_copy", "goal_estimate", "goal_clarify"}:
+        configured = settings.llm_model_fast or settings.llm_model or "qwen3:8b"
+    elif task == "summarize":
+        configured = settings.llm_model_summarize or settings.llm_model_fast or settings.llm_model or "qwen3:8b"
+    else:
+        configured = settings.llm_model_extraction or settings.llm_model or "qwen3:8b"
+    return _resolve_model(configured)
 
 
 def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
@@ -238,16 +320,27 @@ def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
         return 180
     if task == "recommendation_explanation":
         return 210
+    if task == "goal_estimate":
+        return 160
+    if task == "goal_clarify":
+        # One clarifying question with a few options — a tight cap keeps the
+        # onboarding round-trip fast.
+        return 140
     return 520 if expect_json else 180
 
 
 def _timeout_for_task(task: LLMTask) -> int:
     if task == "chat":
         return min(30, max(5, int(settings.llm_timeout_chat_seconds or 25)))
+    if task in {"goal_estimate", "goal_clarify"}:
+        # In the onboarding request path — keep it snappy and fall back fast.
+        return min(15, max(5, int(settings.llm_timeout_chat_seconds or 12)))
     if task == "summarize":
         return min(10, max(3, int(settings.llm_timeout_summarize_seconds or 8)))
     if task in {"recommendation_explanation", "asset_explanation", "market_signal_copy", "market_explanation"}:
-        return min(10, max(3, int(settings.llm_timeout_enhancement_seconds or 10)))
+        # Background enhancement (not in the request path) — allow qwen3 enough time
+        # to actually generate, so explanations don't always fall back to templates.
+        return min(30, max(3, int(settings.llm_timeout_enhancement_seconds or 30)))
     return min(max(3, int(settings.llm_timeout_seconds or 25)), 10)
 
 

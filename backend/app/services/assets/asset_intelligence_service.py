@@ -34,7 +34,7 @@ def refresh_asset_intelligence(db: Session, risk_profile: str = "moderate") -> d
     signals = market_signal_list(db, limit=120)
     impact_maps = impact_map_list(db, limit=120)
     regime = latest_market_regime(db)
-    assets = _dedupe_assets(base_asset_universe() + map_signals_to_assets(signals, impact_maps))
+    assets = _dedupe_assets(base_asset_universe() + map_signals_to_assets(signals, impact_maps) + _reddit_underdog_assets())
     sector_scores = _sector_scores_from_impact_maps(impact_maps)
 
     technical_by_name: dict[str, dict] = {}
@@ -79,29 +79,100 @@ def refresh_asset_intelligence(db: Session, risk_profile: str = "moderate") -> d
     }
 
 
+def _reddit_underdog_assets() -> list[dict]:
+    """Underdog names trending in curated subreddits that we don't already hold/
+    recommend, each **factor-checked** against the live quant engine before being
+    fed into the Discover research pipeline. Reddit only nominates; the factor check
+    decides whether a name is even researched. Degrades to [] on any error."""
+    try:
+        from app.services.research.reddit_research_service import discover_underdogs
+
+        nominations = discover_underdogs(set(), limit=4)
+    except Exception:  # noqa: BLE001 — community data must never break Discover
+        return []
+
+    out: list[dict] = []
+    for nom in nominations:
+        try:
+            factors = None
+            if nom["assetClass"] == "equity":
+                from app.services.research.equity_factor_service import equity_factors
+
+                factors = equity_factors(nom["ticker"], nom["name"])
+                ticker, asset_class, asset_type = nom["ticker"], "equity", "Equity share"
+            elif nom["assetClass"] == "crypto":
+                from app.services.research.crypto_factor_service import factors_for_symbol
+
+                factors = factors_for_symbol(nom["ticker"], nom["name"])
+                ticker, asset_class, asset_type = f"{nom['ticker']}-USD", "crypto", "Crypto asset"
+            else:
+                continue
+            if not factors or factors.get("sortino") is None:
+                continue  # could not validate on factors -> do not surface
+
+            subs = ", ".join(f"r/{s}" for s in nom.get("subreddits", [])[:2]) or "community forums"
+            evidence = [
+                {"sourceName": f"Reddit {subs}", "sourceUrl": sp.get("url", ""), "dataMode": "limited"}
+                for sp in nom.get("samplePosts", [])[:2]
+                if sp.get("url")
+            ]
+            out.append(
+                {
+                    "name": nom["name"],
+                    "ticker": ticker,
+                    "assetClass": asset_class,
+                    "assetType": asset_type,
+                    "sectors": [],
+                    "reasonForInclusion": (
+                        f"Surfaced from community discussion on {subs} ({nom['mentionCount']} recent mentions) "
+                        f"and clears our risk-adjusted factor screen (Sortino {factors['sortino']}). "
+                        "Community chatter is noisy — research before acting."
+                    ),
+                    "evidence": evidence,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
 def asset_research(db: Session) -> list[dict]:
     rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).limit(120).all()
     if not rows:
         refresh_asset_intelligence(db)
         rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).limit(120).all()
+    regime = latest_market_regime(db)
     seen = set()
     output = []
     for row in rows:
         if row.instrument_name in seen:
             continue
         seen.add(row.instrument_name)
-        output.append(validate_asset_insight(_research_row(db, row), llm_enhance=False))
+        output.append(validate_asset_insight(_research_row(db, row, regime), llm_enhance=False))
     return output
 
 
 def asset_detail(db: Session, symbol: str) -> dict | None:
     symbol_lower = symbol.lower()
     rows = db.query(AssetResearch).order_by(AssetResearch.retrieved_at.desc()).all()
+    regime = latest_market_regime(db)
     for row in rows:
         ticker = _ticker_for_name(row.instrument_name)
         if symbol_lower in {row.instrument_name.lower(), ticker.lower(), ticker.replace(".NS", "").lower()}:
-            return validate_asset_insight(_research_row(db, row), llm_enhance=False)
+            return validate_asset_insight(_research_row(db, row, regime), llm_enhance=False)
     return None
+
+
+def _alpha_expected_return(asset_type: str | None, regime: dict | None) -> dict | None:
+    """Category-level estimate for an alpha/underdog pick (equity / ETF / gold) so the
+    card shows a real range instead of 'Estimate pending'. These are signal-surfaced
+    names without per-fund NAV history, so a category anchor — not a per-fund figure —
+    is the honest source."""
+    from app.services.research.fund_factor_service import category_expected_return
+
+    text = (asset_type or "").lower()
+    key = "gold" if ("gold" in text or "silver" in text) else "crypto" if "crypto" in text else "equity_stock"
+    return category_expected_return(key, regime)
 
 
 def alpha_opportunities(db: Session) -> list[dict]:
@@ -109,11 +180,13 @@ def alpha_opportunities(db: Session) -> list[dict]:
     if not rows:
         refresh_asset_intelligence(db)
         rows = db.query(AlphaOpportunity).order_by(AlphaOpportunity.risk_adjusted_score.desc()).limit(40).all()
+    regime = latest_market_regime(db)
     return [
         validate_alpha_insight({
             "assetName": row.asset_name,
             "ticker": row.ticker,
             "assetType": row.asset_type,
+            "expectedReturn": _alpha_expected_return(row.asset_type, regime),
             "bucket": row.bucket,
             "nonObviousReason": row.non_obvious_reason,
             "keySignal": row.key_signal,
@@ -197,8 +270,11 @@ def _asset_research_payload(asset: dict, technical: dict, fundamental: dict, liq
     action = _action(liquidity, technical, fundamental, crypto)
     evidence = (asset.get("evidence", []) + fundamental.get("evidence", []) + (crypto.get("evidence", []) if crypto else []))[:8]
     data_mode = "live" if technical.get("dataMode") == "live" or any(item.get("dataMode") == "live" for item in evidence) else technical.get("dataMode", "limited")
+    reason = asset.get("reasonForInclusion", "")
     summary = complete_sentence_summary(
-        f"{asset['name']} is classified as {action}. Technical setup: {technical.get('breakoutStatus', 'limited data')}; "
+        f"{asset['name']} is classified as {action}. "
+        + (f"{reason} " if reason else "")
+        + f"Technical setup: {technical.get('breakoutStatus', 'limited data')}; "
         f"fundamental score {fundamental.get('fundamentalScore', 50)} with {fundamental.get('dataCompleteness', 'low')} data completeness. "
         f"Liquidity: {liquidity.get('liquidityScore', 50)}. This is decision-support research, not a return promise."
     )
@@ -216,7 +292,26 @@ def _asset_research_payload(asset: dict, technical: dict, fundamental: dict, liq
     }, llm_enhance=False)
 
 
-def _research_row(db: Session, row: AssetResearch) -> dict:
+def _asset_expected_return(category: str | None, regime: dict | None, return_factors: dict | None = None) -> dict | None:
+    """Forward return estimate for a Discover card. Prefers the chosen fund's OWN
+    factor history (cagr/volatility from real NAV) run through the same model the
+    recommendation engine uses, so the estimate is genuinely per-fund — not a UI
+    constant. Falls back to a category-level estimate only when those factors aren't
+    on hand (non-fund assets, or picks saved before factors were persisted)."""
+    from app.services.research.fund_factor_service import category_expected_return, expected_return_from_factors
+    from app.services.research.fund_research_service import category_key_for_name
+
+    key = category_key_for_name(category or "")
+    if not key:
+        return None
+    if return_factors:
+        per_fund = expected_return_from_factors(return_factors, key, regime)
+        if per_fund:
+            return per_fund
+    return category_expected_return(key, regime)
+
+
+def _research_row(db: Session, row: AssetResearch, regime: dict | None = None) -> dict:
     ticker = _ticker_for_name(row.instrument_name)
     technical = db.query(TechnicalIndicator).filter(TechnicalIndicator.asset_name == row.instrument_name).order_by(TechnicalIndicator.id.desc()).first()
     fundamental = db.query(FundamentalMetric).filter(FundamentalMetric.asset_name == row.instrument_name).order_by(FundamentalMetric.id.desc()).first()
@@ -229,6 +324,7 @@ def _research_row(db: Session, row: AssetResearch) -> dict:
         "ticker": ticker,
         "assetType": row.asset_type,
         "category": row.category,
+        "expectedReturn": _asset_expected_return(row.category, regime, _loads_dict(row.return_factors_json)),
         "summary": row.summary,
         "suitabilityNotes": row.suitability_notes,
         "riskNotes": row.risk_notes,
@@ -580,3 +676,11 @@ def _loads(value: str) -> list:
         return json.loads(value or "[]")
     except json.JSONDecodeError:
         return []
+
+
+def _loads_dict(value: str | None) -> dict:
+    try:
+        parsed = json.loads(value or "{}")
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}

@@ -14,6 +14,7 @@ with source='manual' and currentValue unchanged.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Iterable
 from urllib.parse import quote
@@ -117,26 +118,122 @@ def _price_crypto(symbol: str) -> float | None:
     return float(inr) if isinstance(inr, (int, float)) and inr > 0 else None
 
 
+# gold-api.com returns the spot price in USD per troy ounce (1 oz = 31.1035 g).
+_METAL_SYMBOLS = {"gold": "XAU", "silver": "XAG"}
+_USD_INR = 86.0  # rough USD→INR; metals are quoted in USD upstream
+
+
 def _price_metal(metal: str) -> float | None:
-    """metals.live returns USD/oz. Convert to INR/gram (1 oz = 31.1035 grams)."""
-    url = f"https://api.metals.live/v1/spot/{metal}"
-    result = fetch_text(url, timeout=6, retries=1, cache_ttl_seconds=3600, require_json=True)
+    """Spot price in INR/gram for gold/silver via gold-api.com (no key)."""
+    symbol = _METAL_SYMBOLS.get(metal.lower())
+    if not symbol:
+        return None
+    url = f"https://api.gold-api.com/price/{symbol}"
+    result = fetch_text(url, timeout=8, retries=1, cache_ttl_seconds=3600, require_json=True)
     if not result.text:
         return None
     try:
         payload = json.loads(result.text)
     except (ValueError, json.JSONDecodeError):
         return None
-    # API returns a list of {date: price}
-    if isinstance(payload, list) and payload:
-        latest = payload[-1]
-        if isinstance(latest, dict):
-            for value in latest.values():
-                if isinstance(value, (int, float)) and value > 0:
-                    usd_per_oz = float(value)
-                    inr_per_gram = (usd_per_oz / 31.1035) * 83.0  # rough USD→INR
-                    return inr_per_gram
+    price = payload.get("price") if isinstance(payload, dict) else None
+    if isinstance(price, (int, float)) and price > 0:
+        usd_per_oz = float(price)
+        return (usd_per_oz / 31.1035) * _USD_INR
     return None
+
+
+# Noise tokens to strip before matching a fund name to AMFI — friendly-title
+# verbs ("Add ..."/"Increase ... SIP") plus generic scheme words.
+_FUND_STOP = {
+    "fund", "plan", "scheme", "the", "of", "and", "a", "an",
+    "add", "increase", "boost", "start", "review", "avoid", "buy", "sip", "new", "your",
+}
+_NAME_INDEX_CACHE: dict[str, tuple[float, list[tuple[frozenset, float, str]]]] = {}
+
+
+def _fund_tokens(name: str) -> frozenset:
+    toks = re.findall(r"[a-z0-9]+", (name or "").lower())
+    return frozenset(t for t in toks if t not in _FUND_STOP and len(t) > 1)
+
+
+def _amfi_name_index() -> list[tuple[frozenset, float, str]]:
+    """Cached [(name_tokens, nav, scheme_name)] over the AMFI NAV file, so a fund
+    can be priced from its NAME when no scheme code is available."""
+    cached = _NAME_INDEX_CACHE.get("idx")
+    now = time.time()
+    if cached and now - cached[0] < _AMFI_TTL:
+        return cached[1]
+    text, _, _ = fetch_amfi_nav_text()
+    idx: list[tuple[frozenset, float, str]] = []
+    if text:
+        for line in text.splitlines():
+            parts = line.split(";")
+            if len(parts) >= 5:
+                name = parts[3].strip()
+                if not name:
+                    continue
+                try:
+                    nav = float(parts[4].strip())
+                except ValueError:
+                    continue
+                if nav > 0:
+                    idx.append((_fund_tokens(name), nav, name))
+    _NAME_INDEX_CACHE["idx"] = (now, idx)
+    return idx
+
+
+def _match_fund_nav(name: str) -> float | None:
+    """Best fuzzy match of a fund name to its latest NAV, preferring the
+    Direct-Growth variant. Returns None if nothing matches confidently."""
+    q = _fund_tokens(name)
+    if len(q) < 2:
+        return None
+    best_nav: float | None = None
+    best_score = 0.0
+    for cand_tokens, nav, cand_name in _amfi_name_index():
+        overlap = len(q & cand_tokens)
+        if overlap < 2:
+            continue
+        coverage = overlap / len(q)
+        if coverage < 0.7:
+            continue
+        lname = cand_name.lower()
+        score = coverage
+        score += 0.15 if "direct" in lname else 0.0
+        score += 0.10 if "growth" in lname else 0.0
+        score -= 0.02 * len(cand_tokens - q)  # penalise longer, divergent names
+        if score > best_score:
+            best_score = score
+            best_nav = nav
+    return best_nav if best_score >= 0.7 else None
+
+
+def quote_unit_price(symbol: str, asset_class: str, name: str = "") -> float | None:
+    """Best-effort live price for ONE unit of an instrument, used as the default
+    purchase price when recording an action. Funds resolve by AMFI scheme code
+    when known, otherwise by fuzzy name match — so most recommendations price
+    even without a ticker. Returns None only when nothing resolves."""
+    ac = (asset_class or "").lower()
+    sym = (symbol or "").strip()
+    price: float | None = None
+
+    if ac in ("stock", "etf", "equity", "share"):
+        price = _price_stock(sym)
+    elif ac in ("mutualfund", "mutual_fund", "fund", "mf", "index", "debt", "hybrid", "elss"):
+        price = _amfi_nav_map().get(sym) or _match_fund_nav(name or sym)
+    elif ac == "crypto":
+        price = _price_crypto(sym)
+    elif ac in ("gold", "silver"):
+        price = _price_metal(ac)
+    else:
+        price = _price_stock(sym) or _price_crypto(sym)
+
+    # General safety net: most recommendations are mutual funds, so try a fund
+    # name match for anything still unpriced (covers mislabeled/tickerless recs).
+    if price is None:
+        price = _match_fund_nav(name or sym)
+    return price
 
 
 def refresh_prices(holdings: Iterable[Holding]) -> list[Holding]:

@@ -2,7 +2,7 @@
 
 import { ChoiceCard } from "../_components/choice-card";
 import { PapaBubble, PapaMood } from "../_components/papa-bubble";
-import { TextField } from "../_lib/field-helpers";
+import { CityField, TextField } from "../_lib/field-helpers";
 import { ScreenContext } from "../_flow/types";
 
 const FAMILY_OPTIONS = [
@@ -22,14 +22,20 @@ export function AboutScreen({ form, values }: ScreenContext) {
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField name="name" label="Your name" placeholder="e.g., Rohan Sharma" autoFocus />
+          <TextField
+            name="name"
+            label="Your name"
+            placeholder="e.g., Rohan Sharma"
+            autoFocus
+            sanitize={(v) => v.replace(/[^\p{L}\s.'-]/gu, "")}
+          />
           <TextField
             name="dateOfBirth"
             type="date"
             label="Date of birth"
             helper={values.age ? `Age: ${values.age}` : "Your age helps me plan retirement and risk."}
           />
-          <TextField name="city" label="City" placeholder="e.g., Bengaluru" />
+          <CityField name="city" label="City" placeholder="Start typing, e.g., Beng…" />
           <TextField name="occupation" label="What do you do?" placeholder="e.g., Product manager, founder, student" />
         </div>
 
@@ -58,18 +64,23 @@ export function ScreenWrap({
   headline,
   sub,
   mood,
+  badge,
   children
 }: {
   papa: string;
   headline: string;
   sub?: string;
   mood?: PapaMood;
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-1 flex-col">
       <div>
-        <h2 className="text-[22px] font-semibold leading-tight text-[#0F172A] sm:text-[28px]">{headline}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-[22px] font-semibold leading-tight text-[#0F172A] sm:text-[28px]">{headline}</h2>
+          {badge}
+        </div>
         {sub ? <p className="mt-1 text-[15px] leading-6 text-[#4B5563]">{sub}</p> : null}
       </div>
       <div className="mt-4 mb-[1cm]">

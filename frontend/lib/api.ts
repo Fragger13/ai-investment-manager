@@ -1,6 +1,22 @@
-import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, AssetResearch, CryptoOpportunity, DashboardData, DocumentAnalysis, DriftAlert, DriftResponse, FinancialCopilotBrief, Holding, MarketRegime, MarketSignal, MemoryTimeline, OnboardingProfile, PortfolioOptimization, PortfolioRebalancingSuggestion, PortfolioRiskMetric, PortfolioSummary, PortfolioTargetAllocation, PortfolioValidation, RecommendationReassessment, RecommendationVersion, ResearchSource, ResearchStatus, SignalImpactMap, SignalReliability, StrategyBacktest, ValidationRefresh } from "@/types";
+import { AdvancedRecommendation, AdvancedRecommendationResponse, AlphaOpportunity, AssetIntelligence, AssetResearch, CommunitySentiment, CryptoOpportunity, DashboardData, DocumentAnalysis, DriftAlert, DriftResponse, FinancialCopilotBrief, Holding, MarketRegime, MarketSignal, MemoryTimeline, OnboardingProfile, PortfolioOptimization, PortfolioRebalancingSuggestion, PortfolioRiskMetric, PortfolioSummary, PortfolioTargetAllocation, PortfolioValidation, RecommendationReassessment, RecommendationVersion, ResearchSource, ResearchStatus, SignalImpactMap, SignalReliability, StrategyBacktest, ValidationRefresh } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+// API base resolution:
+//  • An explicit NEXT_PUBLIC_API_URL always wins.
+//  • On localhost we hit the backend directly. The Next dev rewrite proxy drops
+//    long-running LLM requests (ECONNRESET / "socket hang up"), so we only route
+//    through it for remote origins (e.g. an ngrok share) where same-origin
+//    proxying is actually required.
+function resolveApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") return "http://127.0.0.1:8000/api/v1";
+    return "/api/v1"; // remote origin → same-origin path, proxied by next.config rewrite
+  }
+  return "http://127.0.0.1:8000/api/v1";
+}
+
+const API_BASE = resolveApiBase();
 
 export type ChatCard = {
   type: "metrics" | "recommendation" | "options";
@@ -18,6 +34,21 @@ export type ChatResponse = {
   cards: ChatCard[];
   suggestions: string[];
   mood?: string;
+};
+
+export type GoalEstimate = {
+  amount: number;
+  low: number;
+  high: number;
+  rationale: string;
+  assumptions: string[];
+  source: "ai" | "calculator";
+};
+
+export type GoalClarifyQuestion = {
+  key: string;
+  prompt: string;
+  options: { value: string; label: string }[];
 };
 
 export type LlmEnhancementStatusResponse = {
@@ -57,12 +88,31 @@ export class ApiError extends Error {
   }
 }
 
+// The access token carries the user's data decryption key, so every request
+// must present it for the backend to read or write that user's encrypted
+// rows. Read straight from the persisted session (importing the auth store
+// here would be a circular import).
+function sessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("ai-investment-manager-session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.token || null;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = sessionToken();
+  const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const headers = options?.body instanceof FormData
-    ? options.headers
+    ? { ...auth, ...((options.headers as Record<string, string>) || {}) }
     : {
         "Content-Type": "application/json",
-        ...(options?.headers || {})
+        ...auth,
+        ...((options?.headers as Record<string, string>) || {})
       };
   let response: Response;
   try {
@@ -100,6 +150,14 @@ export type AuthResponse = {
   email_verified: boolean;
 };
 
+export type VerificationStatus = {
+  email: string;
+  email_verified: boolean;
+  sent: boolean;
+  provider?: string;
+  detail?: string;
+};
+
 export const api = {
   async login(email: string, password: string): Promise<AuthResponse> {
     return request("/auth/login", {
@@ -107,7 +165,7 @@ export const api = {
       body: JSON.stringify({ email, password })
     });
   },
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
+  async register(name: string, email: string, password: string): Promise<VerificationStatus> {
     return request("/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password })
@@ -119,7 +177,7 @@ export const api = {
       body: JSON.stringify({ email, code })
     });
   },
-  async resendVerification(email: string): Promise<{ email: string; email_verified: boolean; sent: boolean; provider?: string; detail?: string }> {
+  async resendVerification(email: string): Promise<VerificationStatus> {
     return request("/auth/resend-verification", {
       method: "POST",
       body: JSON.stringify({ email })
@@ -129,6 +187,12 @@ export const api = {
     return request("/auth/password-reset", {
       method: "POST",
       body: JSON.stringify({ email })
+    });
+  },
+  async passwordResetConfirm(email: string, token: string, password: string): Promise<{ status: string; email: string }> {
+    return request("/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, token, password })
     });
   },
   async dashboard(profile: OnboardingProfile): Promise<DashboardData> {
@@ -152,6 +216,29 @@ export const api = {
     return request<ChatResponse>("/chat", {
       method: "POST",
       body: JSON.stringify({ message, profile, history: history || [] }),
+      signal: options?.signal
+    });
+  },
+  async estimateGoal(
+    goalType: string,
+    answers: Record<string, string>,
+    profile?: OnboardingProfile | null,
+    options?: { signal?: AbortSignal }
+  ): Promise<GoalEstimate> {
+    return request<GoalEstimate>("/chat/goal-estimate", {
+      method: "POST",
+      body: JSON.stringify({ goalType, answers, profile }),
+      signal: options?.signal
+    });
+  },
+  async clarifyGoal(
+    description: string,
+    profile?: OnboardingProfile | null,
+    options?: { signal?: AbortSignal }
+  ): Promise<{ questions: GoalClarifyQuestion[] }> {
+    return request<{ questions: GoalClarifyQuestion[] }>("/chat/goal-clarify", {
+      method: "POST",
+      body: JSON.stringify({ description, profile }),
       signal: options?.signal
     });
   },
@@ -189,6 +276,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ holdings })
     });
+  },
+  async quoteUnitPrice(symbol: string, assetClass: string, name = ""): Promise<{ symbol: string; assetClass: string; price: number | null; asOf: string }> {
+    return request(`/holdings/quote?symbol=${encodeURIComponent(symbol)}&assetClass=${encodeURIComponent(assetClass)}&name=${encodeURIComponent(name)}`);
+  },
+  async communitySentiment(name: string, assetClass: string): Promise<CommunitySentiment> {
+    return request(`/assets/community-sentiment?name=${encodeURIComponent(name)}&assetClass=${encodeURIComponent(assetClass)}`);
+  },
+  async submitFeedback(payload: { kind: string; category?: string; rating?: number; message?: string; email?: string; page?: string }): Promise<{ status: string; id: number }> {
+    return request("/feedback", { method: "POST", body: JSON.stringify(payload) });
   },
   async analyzeDocument(fileName: string): Promise<DocumentAnalysis> {
     return request<DocumentAnalysis>("/documents/analyze", {
@@ -328,9 +424,10 @@ export const api = {
   async portfolioOptimization(): Promise<PortfolioOptimization> {
     return request("/portfolio/optimization");
   },
-  async portfolioSummary(profile?: OnboardingProfile | null): Promise<PortfolioSummary> {
+  async portfolioSummary(profile?: OnboardingProfile | null, token?: string | null): Promise<PortfolioSummary> {
     return request("/portfolio/summary", {
       method: "POST",
+      headers: authHeaders(token),
       body: JSON.stringify(profile || null),
     });
   },
@@ -349,20 +446,24 @@ export const api = {
   async rebalancingSuggestions(): Promise<PortfolioRebalancingSuggestion[]> {
     return request("/portfolio/rebalancing-suggestions");
   },
+  async metalPrice(metal: "gold" | "silver"): Promise<{ metal: string; inrPerGram: number }> {
+    return request(`/portfolio/metal-price/${metal}`);
+  },
   async memoryTimeline(): Promise<MemoryTimeline> {
     return request("/memory/timeline");
   },
   async recommendationHistory(): Promise<RecommendationVersion[]> {
     return request("/memory/recommendations/history");
   },
-  async recordUserAction(payload: { actionType: string; entityType?: string; entityId?: string; entityName?: string; recommendationKey?: string; instrumentName?: string; [key: string]: unknown }) {
+  async recordUserAction(payload: { actionType: string; entityType?: string; entityId?: string; entityName?: string; recommendationKey?: string; instrumentName?: string; [key: string]: unknown }, token?: string | null) {
     return request("/memory/user-action", {
       method: "POST",
+      headers: authHeaders(token),
       body: JSON.stringify(payload)
     });
   },
-  async removeUserAction(key: string): Promise<{ status: string; deleted: number; key: string }> {
-    return request(`/memory/user-action/by-key/${encodeURIComponent(key)}`, { method: "DELETE" });
+  async removeUserAction(key: string, token?: string | null): Promise<{ status: string; deleted: number; key: string }> {
+    return request(`/memory/user-action/by-key/${encodeURIComponent(key)}`, { method: "DELETE", headers: authHeaders(token) });
   },
   async recommendationVersions(recommendationKey?: string): Promise<RecommendationVersion[]> {
     return request(`/recommendations/versions${recommendationKey ? `?recommendationKey=${encodeURIComponent(recommendationKey)}` : ""}`);

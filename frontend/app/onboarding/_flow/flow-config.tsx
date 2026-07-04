@@ -7,7 +7,6 @@ import { SpendingScreen, LoansScreen } from "../_screens/expenses";
 import {
   AssetsIntroScreen,
   AssetsUploadScreen,
-  AssetsOverviewScreen,
   AssetsManualScreen,
 } from "../_screens/assets";
 import { RiskScreen } from "../_screens/risk";
@@ -50,7 +49,7 @@ export function buildScreens(
   screens.push({
     id: "income",
     sectionId: "income",
-    fields: ["monthlySalary", "otherIncome"],
+    fields: ["monthlySalary", "otherIncome", "investableThisMonth", "salaryDay"],
     render: IncomeScreen
   });
 
@@ -69,7 +68,7 @@ export function buildScreens(
   });
 
   // Assets flow: Intro picks "upload" or "manual" intent.
-  //   • Upload path → Upload screen → Overview (bucket tiles + popups)
+  //   • Upload path → single Upload screen (upload box + portfolio buckets inline)
   //   • Manual path → single Manual screen (lumpsum entry)
   const assetsIntent = (): "upload" | "manual" | null => {
     if (typeof window === "undefined") return null;
@@ -91,13 +90,6 @@ export function buildScreens(
   });
 
   screens.push({
-    id: "assets-overview",
-    sectionId: "assets",
-    render: AssetsOverviewScreen,
-    shouldSkip: () => assetsIntent() === "manual",
-  });
-
-  screens.push({
     id: "assets-manual",
     sectionId: "assets",
     render: AssetsManualScreen,
@@ -107,15 +99,11 @@ export function buildScreens(
   screens.push({
     id: "risk",
     sectionId: "risk",
-    fields: [
-      "shortTermLossTolerance",
-      "shortTermHorizon",
-      "drawdownTolerance",
-      "investmentHorizon",
-      "shortTermVolatilityComfort",
-      "opportunityPreference",
-      "retirementAge"
-    ],
+    // Only the two questions the user actually answers are validated here; the
+    // finer-grained risk fields (loss tolerance, short-term horizon, opportunity
+    // preference, volatility comfort) are derived from these in RiskScreen /
+    // onboarding page and validated at final submit.
+    fields: ["drawdownTolerance", "investmentHorizon", "retirementAge"],
     render: RiskScreen
   });
 
@@ -125,7 +113,6 @@ export function buildScreens(
     fields: [
       "spendingDiscipline",
       "emotionalSpendingTendency",
-      "riskReaction",
       "tracksExpenses",
       "investsMonthly",
       "investmentPsychology",

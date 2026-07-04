@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.schemas.financial import Holding
 from app.services.holdings.import_service import parse_holdings_file
-from app.services.holdings.pricing_service import refresh_prices
+from app.services.holdings.pricing_service import quote_unit_price, refresh_prices
 
 router = APIRouter()
 
@@ -79,3 +79,21 @@ def refresh_holding_prices(payload: RefreshPricesRequest) -> RefreshPricesRespon
 
     updated = refresh_prices(payload.holdings)
     return RefreshPricesResponse(holdings=updated, refreshedAt=now_iso())
+
+
+class QuoteResponse(BaseModel):
+    symbol: str
+    assetClass: str
+    price: float | None = None
+    asOf: str = ""
+
+
+@router.get("/quote", response_model=QuoteResponse)
+def quote(symbol: str = "", assetClass: str = "", name: str = "") -> QuoteResponse:
+    """Live per-unit price for one instrument — backs the Take Action popup's
+    default purchase price. `name` lets funds resolve by fuzzy AMFI match when no
+    scheme code/ticker is known. Returns price=null (not an error) when unavailable."""
+    from app.services.intelligence import now_iso
+
+    price = quote_unit_price(symbol, assetClass, name)
+    return QuoteResponse(symbol=symbol, assetClass=assetClass, price=price, asOf=now_iso() if price else "")

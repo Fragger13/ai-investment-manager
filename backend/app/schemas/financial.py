@@ -117,6 +117,10 @@ class OnboardingProfile(BaseModel):
     otherIncome: int = 0
     monthlyCashInflow: int = 0
     incomeStructureVersion: int = 1
+    # Current-month investable override + payday timing (see intelligence.investable_surplus).
+    investableThisMonth: int = 0
+    investableThisMonthMonth: str = ""  # YYYY-MM the override applies to
+    salaryDay: str = ""  # "Last working day" | "1st of the month" | "Variable"
 
     rent: int = 0
     emi: int = 0
@@ -132,6 +136,7 @@ class OnboardingProfile(BaseModel):
     cryptoValue: int = 0
     goldValue: int = 0
     epfPpfValue: int = 0
+    epfPpfMonthly: int = 0
     realEstateValue: int = 0
     cashBalance: int = 0
     additionalInvestments: list[AddedInvestment] = Field(default_factory=list)
@@ -254,9 +259,24 @@ class SourceLink(BaseModel):
     retrievedAt: str
 
 
+class FundPick(BaseModel):
+    name: str
+    fundHouse: str = ""
+    schemeCode: str = ""
+    plan: str = "Direct - Growth"
+    latestNav: float = 0.0
+    navDate: str = ""
+    return1y: float | None = None
+    return3y: float | None = None
+    return5y: float | None = None
+    rankReturn: float | None = None
+    rankBasis: str = ""
+
+
 class Recommendation(BaseModel):
     id: str
     assetClass: str
+    specificFunds: list[FundPick] = Field(default_factory=list)
     suggestedAllocation: int
     suggestedMonthlyAmount: int
     strategyType: str
@@ -329,3 +349,38 @@ class ChatResponse(BaseModel):
     cards: list[ChatCard] = []
     suggestions: list[str] = []
     mood: str = "warm"
+
+
+class GoalEstimateRequest(BaseModel):
+    goalType: str
+    answers: dict[str, Any] = {}
+    profile: OnboardingProfile | None = None
+
+
+class GoalEstimateResponse(BaseModel):
+    amount: int
+    low: int
+    high: int
+    rationale: str
+    assumptions: list[str] = []
+    source: str = "calculator"  # "ai" | "calculator"
+
+
+class GoalClarifyRequest(BaseModel):
+    description: str
+    profile: OnboardingProfile | None = None
+
+
+class GoalClarifyOption(BaseModel):
+    value: str
+    label: str
+
+
+class GoalClarifyQuestion(BaseModel):
+    key: str
+    prompt: str
+    options: list[GoalClarifyOption] = []
+
+
+class GoalClarifyResponse(BaseModel):
+    questions: list[GoalClarifyQuestion] = []

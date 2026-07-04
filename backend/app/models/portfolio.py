@@ -1,7 +1,8 @@
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.encrypted_types import EncryptedText
 
 
 class Portfolio(Base):
@@ -9,5 +10,5 @@ class Portfolio(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    allocations: Mapped[str] = mapped_column(String, default="[]")
-    performance: Mapped[str] = mapped_column(String, default="[]")
+    allocations: Mapped[str] = mapped_column(EncryptedText(fallback="[]"), default="[]")
+    performance: Mapped[str] = mapped_column(EncryptedText(fallback="[]"), default="[]")

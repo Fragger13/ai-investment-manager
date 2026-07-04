@@ -94,6 +94,9 @@ export type OnboardingProfile = {
   otherIncome: number;
   monthlyCashInflow: number;
   incomeStructureVersion: number;
+  investableThisMonth: number;
+  investableThisMonthMonth: string;
+  salaryDay: string;
   rent: number;
   emi: number;
   loans: number;
@@ -107,6 +110,7 @@ export type OnboardingProfile = {
   cryptoValue: number;
   goldValue: number;
   epfPpfValue: number;
+  epfPpfMonthly: number;
   realEstateValue: number;
   cashBalance: number;
   additionalInvestments: Investment[];
@@ -144,7 +148,6 @@ export type OnboardingProfile = {
   spendingDiscipline: string;
   emotionalSpendingTendency: string;
   investmentPsychology: string;
-  riskReaction: string;
   tracksExpenses: string;
   investsMonthly: string;
   panicSellRisk: string;
@@ -157,9 +160,24 @@ export type SourceLink = {
   retrievedAt: string;
 };
 
+export type FundPick = {
+  name: string;
+  fundHouse: string;
+  schemeCode: string;
+  plan: string;
+  latestNav: number;
+  navDate: string;
+  return1y: number | null;
+  return3y: number | null;
+  return5y: number | null;
+  rankReturn: number | null;
+  rankBasis: string;
+};
+
 export type Recommendation = {
   id: string;
   assetClass: string;
+  specificFunds?: FundPick[];
   suggestedAllocation: number;
   suggestedMonthlyAmount: number;
   strategyType: string;
@@ -532,6 +550,16 @@ export type AssetIntelligence = {
   confidenceScore: number;
   dataMode: DataMode;
   retrievedAt: string;
+  expectedReturn?: {
+    label?: string;
+    cagrRange?: string;
+    expectedCagr?: number;
+    conservative?: number;
+    base?: number;
+    aggressive?: number;
+    assumptions?: string;
+    disclaimer?: string;
+  } | null;
   technical?: {
     latestPrice?: number | null;
     movingAverage20?: number | null;
@@ -617,6 +645,11 @@ export type AlphaOpportunity = {
   assetName: string;
   ticker: string;
   assetType: string;
+  expectedReturn?: {
+    label?: string;
+    cagrRange?: string;
+    expectedCagr?: number;
+  } | null;
   bucket: string;
   nonObviousReason: string;
   keySignal: string;
@@ -677,6 +710,72 @@ export type ResearchSource = {
   dataMode: DataMode;
 };
 
+export type FundFactorInsights = {
+  compositeScore?: number;
+  sortino?: number | null;
+  calmar?: number | null;
+  maxDrawdown?: number | null;
+  maxDrawdown3y?: number | null;
+  downCapture?: number | null;
+  alpha?: number | null;
+  volatility?: number | null;
+  sortinoPercentile?: number | null;
+  drawdownPercentile?: number | null;
+  historyYears?: number | null;
+};
+
+export type CommunitySentiment = {
+  source?: string;
+  /** "asset" = chatter about this specific instrument; "category" = overall
+   *  forum mood (the robust fallback when the asset isn't being discussed). */
+  scope?: "asset" | "category";
+  mentionCount: number;
+  sentiment: "positive" | "negative" | "mixed" | "neutral";
+  sentimentScore?: number;
+  bullishTerms?: string[];
+  bearishTerms?: string[];
+  subreddits?: string[];
+  samplePosts?: { title: string; url: string; subreddit?: string }[];
+  disclaimer?: string;
+  asOf?: string;
+};
+
+export type GoalFundingStatus = {
+  fundingPercent: number;
+  requiredMonthlyInvestment: number;
+  allocatedMonthlyInvestment: number;
+  gap: number;
+  onTrack: boolean;
+  fix: string;
+  timeHorizonMonths?: number;
+};
+
+export type GoalFundingPlan = {
+  goals: {
+    id: string;
+    name: string;
+    priority: number;
+    essential: boolean;
+    targetAmount: number;
+    currentProgress: number;
+    timeHorizonMonths: number;
+    expectedReturn: number;
+    requiredMonthlyInvestment: number;
+    allocatedMonthlyInvestment: number;
+    projectedCorpus: number;
+    fundingPercent: number;
+    gap: number;
+    onTrack: boolean;
+    fix: string;
+  }[];
+  surplus: number;
+  totalRequired: number;
+  totalAllocated: number;
+  unallocatedSurplus?: number;
+  fullyFundsAll: boolean;
+  sipByGoalId?: Record<string, number>;
+};
+
 export type AdvancedRecommendation = {
   id: string;
   recommendationTitle: string;
@@ -728,6 +827,17 @@ export type AdvancedRecommendation = {
   goalTimeHorizonMonths: number;
   goalFundingGap: number;
   essentialGoal: boolean;
+  isFundPick?: boolean;
+  factorScore?: number;
+  factorDrivers?: string[];
+  factorInsights?: FundFactorInsights;
+  fundFactors?: Record<string, number | string | null>;
+  diversification?: {
+    correlationToHoldings?: number | null;
+    diversifies?: boolean | null;
+    redundant?: boolean;
+  };
+  goalFunding?: GoalFundingStatus;
   portfolioRole: string;
   portfolioConstruction: {
     currentAllocation?: Record<string, number>;
@@ -1174,6 +1284,7 @@ export type PortfolioHolding = {
   id: string;
   name: string;
   category: string;
+  allocationCategory?: string;
   value: number;
   valueAtCost?: number;
   source: "profile" | "action";
@@ -1361,6 +1472,7 @@ export type AdvancedRecommendationResponse = {
   validationSummary?: Record<string, unknown>;
   investorCluster?: Record<string, unknown>;
   factorScores?: Record<string, number>;
+  goalFunding?: GoalFundingPlan;
   recommendationGroups?: Record<string, {
     id?: string;
     instrumentName?: string;

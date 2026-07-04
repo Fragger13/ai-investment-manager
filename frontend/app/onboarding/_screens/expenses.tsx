@@ -54,6 +54,7 @@ export function SpendingScreen(_ctx: ScreenContext) {
           placeholder="Total monthly spend"
           helper="Groceries, shopping, eating out, subscriptions (Netflix, Spotify), bills — bundle it all in. Don't include rent or EMIs."
           size="lg"
+          hint="Everything you spend in a normal month except rent and loan EMIs: groceries, transport, eating out, shopping, bills and subscriptions. A rough monthly average is perfectly fine."
         />
       </div>
     </ScreenWrap>
@@ -152,7 +153,7 @@ export function LoansScreen({ form, values }: ScreenContext) {
                 <div key={index} className="flex items-center justify-between gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 shadow-md">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[#0F172A]">{loan?.name || loan?.productType || `Loan ${index + 1}`}</p>
-                    <p className="mt-0.5 text-xs text-[#4B5563]">{loan?.productType || "—"} · {monthly ? `${formatINR(monthly)} / month` : "Add start + end dates"}</p>
+                    <p className="mt-0.5 text-[13px] text-[#4B5563]">{loan?.productType || "—"} · {monthly ? `${formatINR(monthly)} / month` : "Add start + end dates"}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" size="icon" onClick={() => openEdit(index)} title="Edit"><Pencil className="h-4 w-4" /></Button>
@@ -177,7 +178,7 @@ export function LoansScreen({ form, values }: ScreenContext) {
         onCommit={commit}
       />
 
-      <PapaPeek open={peekOpen} onClose={() => setPeekOpen(false)} variant="edge">
+      <PapaPeek open={peekOpen} onClose={() => setPeekOpen(false)} variant="edge" bubbleTopClass="-top-16 sm:-top-24">
         Not sure where to look, beta? Check <a href="https://www.cibil.com/" target="_blank" rel="noreferrer noopener" className="underline">CIBIL</a> for every loan on your PAN, and your credit card statements for any card EMIs.
       </PapaPeek>
     </ScreenWrap>
@@ -295,7 +296,7 @@ function LoanDialog({
         </div>
 
         <div className="mt-4 rounded-lg border border-[#E5E7EB] bg-[#FAFAFA] p-3">
-          <Label className="text-xs uppercase tracking-wide text-[#4B5563]">Total loan / EMI amount</Label>
+          <Label className="text-[13px] uppercase tracking-wide text-[#4B5563]">Total loan / EMI amount</Label>
           <div className="relative mt-2">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">₹</span>
             <Input

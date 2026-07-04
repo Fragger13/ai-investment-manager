@@ -1,10 +1,12 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     email: EmailStr
-    password: str
+    # Enforced at the API too (not just the form): a leaked curl one-liner
+    # should not be able to create an account with a 1-character password.
+    password: str = Field(min_length=8)
 
 
 class LoginRequest(BaseModel):
@@ -28,6 +30,13 @@ class RefreshRequest(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: EmailStr
+    token: str = Field(min_length=16)
+    # Same floor as registration: a reset must not weaken the account.
+    password: str = Field(min_length=8)
 
 
 class VerifyEmailRequest(BaseModel):

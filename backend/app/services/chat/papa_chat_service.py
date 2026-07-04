@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.agents.chat_context_assembler_agent import assemble_chat_context
 from app.schemas.financial import ChatCard, ChatResponse, OnboardingProfile
 from app.services.chat.context_builder_service import build_chat_context
-from app.services.intelligence import build_dashboard
+from app.services.intelligence import build_dashboard, current_ist_month, monthly_commitments, total_emi_payments
 from app.services.llm.model_router import generate_chat_answer
 
 
@@ -47,6 +47,7 @@ def papa_chat_answer(
     intent = detect_intent(message)
 
     summary = dashboard.get("summary", {})
+    available_now = _available_this_month(profile, dashboard)
     profile_extras = {
         **(context.get("profile") or {}),
         "name": profile.name,
@@ -56,7 +57,12 @@ def papa_chat_answer(
         "maritalStatus": profile.maritalStatus,
         "monthlyIncome": summary.get("monthlyIncome"),
         "monthlyExpenses": summary.get("monthlyExpenses"),
-        "monthlySurplus": summary.get("investableSurplus"),
+        # Same figures the cards + the rest of the app show, so the LLM's spoken
+        # numbers stay consistent with what the user sees elsewhere.
+        "monthlyCommitments": round(_monthly_commitments(profile)),
+        "monthlySurplus": round(available_now),
+        "availableToInvest": round(available_now),
+        "affordableMonthlyPayment": _affordable_monthly(summary.get("monthlyIncome") or 0, available_now),
         "rent": profile.rent,
         "subscriptions": profile.subscriptions,
         "emi": profile.emi,
@@ -198,12 +204,32 @@ def _months_from_message(message: str, default: int = 6) -> int:
     return default
 
 
+def _monthly_commitments(profile: OnboardingProfile) -> float:
+    """Single source of truth: intelligence.monthly_commitments (rent + monthly
+    expenses + subscriptions + EMIs) so the chat's numbers match the Dashboard,
+    Plan and Portfolio."""
+    return float(monthly_commitments(profile))
+
+
+def _available_this_month(profile: OnboardingProfile, dashboard: dict) -> float:
+    """The same 'available to invest this month' shown everywhere else: the
+    per-month override when set for the current month, else income − commitments.
+    Income − commitments == available, so the chat's three numbers reconcile."""
+    income = float(dashboard.get("summary", {}).get("monthlyIncome") or 0)
+    if (profile.investableThisMonth or 0) > 0 and profile.investableThisMonthMonth == current_ist_month():
+        return float(profile.investableThisMonth)
+    return max(income - _monthly_commitments(profile), 0.0)
+
+
 def _surplus(profile: OnboardingProfile, dashboard: dict) -> float:
-    s = dashboard.get("summary", {})
-    income = float(s.get("monthlyIncome") or 0)
-    expenses = float(s.get("monthlyExpenses") or 0)
-    commitments = float(profile.rent or 0) + float(profile.subscriptions or 0) + float(profile.emi or 0)
-    return max(income - expenses - commitments, float(s.get("investableSurplus") or 0), 0)
+    return _available_this_month(profile, dashboard)
+
+
+def _affordable_monthly(income: float, available: float) -> int:
+    """A monthly payment toward a new purchase/EMI that won't strain cash flow:
+    at most 20% of income, and never more than the actual monthly surplus."""
+    cap = round(float(income) * 0.20)
+    return max(min(cap, round(float(available))), 0)
 
 
 # ---------------------------------------------------------------------------
@@ -290,11 +316,12 @@ def _papa_baseline(message: str, intent: str, profile: OnboardingProfile, dashbo
                 "With nothing left after expenses and EMIs, this isn't the time, beta. Fix the cash flow "
                 "first — then we can talk about the new toy."
             )
-        emi_cap = round(income * 0.20)
+        monthly = _affordable_monthly(income, available)
         return (
-            f"Acha, let me see — you have around {_money_str(available)}/month after expenses and EMIs. "
-            f"You can consider it, but keep the EMI under {_money_str(emi_cap)}/month, which is 20% of income. "
-            f"Anything more and every other goal starts to suffer."
+            f"Acha, let me see — you have around {_money_str(available)}/month spare after expenses and EMIs. "
+            f"You can consider it, but keep the monthly payment under {_money_str(monthly)} so it doesn't eat "
+            f"into your other goals. Spread over 6-12 months, that's roughly a "
+            f"{_money_str(monthly * 6)}-{_money_str(monthly * 12)} purchase."
         )
 
     if intent == "afford_house":
@@ -477,8 +504,8 @@ def _build_cards(intent: str, profile: OnboardingProfile, dashboard: dict, messa
     s = dashboard.get("summary", {})
     income = float(s.get("monthlyIncome") or 0)
     expenses = float(s.get("monthlyExpenses") or 0)
-    commitments = float(profile.rent or 0) + float(profile.subscriptions or 0) + float(profile.emi or 0)
-    available = _surplus(profile, dashboard)
+    commitments = _monthly_commitments(profile)
+    available = _available_this_month(profile, dashboard)
 
     snapshot_intents = {
         "afford_purchase",
@@ -522,18 +549,25 @@ def _build_cards(intent: str, profile: OnboardingProfile, dashboard: dict, messa
             )
         )
     elif intent == "afford_purchase":
-        budget_low = round(income * 0.40 * 12)
-        budget_high = round(income * 0.60 * 12)
+        monthly = _affordable_monthly(income, available)
+        if monthly > 0:
+            body = (
+                f"Keep the monthly outgo under about {_money_str(monthly)} — that comfortably supports a "
+                f"purchase of {_money_str(monthly * 6)} – {_money_str(monthly * 12)} spread over 6–12 months, "
+                f"without straining your cash flow."
+            )
+        else:
+            body = (
+                "There's very little spare each month right now, so a new EMI would strain things. "
+                "Free up some cash flow first, then this becomes comfortable."
+            )
         cards.append(
             ChatCard(
                 type="recommendation",
                 title="My recommendation",
-                body=(
-                    f"A purchase in the range of {_money_str(budget_low)} – {_money_str(budget_high)} "
-                    f"would fit your current cash flow without strain."
-                ),
+                body=body,
                 icon="target",
-                tone="positive" if available > 0 else "warning",
+                tone="positive" if monthly > 0 else "warning",
             )
         )
         cards.append(

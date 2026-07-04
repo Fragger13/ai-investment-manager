@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ai_investment_manager.db"
     jwt_secret: str = "prototype-secret-change-me"
     jwt_algorithm: str = "HS256"
+    # Derives the guest/server data-at-rest key (core/data_encryption); falls
+    # back to jwt_secret when unset. Rotating it is safe only for secrets
+    # listed in data_encryption._LEGACY_GUEST_SECRETS (startup rekeys them).
+    data_encryption_secret: str | None = None
+    # Wraps the escrow copy of each user's data key so password reset keeps
+    # their financial data. Losing this secret means reset = data loss again.
+    recovery_master_key: str | None = None
     access_token_expire_minutes: int = 60 * 24
     cors_origins: list[str] = [
         "http://localhost:3000",
@@ -42,17 +49,23 @@ class Settings(BaseSettings):
     app_url: str = "http://localhost:3000"
     llm_provider: str = "ollama"
     llm_enabled: bool = True
-    llm_model: str = "llama3.1:8b"
+    llm_model: str = "qwen3:8b"
     ollama_base_url: str = "http://localhost:11434"
-    # llama3.1:8b — Meta's instruct model, strong general chat for M-series Macs.
-    # Falls back gracefully to qwen2.5:7b if you pull it; both fit on 16GB.
-    llm_model_reasoning: str = "llama3.1:8b"
-    llm_model_fast: str = "qwen2.5:7b"
-    llm_model_extraction: str = "qwen2.5:7b"
-    llm_model_summarize: str = "qwen2.5:7b"
+    # Set for Ollama Cloud (ollama_base_url=https://ollama.com): sent as a
+    # Bearer token, and makes the router trust the configured model names
+    # instead of resolving them against the local /api/tags list.
+    ollama_api_key: str | None = None
+    # Defaults target qwen3:8b (commonly pulled here). The runtime resolves any
+    # configured model that isn't actually installed to one that is (see
+    # model_router._resolve_model), so a config/.env drift degrades to a working
+    # model instead of always falling back to the deterministic baseline.
+    llm_model_reasoning: str = "qwen3:8b"
+    llm_model_fast: str = "qwen3:8b"
+    llm_model_extraction: str = "qwen3:8b"
+    llm_model_summarize: str = "qwen3:8b"
     llm_timeout_seconds: int = 25
     llm_timeout_chat_seconds: int = 25
-    llm_timeout_enhancement_seconds: int = 10
+    llm_timeout_enhancement_seconds: int = 30
     llm_timeout_summarize_seconds: int = 8
     llm_retries: int = 1
     llm_batch_size: int = 2

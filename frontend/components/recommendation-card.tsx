@@ -35,7 +35,35 @@ export function RecommendationCard({ rec, compact = false }: { rec: Recommendati
           </div>
           <Progress value={rec.confidenceScore} />
         </div>
-        <p className="text-sm leading-6 text-foreground/80">{rec.reasoning}</p>
+        <p className="text-sm leading-6 text-foreground">{rec.reasoning}</p>
+        {rec.specificFunds && rec.specificFunds.length ? (
+          <div className="rounded-md border border-border/60 bg-surface-soft p-3">
+            <p className="text-xs font-medium text-foreground/90">Specific funds to consider (Direct plans, ranked by past returns)</p>
+            <ul className="mt-2 space-y-2">
+              {rec.specificFunds.map((fund, idx) => (
+                <li key={fund.schemeCode || fund.name} className="text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="font-medium text-foreground">
+                      {idx === 0 ? "★ " : ""}{fund.name}
+                    </span>
+                    {fund.rankReturn != null && fund.rankBasis ? (
+                      <span className="shrink-0 text-xs font-semibold text-primary">
+                        {fund.rankReturn.toFixed(1)}% <span className="font-normal text-muted-foreground">{fund.rankBasis}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {fund.plan}
+                    {fund.return1y != null ? ` · 1Y ${fund.return1y.toFixed(1)}%` : ""}
+                    {fund.return3y != null ? ` · 3Y ${fund.return3y.toFixed(1)}%` : ""}
+                    {fund.return5y != null ? ` · 5Y ${fund.return5y.toFixed(1)}%` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-muted-foreground">Past returns don&apos;t guarantee future results. Returns are net of expenses (NAV-based).</p>
+          </div>
+        ) : null}
         {!compact ? (
           <div className="space-y-2 text-xs text-muted-foreground">
             <p><span className="text-foreground/90">When to consider starting:</span> {rec.entryTiming}</p>

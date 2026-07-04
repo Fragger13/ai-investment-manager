@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Save } from "lucide-react";
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, inter } from "@/lib/fonts";
+import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, sans } from "@/lib/fonts";
 import { ProgressSegments } from "./progress-segments";
 import { CalculatorButton } from "./calculator";
 
@@ -46,15 +46,15 @@ export function OnboardingShell({
 }: OnboardingShellProps) {
   return (
     <main
-      className={`${inter.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
-      style={{ fontFamily: "var(--font-inter)" }}
+      className={`${sans.variable} ${caveat.variable} min-h-screen bg-white text-[#0F172A]`}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-4 py-3 sm:px-10 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/papa-avatar.png" alt="" aria-hidden className="h-14 w-14 rounded-full object-cover ring-2 ring-white shadow-sm" />
-            <span className="text-xl font-semibold text-[#0F172A]">AskPapa</span>
+            <span className="text-xl font-bold text-[#0F172A]">AskPapa</span>
           </Link>
           <div className="flex items-center gap-2">
             <AnimatePresence>
@@ -93,7 +93,7 @@ export function OnboardingShell({
 
         <div className="mt-5">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold uppercase tracking-widest text-[#0F172A]">
+            <p className="text-sm font-bold uppercase tracking-wide text-[#0F172A]">
               Section {Math.min(activeSectionIndex + 1, sections.length)} of {sections.length} · {sectionLabel}
             </p>
             <p className="text-2xl font-semibold sm:text-[28px]" style={{ fontFamily: SCRIPT_FAMILY, color: SCRIPT_GREEN }}>
@@ -113,7 +113,7 @@ export function OnboardingShell({
           </div>
         </section>
 
-        <footer className="mt-4 mb-[2cm] flex items-center justify-between">
+        <footer className="mt-4 mb-10 flex items-center justify-between sm:mb-14">
           <Button
             type="button"
             variant="outline"
