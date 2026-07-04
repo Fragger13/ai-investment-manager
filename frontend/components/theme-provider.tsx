@@ -29,6 +29,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // so we always render it in light (without touching the saved preference) and
   // hide the toggle there. It restores the user's theme on leaving.
   const onOnboarding = Boolean(pathname && pathname.startsWith("/onboarding"));
+  // The landing page is the same hardcoded-light design, so the toggle does
+  // nothing there — render it light and hide the button too.
+  const lightOnly = onOnboarding || pathname === "/";
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -43,9 +46,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // data-onboarding marker lets globals.css scope onboarding-only rules
   // (e.g. pure-black field text) even to dialogs that portal to <body>.
   useEffect(() => {
-    applyTheme(onOnboarding ? "light" : theme);
+    applyTheme(lightOnly ? "light" : theme);
     document.documentElement.dataset.onboarding = onOnboarding ? "true" : "false";
-  }, [onOnboarding, theme]);
+  }, [lightOnly, onOnboarding, theme]);
 
   const setTheme = useCallback((nextTheme: Theme) => {
     applyTheme(nextTheme);
@@ -62,7 +65,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>
       {children}
-      {!onOnboarding ? (
+      {!lightOnly ? (
         <button
           type="button"
           data-tour="theme-toggle"
