@@ -6,8 +6,12 @@ import { caveat, sans } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Investment Manager",
-  description: "Clear, practical guidance for building your financial plan"
+  title: "AskPapa",
+  description: "Clear, practical guidance for building your financial plan",
+  icons: {
+    icon: "/landing/papa-avatar-round.png",
+    apple: "/landing/papa-avatar-round.png"
+  }
 };
 
 const themeScript = `

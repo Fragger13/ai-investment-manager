@@ -33,9 +33,5 @@ uploaded_documents/
 # Build metadata
 *.tsbuildinfo
 
-# Large media exceeding GitHub 100MB file limit (Our Story video, 141MB).
-# Keep locally; ship via Git LFS or a compressed re-export when ready.
-frontend/public/AskPapa_final.mp4
-
 # OS files
 .DS_Store

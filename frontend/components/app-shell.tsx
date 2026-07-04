@@ -67,7 +67,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
           />
           <span className="leading-tight">
             <span className="block text-lg font-extrabold text-foreground">AskPapa</span>
-            <span className="block text-[11px] font-medium text-muted-foreground">Your money buddy</span>
+            <span className="block whitespace-nowrap text-[9px] font-medium tracking-tight text-muted-foreground">Your Papa for all things Finance</span>
           </span>
         </Link>
 
