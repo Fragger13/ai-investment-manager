@@ -758,6 +758,34 @@ def _personalized_weights(context, horizon_months: int) -> dict[str, float]:
     if getattr(context, "disciplined", False) and long_term:
         for k, bump in (("alpha", 0.04), ("momentum12m", 0.03), ("sortino", 0.03)):
             w[k] += bump
+
+    # Life-stage tilt: the same category reads differently at 24 and at 53.
+    age_band = getattr(context, "age_band", "")
+    if age_band in {"pre_retire", "senior"}:
+        for k, bump in (("maxDrawdown3y", 0.06), ("downCapture", 0.05), ("downsideDeviation", 0.03)):
+            w[k] += bump
+        for k, cut in (("momentum12m", 0.03), ("alpha", 0.02)):
+            w[k] = max(0, w[k] - cut)
+    elif age_band == "young":
+        for k, bump in (("momentum12m", 0.03), ("alpha", 0.03), ("cagr3y", 0.02)):
+            w[k] += bump
+        w["volatility"] = max(0, w["volatility"] - 0.02)
+
+    # First-time investors get consistency over cleverness: steadier rolling
+    # returns and shallower drawdowns beat chart-topping alpha they may not
+    # hold through a rough year.
+    beginner = getattr(context, "investments_total", 0) < 100_000 or not getattr(context, "invest_monthly_active", True)
+    if beginner:
+        for k, bump in (("rollingMean3y", 0.05), ("maxDrawdown3y", 0.04), ("rollingStd3y", 0.03)):
+            w[k] += bump
+        for k, cut in (("alpha", 0.04), ("momentum12m", 0.02)):
+            w[k] = max(0, w[k] - cut)
+
+    # Irregular income may need to redeem at a bad moment — protect the exit.
+    if getattr(context, "irregular_income", False):
+        for k, bump in (("downsideDeviation", 0.04), ("downCapture", 0.03)):
+            w[k] += bump
+        w["momentum12m"] = max(0, w["momentum12m"] - 0.02)
     return w
 
 

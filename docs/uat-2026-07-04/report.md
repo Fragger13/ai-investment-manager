@@ -74,10 +74,27 @@ Dashboard, engine and chat each computed "available money" differently (chat sub
 - **UI walkthrough:** login-injected sessions for all 5 users across Home, Plan, Goals, Portfolio, Discover — correct name, correct numbers, plan sized to the user's true monthly budget, portfolio itemised per user (25 screenshots in `screenshots/`).
 - **Security posture:** XSS payload in a text field is stored but React-escaped on render, and the input sanitizer strips it in the UI; no secrets or DBs tracked in git.
 
+## Addendum (same day): instrument pool personalization shipped
+
+Limitation #2 below was addressed right after this report. A deterministic
+**category planner** (`services/recommendations/category_planner.py`) now gates
+and orders fund categories per profile — ELSS only above the tax threshold,
+small caps never for beginners/panic-sellers/conservative pre-retirees, gilt
+and corporate bond ladders for conservative and older profiles, index-first
+for first-time investors — and the factor engine's fund scoring gained
+life-stage, beginner and irregular-income weight tilts. One recommendation per
+fund category (no more duplicate balanced-advantage rows), and generic debt
+products (bank FD) rank below the curated fund ladder.
+
+Result on the same 5 personas: average pairwise instrument overlap fell from
+~78% to ~59%; fresher vs executive from 100% to 75%; executive vs preretiree
+78% → 47%. The student no longer sees an ELSS; every plan still fits inside
+the user's surplus with ≥ ₹500 tickets.
+
 ## Known limitations (documented, deliberate)
 
 1. **LLM latency** — qwen3:8b chat takes 14–20s and often hits the 20s timeout (falls back to deterministic replies). Consider a smaller/faster chat model or a longer timeout.
-2. **Instrument pool overlap** within the same risk band (see verdict above).
+2. **Instrument pool overlap** within the same risk band — addressed same-day, see addendum above.
 3. **Emergency ladder redundancy** — up to 3 cash-like debt funds (liquid/overnight/short-duration); amounts are correct, could consolidate to 1–2 rows.
 4. **Uniform confidence badges** (94 debt / 88 equity) across users — cosmetic.
 5. **`AskPapa_final.mp4` (141MB)** exceeds GitHub's 100MB hard limit → gitignored so the push succeeds. The Our Story button still works locally. Ship it via Git LFS or a compressed re-export (~720p H.264 lands well under 100MB).

@@ -46,6 +46,7 @@ from app.services.intelligence import DISCLAIMER
 from app.services.backtesting_service import initialize_recommendation_performance, model_metadata
 from app.services.optimization.portfolio_optimizer import optimize_portfolio
 from app.services.recommendations.asset_screening_service import signals_for_asset
+from app.services.recommendations.category_planner import NEUTRAL_PREFERENCE, build_category_plan, category_preference
 from app.services.recommendations.goal_funding_service import solve_goal_funding
 from app.services.recommendations.recommendation_builder import build_recommendation
 from app.services.recommendations.suitability_scoring_service import build_profile_context
@@ -93,12 +94,36 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
     portfolio_plan = construct_portfolio(profile, context, goals, regime)
     portfolio_optimization = optimize_portfolio(db, profile, persist=False)
 
+    # Per-profile category plan: gate out categories that don't fit this user
+    # (an ELSS for someone below the tax threshold, small caps for a beginner)
+    # and let preferred categories claim the per-class slots first. This is
+    # what makes two users in the same risk band receive different instrument
+    # sets, not just different amounts.
+    category_plan = build_category_plan(context)
+
+    def _plan_pref(a) -> float:
+        key = category_key_for_name(a.category)
+        if not key and a.asset_key == "debt":
+            # Unmapped debt products (e.g. a generic bank FD) rank below the
+            # curated debt-fund ladder; they only surface when slots remain.
+            return 40.0
+        return category_preference(category_plan, key)
+
+    assets = [asset for asset in assets if _plan_pref(asset) >= 0]
+    assets.sort(key=_plan_pref, reverse=True)  # stable: non-fund assets keep their order
+
     recommendations = []
     asset_key_counts: dict[str, int] = {}
     bucket_members: dict[str, list[dict]] = {}
+    seen_category_keys: set[str] = set()
     max_by_key = _asset_count_caps(cluster)
     for asset in assets:
         if asset_key_counts.get(asset.asset_key, 0) >= max_by_key.get(asset.asset_key, 1):
+            continue
+        # One recommendation per fund category: two research rows for e.g.
+        # "Hybrid balanced fund" should not become two near-identical picks.
+        category_key = category_key_for_name(asset.category)
+        if category_key and category_key in seen_category_keys:
             continue
         candidate = candidates_by_name.get(asset.instrument_name)
         supporting, conflicting = signals_for_asset(asset, signals)
@@ -114,6 +139,12 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
             fund_choice = _personalize_equity(asset, context, goal, regime) or _personalize_crypto(asset, context, goal, regime)
         if fund_choice:
             fit["suitabilityScore"] = max(5, min(96, round(fit["suitabilityScore"] + (fund_choice["score"] - 50) * 0.25)))
+        # Category-plan fit also moves suitability, so categories this profile
+        # prefers outrank within their bucket (ticket-size normalization keeps
+        # the top-ranked picks when the budget is small).
+        pref = _plan_pref(asset)
+        if pref != NEUTRAL_PREFERENCE:
+            fit["suitabilityScore"] = max(5, min(96, round(fit["suitabilityScore"] + (pref - NEUTRAL_PREFERENCE) * 0.2)))
         sizing = size_position(context, asset, goal, portfolio_plan, regime)
         if sizing["suggestedAllocationPercentage"] <= 0 or sizing["suggestedMonthlyAmount"] <= 0:
             continue
@@ -177,6 +208,8 @@ def generate_institutional_recommendations(db: Session, profile: OnboardingProfi
         recommendations.append(enriched)
         bucket_members.setdefault(asset.asset_key, []).append(enriched)
         asset_key_counts[asset.asset_key] = asset_key_counts.get(asset.asset_key, 0) + 1
+        if category_key:
+            seen_category_keys.add(category_key)
         if len(recommendations) >= 15:
             break
 
