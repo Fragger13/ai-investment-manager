@@ -289,6 +289,14 @@ body {
   font-weight: 600;
 }
 
+/* Hide the theme toggle on light-only routes (landing "/" + onboarding) before
+   hydration. usePathname() is null during static prerender, so the button is
+   baked into the SSR HTML; the pre-paint script in layout.tsx sets this marker
+   so the button never paints, and ThemeProvider mirrors it on client nav. */
+html[data-hide-theme-toggle="true"] [data-tour="theme-toggle"] {
+  display: none !important;
+}
+
 /* Onboarding is a light-only funnel; force every field's typed value to pure
    black for maximum legibility. Scoped via the data-onboarding marker set by
    the ThemeProvider so it reaches inputs inside popups that portal to <body>,

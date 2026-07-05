@@ -48,6 +48,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTheme(lightOnly ? "light" : theme);
     document.documentElement.dataset.onboarding = onOnboarding ? "true" : "false";
+    // Mirror the pre-paint script so client-side navigation between the
+    // landing/onboarding pages and the app keeps the toggle hidden/shown. CSS
+    // scoped to this attribute hides the button even in the SSR/prerender HTML.
+    document.documentElement.dataset.hideThemeToggle = lightOnly ? "true" : "false";
   }, [lightOnly, onOnboarding, theme]);
 
   const setTheme = useCallback((nextTheme: Theme) => {

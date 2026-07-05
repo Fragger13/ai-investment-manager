@@ -14,13 +14,21 @@ export const metadata: Metadata = {
   }
 };
 
+// Runs before first paint so the theme and the toggle's visibility are correct
+// on the very first frame — no flash. The landing page ("/") and onboarding are
+// hardcoded light-only, so we force light there and hide the toggle up front
+// (usePathname() is null during static prerender, so the React layer alone
+// would briefly render the button before hydration removes it).
 const themeScript = `
   (function () {
     try {
+      var path = window.location.pathname;
+      var lightOnly = path === "/" || path.indexOf("/onboarding") === 0;
       var storedTheme = window.localStorage.getItem("${THEME_STORAGE_KEY}");
-      var theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "light";
+      var theme = (!lightOnly && (storedTheme === "light" || storedTheme === "dark")) ? storedTheme : "light";
       document.documentElement.classList.toggle("dark", theme === "dark");
       document.documentElement.dataset.theme = theme;
+      if (lightOnly) document.documentElement.dataset.hideThemeToggle = "true";
     } catch (error) {
       document.documentElement.dataset.theme = "light";
     }
