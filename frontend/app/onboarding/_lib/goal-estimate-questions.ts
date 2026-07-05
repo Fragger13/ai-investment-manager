@@ -159,6 +159,16 @@ const QUESTIONS: Record<string, EstimateQuestion[]> = {
         { value: "family", label: "Family" },
       ],
     },
+    {
+      key: "nights",
+      prompt: "How long is the trip?",
+      chips: [
+        { value: "weekend", label: "A weekend" },
+        { value: "week", label: "About a week" },
+        { value: "twoweeks", label: "About two weeks" },
+        { value: "month", label: "A month or more" },
+      ],
+    },
   ],
   "Business/startup": [
     {

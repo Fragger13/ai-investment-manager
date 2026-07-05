@@ -81,8 +81,11 @@ _EDU_LEVEL_LABEL = {"school": "school", "undergrad": "an undergraduate degree", 
 _WEDDING_SCALE = {"simple": 800_000, "moderate": 2_000_000, "grand": 5_000_000}
 _WEDDING_SCALE_LABEL = {"simple": "a simple wedding", "moderate": "a mid-scale wedding", "grand": "a grand wedding"}
 
-_TRAVEL_PER_PERSON = {"domestic": 30_000, "international": 150_000}
+# Rough all-in spend per traveller per day (stay + food + local travel). Flights
+# and inter-city transport are folded into the higher international rate.
+_TRAVEL_PER_PERSON_PER_DAY = {"domestic": 5_000, "international": 18_000}
 _TRAVEL_TRAVELLERS = {"solo": 1, "couple": 2, "family": 4}
+_TRAVEL_DAYS = {"weekend": 3, "week": 6, "twoweeks": 13, "month": 30}
 
 _BUSINESS_SCALE = {"side": 300_000, "small": 1_500_000, "ambitious": 5_000_000}
 _BUSINESS_SCALE_LABEL = {"side": "a side hustle", "small": "a small business", "ambitious": "an ambitious venture"}
@@ -148,11 +151,13 @@ def _estimate_wedding(answers: dict[str, Any], profile: dict[str, Any] | None) -
 def _estimate_travel(answers: dict[str, Any], profile: dict[str, Any] | None) -> dict[str, Any]:
     locale = str(answers.get("locale") or "domestic")
     travellers = _TRAVEL_TRAVELLERS.get(str(answers.get("travelers") or "couple"), 2)
-    base = _TRAVEL_PER_PERSON.get(locale, _TRAVEL_PER_PERSON["domestic"]) * travellers
+    days = _TRAVEL_DAYS.get(str(answers.get("nights") or "week"), 6)
+    per_day = _TRAVEL_PER_PERSON_PER_DAY.get(locale, _TRAVEL_PER_PERSON_PER_DAY["domestic"])
+    base = per_day * travellers * days
     years = _years(answers)
     where = "an international" if locale == "international" else "a domestic"
-    rationale = f"Ballpark for {where} trip for {travellers} traveller(s), grown for travel inflation."
-    assumptions = [f"{where.capitalize()} trip, {travellers} traveller(s)", "~6% travel inflation a year"]
+    rationale = f"Ballpark for {where} trip for {travellers} traveller(s) over about {days} days, grown for travel inflation."
+    assumptions = [f"{where.capitalize()} trip, {travellers} traveller(s), ~{days} days", "~6% travel inflation a year"]
     return _result(base, 0.06, years, rationale, assumptions)
 
 

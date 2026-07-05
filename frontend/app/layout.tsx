@@ -5,9 +5,47 @@ import { THEME_STORAGE_KEY } from "@/lib/theme";
 import { caveat, sans } from "@/lib/fonts";
 import "./globals.css";
 
+const SITE_URL = "https://www.askpapa.in";
+const SITE_DESCRIPTION =
+  "AskPapa is your friendly AI money mentor for India. Build a clear financial plan, set goals, track your portfolio, and make confident money decisions, all explained in simple language.";
+const SOCIAL_DESCRIPTION =
+  "Your friendly AI money mentor for India. A clear financial plan, goals, and portfolio tracking, all explained in simple language.";
+
 export const metadata: Metadata = {
-  title: "AskPapa",
-  description: "Clear, practical guidance for building your financial plan",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "AskPapa: Your Papa for all things Finance",
+    template: "%s · AskPapa"
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: "AskPapa",
+  keywords: [
+    "AskPapa",
+    "financial planning India",
+    "AI investment guidance",
+    "personal finance",
+    "mutual funds",
+    "SIP",
+    "retirement planning",
+    "goal planning"
+  ],
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "AskPapa",
+    title: "AskPapa: Your Papa for all things Finance",
+    description: SOCIAL_DESCRIPTION,
+    locale: "en_IN",
+    images: [{ url: "/landing/papa-avatar-round.png", width: 280, height: 280, alt: "AskPapa" }]
+  },
+  twitter: {
+    card: "summary",
+    title: "AskPapa: Your Papa for all things Finance",
+    description: SOCIAL_DESCRIPTION,
+    images: ["/landing/papa-avatar-round.png"]
+  },
   icons: {
     icon: "/landing/papa-avatar-round.png",
     apple: "/landing/papa-avatar-round.png"

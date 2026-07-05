@@ -106,7 +106,7 @@ export const onboardingSchema = z.object({
   volatilityComfort: z.string().optional().default(""),
   liquidityRequirement: z.string().optional().default(""),
   investmentHorizon: z.string().min(1),
-  retirementAge: z.coerce.number().min(40).max(80),
+  retirementAge: z.coerce.number().min(30).max(80),
   emergencyFundTarget: numeric,
   housePurchaseTarget: numeric,
   travelTarget: numeric,

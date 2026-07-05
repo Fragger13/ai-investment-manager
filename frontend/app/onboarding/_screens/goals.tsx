@@ -228,7 +228,17 @@ function GoalDialog({
   const isRetirementGoal = goal.type === "Retirement" || goal.type === "Financial freedom";
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) return;
+        // While Papa's estimate is open, a close gesture (Esc, tap-outside, or
+        // the phone's back button) should return to the goal form — not discard
+        // the whole goal and drop the user back at the picker.
+        if (estimating) setEstimating(false);
+        else onCancel();
+      }}
+    >
       <DialogContent className="max-h-[88vh] overflow-y-auto">
         {estimating ? (
           <>

@@ -212,7 +212,13 @@ export function CityField({ name, label, placeholder, helper, optional, hint, hi
                         type="button"
                         className={`flex w-full items-center px-3 py-1.5 text-left text-[0.9375rem] ${idx === highlight ? "bg-surface-hover" : ""} hover:bg-surface-hover`}
                         onMouseEnter={() => setHighlight(idx)}
-                        onClick={() => choose(city)}
+                        // Pick on mousedown and keep focus on the input: without
+                        // preventDefault the input blurs first, and the blur-close
+                        // race could swallow the click so only Enter worked.
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          choose(city);
+                        }}
                       >
                         {city}
                       </button>
