@@ -179,7 +179,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15"><Upload className="h-5 w-5" /></span>
             <p className="text-[1.0625rem] font-semibold">Upload statement</p>
-            <p className="text-[0.875rem] leading-snug text-white/85">Upload XIRR statements from your broker, mutual fund platform, or demat account. I&apos;ll automatically build a complete picture of your investments.</p>
+            <p className="text-[0.875rem] leading-snug text-white/85">Upload a portfolio or holdings statement from your broker, mutual fund platform, or demat account. I&apos;ll automatically build a complete picture of your investments.</p>
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[0.75rem] font-medium text-white">⚡ Live P&amp;L · auto-refresh with the market</p>
           </button>
           <button
@@ -201,7 +201,7 @@ export function AssetsIntroScreen({ form, values, next }: ScreenContext) {
         onClose={() => setPeekOpen(false)}
         variant="edge"
         imageSrc="/landing/papa-peek-concerned.png"
-        autoDismissMs={8000}
+        autoDismissMs={18000}
       >
         <strong>You don&apos;t have the statement handy, do you? Thought so.</strong>
         <br />
@@ -219,9 +219,9 @@ export function AssetsUploadScreen({ form, values }: ScreenContext) {
   const skippedFromIntro = intent === "manual";
   return (
     <ScreenWrap
-      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload that XIRR file and I'll line everything up for you."}
+      papa={skippedFromIntro ? "Beta, you already picked manual. You can still upload here if you want." : "Beta, upload your portfolio statement and I'll line everything up for you."}
       headline="Your portfolio"
-      sub="Upload an XIRR statement (XLSX/CSV) to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
+      sub="Upload a portfolio statement (Excel or CSV) from any broker or fund platform to auto-fill, or tap any bucket below to add by hand. Everything lands in one portfolio with live P&L."
       mood="curious"
     >
       <div className="space-y-6">
@@ -364,7 +364,7 @@ export function StatementUploader({ form, onCommitted }: { form: UseFormReturn<O
               className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#138A3C]/40 bg-white p-8 text-center transition hover:border-[#138A3C] hover:bg-[#F8FAF9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#138A3C] focus-visible:ring-offset-2 disabled:opacity-50"
             >
               {parsing ? <Loader2 className="h-7 w-7 animate-spin text-[#138A3C]" /> : <Upload className="h-7 w-7 text-[#138A3C]" />}
-              <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more XIRR files"}</p>
+              <p className="text-[0.9375rem] font-semibold text-[#0F172A]">{parsing ? "Parsing your statement(s)…" : "Tap to choose one or more files"}</p>
               <p className="text-[0.75rem] text-[#4B5563]">HDFC, Zerodha, Groww, CAMS, KFintech, etc. — select multiple if you have more than one broker</p>
             </button>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" className="hidden" onChange={onChange} />
@@ -579,7 +579,7 @@ export function ManualLumpsumEditor({ form, values }: { form: UseFormReturn<Onbo
     <>
       <div className="space-y-4">
         <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-[0.75rem] text-amber-900">
-          <strong>Heads up:</strong> live portfolio P&amp;L and live valuation are only available with the XIRR upload option. Since you&apos;re entering manually, please refresh these values once a month so your plan stays accurate.
+          <strong>Heads up:</strong> live portfolio P&amp;L and live valuation are only available with the statement upload option. Since you&apos;re entering manually, please refresh these values once a month so your plan stays accurate.
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {LUMPSUM_TILES.map((tile) => (

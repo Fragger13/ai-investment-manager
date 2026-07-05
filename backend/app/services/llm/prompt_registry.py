@@ -521,9 +521,13 @@ def goal_estimate_prompt(
     if description:
         anchor = (
             "'goalDescription' is exactly what the user is saving for. Estimate its realistic current cost in "
-            "India from your own knowledge, taking the clarifying answers into account. Some goals are small "
-            "(a gadget can be well under ₹1,00,000) and some are large — give the true figure, not a rounded-up "
-            "one. The baseline is only a rough hint, not a constraint; ignore it if it looks off. "
+            "India from your own knowledge, and USE every clarifying answer provided (destination, number of people, "
+            "number of days, tier/model, etc.) to size it. For a trip, reason per person per day and multiply by "
+            "people and days, then add flights/transport. Use typical middle-class Indian prices, not luxury or "
+            "worst-case ones: a week-long domestic trip for two usually lands well under ₹1,00,000, and most "
+            "international trips for a couple are about ₹1,50,000 to ₹3,00,000 — not ₹10,00,000+. Some goals are "
+            "genuinely small (a gadget can be well under ₹1,00,000). Give the true, typical figure — do not round up "
+            "or pad for safety. The baseline is only a rough hint, not a constraint; ignore it if it looks off. "
         )
     else:
         anchor = (
@@ -542,20 +546,22 @@ def goal_estimate_prompt(
 
 
 def goal_clarify_prompt(description: str, profile_ctx: dict[str, Any]) -> str:
-    """Given a free-form goal description, ask the model for ONE short clarifying
-    question (with concrete chip options) that most affects its cost in India.
-    One question keeps the onboarding round-trip fast."""
+    """Given a free-form goal description, ask the model for a few short clarifying
+    questions (with concrete chip options) covering the biggest cost drivers in
+    India. More context makes the follow-up estimate far more realistic."""
     payload = {
         "goalDescription": description,
         "user": {"city": profile_ctx.get("city"), "occupation": profile_ctx.get("occupation")},
     }
     return (
         "A first-time Indian investor wants to save up for the goal described below but isn't sure how much it costs. "
-        "Ask exactly ONE short clarifying question whose answer most changes the price in India (e.g. for 'Apple Watch': "
-        "which model; for 'a vacation': domestic or international). The question must have 2 to 4 concrete quick-reply "
-        "options. Do NOT ask the user how much it costs — that's the whole point, they don't know. "
-        "Keep the prompt under 12 words and option labels under 5 words. Use a short snake_case key.\n"
-        "Return ONLY a JSON object with exactly ONE question, nothing else, in this shape:\n"
+        "Ask 2 to 4 short clarifying questions whose answers most change the price in India. Cover the main cost drivers "
+        "for THIS goal — e.g. for a trip: destination (domestic/international or which country), how many people, how "
+        "many days, and the style of stay; for a gadget: which model/tier; for an event: scale and city. "
+        "Do NOT ask the user how much it costs — that's the whole point, they don't know. "
+        "Each question must have 2 to 4 concrete quick-reply options. Keep each prompt under 12 words and option labels "
+        "under 5 words. Use short snake_case keys, all distinct.\n"
+        "Return ONLY a JSON object, nothing else, in this shape:\n"
         '{"questions": [{"key": "<snake_case>", "prompt": "<question>", '
         '"options": [{"value": "<short_code>", "label": "<short label>"}]}]}\n\n'
         f"Context:\n{json.dumps(payload, ensure_ascii=False, default=str)}"

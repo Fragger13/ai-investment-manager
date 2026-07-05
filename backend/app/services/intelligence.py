@@ -221,7 +221,8 @@ def behavior_agent(profile: OnboardingProfile) -> dict:
         nudges.append("Use smaller SIPs and avoid checking long-term investments daily.")
     if profile.tracksExpenses not in {"Yes", "Often"}:
         nudges.append("Track expenses weekly so recommendations stay accurate.")
-    if profile.investingBlocker in {"Fear of losses", "Too many choices"}:
+    # investingBlocker may hold several ", "-joined choices, so match on substring.
+    if any(b in (profile.investingBlocker or "") for b in ("Fear of losses", "Too many choices")):
         nudges.append("Use simple, smaller monthly investments first so the habit feels manageable.")
     if not nudges:
         nudges.append("Keep investing consistently and review the plan monthly.")

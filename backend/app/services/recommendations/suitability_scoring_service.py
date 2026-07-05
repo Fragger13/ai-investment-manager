@@ -125,7 +125,8 @@ def build_profile_context(profile: OnboardingProfile) -> ProfileContext:
     age_band = _age_band(age)
 
     invest_monthly_active = profile.investsMonthly in {"Yes", "Always", "Often", "Sometimes"}
-    irregular_income = (profile.investingBlocker or "").strip().lower().startswith("irregular")
+    # investingBlocker may be a ", "-joined multi-select, so match anywhere in it.
+    irregular_income = "irregular" in (profile.investingBlocker or "").lower()
 
     investments_total = (
         profile.stocksValue

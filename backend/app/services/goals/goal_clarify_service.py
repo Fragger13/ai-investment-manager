@@ -1,12 +1,18 @@
-"""For a free-form ("Other") goal, ask the LLM for ONE clarifying question
-tailored to what the user is saving for. One question keeps the onboarding
-round-trip fast. Falls back to a single budget-range question when the model is
-unavailable, which also anchors the estimate."""
+"""For a free-form ("Other") goal, ask the LLM for a few clarifying questions
+tailored to what the user is saving for — the cost drivers that matter (for a
+trip: destination, how many people, how many days, style of stay). More context
+means a far more realistic estimate. Falls back to a single budget-range question
+when the model is unavailable, which also anchors the estimate."""
 from __future__ import annotations
 
 from typing import Any
 
 from app.services.llm.model_router import generate_goal_clarify
+
+# Upper bound on tailored clarifiers. Enough to nail the cost drivers, few enough
+# that the "Not sure?" flow still feels quick (a "when do you need it" question is
+# appended by the client on top of these).
+_MAX_CLARIFY_QUESTIONS = 4
 
 # Fallback when the LLM can't generate tailored questions. It doubles as the
 # deterministic estimate anchor (price_range → a number in goal_estimator).
@@ -68,10 +74,17 @@ def clarify_goal(description: str, profile: dict[str, Any] | None = None) -> dic
     if not isinstance(raw, list):
         return fallback
 
-    # Keep only the first valid question — one clarifier is enough for a rough
-    # figure and keeps the flow snappy.
+    # Keep the valid clarifiers (deduped by key), capped so the flow stays short.
+    # A handful is enough to pin the real cost drivers — destination, party size,
+    # duration, tier — which is what makes a "Sri Lanka trip" land near ₹1.5L
+    # instead of a wild ₹12L guess.
+    cleaned: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
     for question in raw:
         cq = _clean_question(question)
-        if cq:
-            return {"questions": [cq]}
-    return {"questions": [_PRICE_RANGE_FALLBACK]}
+        if cq and cq["key"] not in seen_keys:
+            cleaned.append(cq)
+            seen_keys.add(cq["key"])
+        if len(cleaned) >= _MAX_CLARIFY_QUESTIONS:
+            break
+    return {"questions": cleaned or [_PRICE_RANGE_FALLBACK]}
