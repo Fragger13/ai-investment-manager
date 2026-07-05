@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ChartPie, Lightbulb, Plus, Sprout, Target, TrendingUp } from "lucide-react";
 import { caveat, sans, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
 import { OurStoryButton } from "@/components/our-story-button";
+import { LandingAuthCta } from "@/components/landing-auth-cta";
 
 const script: React.CSSProperties = { fontFamily: SCRIPT_FAMILY };
 
@@ -34,12 +35,7 @@ function Header() {
 
       <div className="flex items-center gap-3">
         <OurStoryButton />
-        <Link
-          href="/register"
-          className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-bold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg"
-        >
-          Get Started <ArrowRight className="h-4 w-4" />
-        </Link>
+        <LandingAuthCta className="inline-flex items-center gap-2 rounded-full bg-[#138A3C] px-6 py-2.5 text-sm font-bold text-white shadow-md ring-1 ring-[#138A3C]/30 transition hover:bg-[#107132] hover:shadow-lg" />
       </div>
     </header>
   );

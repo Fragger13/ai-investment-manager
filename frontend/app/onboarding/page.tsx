@@ -23,6 +23,7 @@ export default function OnboardingPage() {
   const saveProfile = useAuthStore((state) => state.saveProfile);
   const existing = useAuthStore((state) => state.profile);
   const token = useAuthStore((state) => state.token);
+  const logout = useAuthStore((state) => state.logout);
 
   const [flowMode, setFlowMode] = useState<FlowMode>("default");
   const [screenIndex, setScreenIndex] = useState(0);
@@ -159,7 +160,13 @@ export default function OnboardingPage() {
     const mode = params.get("mode");
     if (mode === "edit" && existing) {
       setFlowMode("edit");
-      setScreenIndex(0);
+      // Optional deep-link: ?section=<id> jumps straight to that section's first
+      // screen (from the dashboard "Edit profile" menu). No section → start at
+      // the top of the edit flow.
+      const section = params.get("section");
+      const editScreens = buildScreens(form.getValues(), { skipWelcome: true, skipCelebrate: true });
+      const sectionIdx = section ? editScreens.findIndex((screen) => screen.sectionId === section) : -1;
+      setScreenIndex(sectionIdx >= 0 ? sectionIdx : 0);
     } else if (mode === "goals") {
       setFlowMode("goals");
       setScreenIndex(0);
@@ -213,6 +220,14 @@ export default function OnboardingPage() {
     } catch {
       setSaveState("idle");
     }
+  };
+
+  // Save the current draft, then end the session and return to the landing page.
+  // Progress is already persisted to the backend, so the user can resume later.
+  const saveAndLogout = async () => {
+    await persistDraft();
+    logout();
+    router.push("/");
   };
 
   const finalSubmit = async () => {
@@ -380,6 +395,7 @@ export default function OnboardingPage() {
         sectionLabel={currentSectionLabel}
         saveState={saveState}
         onSaveDraft={!isCelebrate ? persistDraft : undefined}
+        onSaveAndLogout={flowMode === "default" && !isCelebrate ? saveAndLogout : undefined}
         onBack={isFirst ? undefined : goBack}
         onNext={goNext}
         onExit={flowMode === "edit" ? () => router.push("/dashboard") : undefined}

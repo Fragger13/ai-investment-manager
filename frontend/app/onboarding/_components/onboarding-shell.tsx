@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, LogOut, Save } from "lucide-react";
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, sans } from "@/lib/fonts";
@@ -18,6 +18,7 @@ type OnboardingShellProps = {
   saveState: SaveState;
   draftLabel?: string;
   onSaveDraft?: () => void;
+  onSaveAndLogout?: () => void;
   onBack?: () => void;
   onNext: () => void;
   onExit?: () => void;
@@ -35,6 +36,7 @@ export function OnboardingShell({
   saveState,
   draftLabel,
   onSaveDraft,
+  onSaveAndLogout,
   onBack,
   onNext,
   onExit,
@@ -85,6 +87,11 @@ export function OnboardingShell({
             {onSaveDraft ? (
               <Button variant="outline" size="lg" onClick={onSaveDraft}>
                 <Save className="h-5 w-5" /> Save
+              </Button>
+            ) : null}
+            {onSaveAndLogout ? (
+              <Button variant="outline" size="lg" onClick={onSaveAndLogout}>
+                <LogOut className="h-5 w-5" /> Save &amp; log out
               </Button>
             ) : null}
             <CalculatorButton />
