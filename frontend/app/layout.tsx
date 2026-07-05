@@ -73,11 +73,40 @@ const themeScript = `
   })();
 `;
 
+// Schema.org data so Google can render the result with the right site name,
+// logo and description (instead of guessing). Organization + WebSite are the
+// two signals that most affect the search snippet and knowledge panel.
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "AskPapa",
+      url: SITE_URL,
+      logo: `${SITE_URL}/landing/papa-avatar-round.png`,
+      description: SITE_DESCRIPTION
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "AskPapa",
+      url: SITE_URL,
+      inLanguage: "en-IN",
+      publisher: { "@id": `${SITE_URL}/#organization` }
+    }
+  ]
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${caveat.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
       </head>
       <body>
         <ThemeProvider>
