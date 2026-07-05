@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, IndianRupee, Trash2 } from "lucide-react";
+import { ArrowRight, IndianRupee, Sparkles, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { OnboardingProfile, ProfileGoal } from "@/types";
+import { GoalEstimateHelper } from "@/app/onboarding/_screens/goal-estimate-helper";
+import { goalDateSuggestions } from "@/app/onboarding/_lib/goal-estimate-questions";
 
 const GOAL_TYPES = [
   "Retirement",
@@ -71,11 +73,16 @@ export function GoalEditDialog({
   const [goal, setGoal] = useState<ProfileGoal>(mode.kind === "edit" ? mode.goal : blankGoal((profile?.goals?.length || 0) + 1));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "Not sure?" helpers, mirroring the onboarding goal planner.
+  const [estimating, setEstimating] = useState(false);
+  const [datePicking, setDatePicking] = useState(false);
 
   useEffect(() => {
     if (open) {
       setGoal(mode.kind === "edit" ? mode.goal : blankGoal((profile?.goals?.length || 0) + 1));
       setError(null);
+      setEstimating(false);
+      setDatePicking(false);
     }
   }, [open, mode, profile?.goals?.length]);
 
@@ -148,6 +155,19 @@ export function GoalEditDialog({
           </DialogDescription>
         </div>
 
+        {estimating && profile ? (
+          <div className="p-6">
+            <p className="text-sm font-semibold text-foreground">Estimate: {displayName(goal)}</p>
+            <p className="mb-4 mt-1 text-xs text-muted-foreground">Answer a couple of quick questions and Papa will suggest a figure.</p>
+            <GoalEstimateHelper
+              goal={goal}
+              profile={profile}
+              onUse={(amount) => { setGoal({ ...goal, targetAmount: amount }); setEstimating(false); }}
+              onBack={() => setEstimating(false)}
+            />
+          </div>
+        ) : (
+        <>
         <div className="space-y-4 p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -204,17 +224,42 @@ export function GoalEditDialog({
               label={isRetirementLike && goal.retirementInputType !== "corpus" ? "Calculated target (auto-estimated)" : "Target amount"}
               value={goal.targetAmount}
               onChange={(value) => setGoal({ ...goal, targetAmount: value })}
+              action={profile ? <NotSureButton onClick={() => { if (!goal.type) { setError("Pick a goal type first, then Papa can estimate it."); return; } setEstimating(true); }} /> : null}
             />
             <CurrencyField label="Already saved" value={goal.currentAmount} onChange={(value) => setGoal({ ...goal, currentAmount: value })} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label className="text-sm font-medium">Target date</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm font-medium">Target date</Label>
+                <NotSureButton onClick={() => setDatePicking((v) => !v)} />
+              </div>
               <Input className="mt-1.5" type="date" value={goal.targetDate} onChange={(event) => setGoal({ ...goal, targetDate: event.target.value })} />
             </div>
             <CurrencyField label="Planned monthly contribution" value={goal.monthlyContribution} onChange={(value) => setGoal({ ...goal, monthlyContribution: value })} />
           </div>
+
+          {datePicking ? (
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+              <p className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-primary">
+                <Sparkles className="h-3.5 w-3.5" /> Not sure when? Pick a rough timeline
+              </p>
+              <p className="mt-1 text-[0.8125rem] text-muted-foreground">Papa will set a target date from this. You can fine tune it anytime.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {goalDateSuggestions(goal.type, profile || undefined).map((chip) => (
+                  <button
+                    key={`${chip.date}-${chip.label}`}
+                    type="button"
+                    onClick={() => { setGoal({ ...goal, targetDate: chip.date }); setDatePicking(false); }}
+                    className="rounded-full border border-border bg-surface px-4 py-2 text-[0.875rem] font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* Payment style */}
           <div>
@@ -269,15 +314,32 @@ export function GoalEditDialog({
             </Button>
           </div>
         </div>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
-function CurrencyField({ label, value, onChange, className }: { label: string; value: number; onChange: (value: number) => void; className?: string }) {
+function NotSureButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-primary transition hover:border-primary hover:bg-primary/15"
+    >
+      <Sparkles className="h-3 w-3" /> Not sure?
+    </button>
+  );
+}
+
+function CurrencyField({ label, value, onChange, className, action }: { label: string; value: number; onChange: (value: number) => void; className?: string; action?: React.ReactNode }) {
   return (
     <div className={className}>
-      <Label className="text-sm font-medium">{label}</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-sm font-medium">{label}</Label>
+        {action}
+      </div>
       <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-input bg-surface px-3">
         <IndianRupee className="h-4 w-4 text-muted-foreground" />
         <Input

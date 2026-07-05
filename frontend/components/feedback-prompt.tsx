@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import { useTourStore } from "@/store/tour-store";
 import { cn } from "@/lib/utils";
 
 const KEY = "askpapa-feedback-prompt";
 const SESSION_FLAG = "askpapa-feedback-shown";
 const SNOOZE_DAYS = 3;
-const DELAY_MS = 25_000; // surface ~25s into a session, never immediately
+// Surface a few minutes into a session, and never while the guided tour is
+// running, so it doesn't cut across a first-time user's walkthrough.
+const DELAY_MS = 180_000;
 
 type Persisted = { submittedAt?: string; snoozedUntil?: number };
 
@@ -30,6 +33,7 @@ function writeState(next: Persisted) {
  *  dismiss — so it nudges "now and then" without nagging. */
 export function FeedbackPrompt() {
   const user = useAuthStore((state) => state.user);
+  const tourActive = useTourStore((state) => state.active);
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
@@ -40,16 +44,19 @@ export function FeedbackPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (tourActive) return;                                      // wait out the guided tour
     if (window.sessionStorage.getItem(SESSION_FLAG)) return;
     const s = readState();
     if (s.submittedAt) return;                                   // already rated
     if (s.snoozedUntil && Date.now() < s.snoozedUntil) return;   // snoozed recently
+    // The clock only runs while the tour isn't active; if the tour starts, this
+    // effect re-runs and the timer restarts once it ends.
     const timer = window.setTimeout(() => {
       window.sessionStorage.setItem(SESSION_FLAG, "1");
       setOpen(true);
     }, DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [tourActive]);
 
   function snooze() {
     writeState({ ...readState(), snoozedUntil: Date.now() + SNOOZE_DAYS * 86_400_000 });

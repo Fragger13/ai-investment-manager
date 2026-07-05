@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ArrowRight, CalendarRange, CheckCircle2, ChevronRight, CircleAlert, CreditCard, Home, Pencil, PiggyBank, Receipt, Repeat, Sprout, Sparkles, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AppShell } from "@/components/app-shell";
+import { EditProfileMenu } from "@/components/edit-profile-menu";
 import { ColorfulIcon } from "@/components/colorful-icon";
 import { InvestmentLogo } from "@/components/investment-logo";
 import { Badge } from "@/components/ui/badge";
@@ -100,9 +101,7 @@ export default function DashboardPage() {
           </h1>
           <p className="mt-2 text-base text-muted-foreground">{dashboardSubtitle(data.health.score)}</p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/onboarding?mode=edit"><Pencil className="h-4 w-4" /> Edit profile</Link>
-        </Button>
+        <EditProfileMenu />
       </section>
 
       {needsProfile ? (

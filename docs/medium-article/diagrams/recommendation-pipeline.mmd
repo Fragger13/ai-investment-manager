@@ -1,0 +1,20 @@
+flowchart TD
+    P["User profile + goals<br/>income, risk, horizon, habits"]
+    R["Research layer<br/>market data, fund data,<br/>news signals, source credibility"]
+    REG["Market regime check<br/>what kind of market is this?"]
+    SCR["Instrument screening<br/>drop unfit or low quality candidates"]
+    GATE["Personal category gates<br/>what fits THIS user's life<br/>(not just their risk band)"]
+    PORT["Portfolio construction<br/>allocation, sizing, caps,<br/>diversification math"]
+    CONS["Consensus pass<br/>multiple checks must agree<br/>before an idea survives"]
+    EXP["Explanation layer<br/>why this, what can go wrong,<br/>evidence and confidence"]
+    UI["Plan + Discover pages<br/>every idea carries its reasons"]
+
+    P --> SCR
+    R --> REG --> SCR
+    SCR --> GATE --> PORT --> CONS --> EXP --> UI
+    P --> GATE
+    P --> PORT
+
+    style P fill:#E9F4EC,stroke:#138A3C
+    style R fill:#EFF6FF,stroke:#2563EB
+    style EXP fill:#FEF3C7,stroke:#D97706
