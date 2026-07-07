@@ -2,7 +2,7 @@
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Avenir, Helvetica, Arial, sans-serif",
-    "fontSize": "16px",
+    "fontSize": "15px",
     "primaryColor": "#FFFFFF",
     "primaryBorderColor": "#138A3C",
     "primaryTextColor": "#0F172A",
@@ -11,9 +11,16 @@
     "clusterBorder": "#D8E4DC",
     "edgeLabelBackground": "#FFFFFF"
   },
-  "flowchart": { "curve": "basis", "nodeSpacing": 50, "rankSpacing": 56, "padding": 14 }
+  "flowchart": { "curve": "basis", "nodeSpacing": 38, "rankSpacing": 44, "padding": 12 }
 }}%%
 flowchart TB
+    subgraph SRC["🌍 &nbsp;Free data sources"]
+        direction LR
+        MKTD["📈 <b>Market data APIs</b><br/>AMFI, Yahoo Finance,<br/>CoinGecko"]
+        RSS["📰 <b>News + filings RSS</b><br/>business press,<br/>RBI and SEBI feeds"]
+        REDDIT["👽 <b>Reddit</b><br/>Indian investing communities,<br/>what retail is actually saying"]
+    end
+
     U["🧑‍💻 &nbsp;<b>The user</b><br/>phone or laptop"]
     DOMAIN["💳 GoDaddy domain<br/><b>the only thing I paid for</b>"]
 
@@ -21,38 +28,65 @@ flowchart TB
         NEXT["<b>Next.js app</b> · askpapa.in<br/>onboarding, dashboard, goals,<br/>plan, discover, Ask Papa chat"]
     end
 
-    subgraph VM["🖥️ &nbsp;Backend · one AWS EC2 VM with 1 GB RAM · free for 6 months"]
-        direction LR
-        CADDY["Caddy<br/>auto HTTPS,<br/>free SSL"]
-        API["FastAPI<br/>single<br/>worker"]
-        ENGINE["🧮 <b>Deterministic engine</b><br/>goals, plans, portfolio math,<br/>recommendations with reasons<br/><i>the quant decides</i>"]
-        DB[("🔒 <b>SQLite</b><br/>financial data encrypted<br/>per user, unreadable<br/>even to me")]
-        CADDY --> API --> ENGINE --> DB
+    APIBOX["🖥️ <b>Caddy + FastAPI</b><br/>auto HTTPS, single worker<br/><br/>this box and everything below it runs on<br/><b>one AWS EC2 VM with 1 GB RAM</b><br/>free for 6 months"]
+
+    subgraph RESEARCH["📡 &nbsp;Research + evidence layer (background)"]
+        EXTRACT["Article + content<br/>extraction"]
+        NLPX["🧠 <b>Financial NLP</b><br/>entities, signals, sentiment,<br/>contradiction detection"]
+        CRED["⚖️ Source credibility scoring<br/>who to trust, how much"]
+        EVID["🗃️ <b>Evidence + research store</b><br/>signals linked to their sources,<br/>reusable across users"]
+        EXTRACT --> NLPX --> CRED --> EVID
     end
 
-    LLM["🗣️ <b>Ollama Cloud LLM</b> · free tier<br/>rewrites every answer<br/>in Papa's voice<br/><i>the LLM explains</i>"]
-
-    subgraph EXT["🤝 &nbsp;More free tiers"]
-        direction LR
-        MKT["📈 <b>Market data + news</b><br/>AMFI, Yahoo Finance,<br/>CoinGecko, RSS feeds"]
-        MAIL["✉️ <b>Resend</b><br/>OTP and<br/>reset emails"]
+    subgraph PIPE["🧮 &nbsp;Multi agent recommendation pipeline · the quant decides"]
+        PROF["<b>1 · Profile + goals</b><br/>factor analysis and investor<br/>clustering agents"]
+        REGIME["<b>2 · Market regime agent</b><br/>what kind of market is this?"]
+        SCREEN["<b>3 · Screening + alpha discovery</b><br/>drop unfit candidates,<br/>surface fresh ideas"]
+        GATES["<b>4 · Category planner</b><br/>personal gates: what fits<br/>THIS user's life"]
+        BUILD["<b>5 · Portfolio construction</b><br/>position sizing, optimizers,<br/>diversification math"]
+        CONS["<b>6 · Fusion + consensus agents</b><br/>multiple checks must agree<br/>before an idea survives"]
+        EXPLAIN["<b>7 · Explainability agent</b><br/>reasons, risks, confidence,<br/>backtest validation"]
+        PROF --> REGIME --> SCREEN --> GATES --> BUILD --> CONS --> EXPLAIN
     end
+
+    subgraph CHATG["💬 &nbsp;Ask Papa chat"]
+        CTX["<b>Context builder</b><br/>your numbers, goals, latest<br/>recommendations, chat memory"]
+        BASE["<b>Intent + deterministic answer</b><br/>complete reply with<br/>numeric cards"]
+        CTX --> BASE
+    end
+
+    MEM["🧭 <b>Adaptive memory</b><br/>snapshots, drift detection,<br/>reassessment triggers"]
+    DB[("🔒 <b>SQLite</b><br/>financial data encrypted per user,<br/>unreadable even to me")]
+    LLM["🗣️ <b>Ollama Cloud LLM</b><br/>free tier · rewrites every answer<br/>in Papa's voice<br/><i>the LLM explains</i>"]
+    MAIL["✉️ <b>Resend</b> · free tier<br/>OTP and reset emails"]
 
     U ==>|HTTPS| NEXT
     DOMAIN -. points to .-> NEXT
-    NEXT ==>|api.askpapa.in| CADDY
-    ENGINE -->|"prose only, never decisions"| LLM
-    API -->|"research refresh, in the background"| MKT
-    API --> MAIL
+    NEXT ==>|api.askpapa.in| APIBOX
+    APIBOX -->|"plan + discover"| PROF
+    APIBOX -->|chat| CTX
+    APIBOX --> MAIL
+    MKTD --> EXTRACT
+    RSS --> EXTRACT
+    REDDIT --> EXTRACT
+    EVID -->|"instrument pool + signals"| SCREEN
+    EVID --> REGIME
+    EXPLAIN --> MEM --> DB
+    EXPLAIN -->|"prose only, never decisions"| LLM
+    BASE --> LLM
 
     classDef user fill:#E9F4EC,stroke:#138A3C,stroke-width:2.5px;
     classDef engine fill:#E9F4EC,stroke:#138A3C,stroke-width:2.5px;
     classDef llm fill:#EFF6FF,stroke:#2563EB,stroke-width:2.5px;
     classDef data fill:#FFF7ED,stroke:#D97706,stroke-width:2px;
     classDef paid fill:#FEF3C7,stroke:#D97706,stroke-width:2px,stroke-dasharray:6 4;
+    classDef reddit fill:#FFF1EC,stroke:#FF4500,stroke-width:2px;
+    classDef nlp fill:#F5F3FF,stroke:#7C3AED,stroke-width:2px;
 
     class U user
-    class ENGINE engine
+    class EXPLAIN,EVID,APIBOX engine
     class LLM llm
     class DB data
     class DOMAIN paid
+    class REDDIT reddit
+    class NLPX nlp
