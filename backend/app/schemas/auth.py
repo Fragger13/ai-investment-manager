@@ -28,6 +28,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class DeleteAccountRequest(BaseModel):
+    # Password re-entry so a stolen token alone cannot wipe an account.
+    password: str
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 

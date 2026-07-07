@@ -11,13 +11,13 @@ import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
-type FormValues = { name: string; email: string; password: string };
+type FormValues = { name: string; email: string; password: string; consent: boolean };
 
 export default function RegisterPage() {
   const router = useRouter();
   const registerUser = useAuthStore((state) => state.register);
   const [error, setError] = useState("");
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ defaultValues: { name: "", email: "", password: "" } });
+  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ defaultValues: { name: "", email: "", password: "", consent: false } });
 
   async function onSubmit(values: FormValues) {
     setError("");
@@ -61,6 +61,19 @@ export default function RegisterPage() {
               <Input type="password" placeholder="Create a password (8+ characters)" {...register("password", { required: true, minLength: 8 })} />
               {errors.password ? <p className="text-sm text-negative-foreground">Use at least 8 characters.</p> : null}
             </div>
+            <label className="flex items-start gap-2.5 pt-1 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
+                {...register("consent", { required: true })}
+              />
+              <span>
+                I am 18 or older and I understand AskPapa gives educational guidance, not investment advice. I agree to the{" "}
+                <Link className="font-semibold text-primary hover:underline" href="/terms" target="_blank">Terms</Link> and{" "}
+                <Link className="font-semibold text-primary hover:underline" href="/privacy" target="_blank">Privacy Policy</Link>.
+              </span>
+            </label>
+            {errors.consent ? <p className="text-sm text-negative-foreground">Please accept the Terms and Privacy Policy to continue.</p> : null}
             {error ? <p className="text-sm text-negative-foreground">{error}</p> : null}
             <Button className="w-full" type="submit">Get Started</Button>
           </form>

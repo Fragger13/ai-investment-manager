@@ -255,6 +255,13 @@ export const api = {
       headers: authHeaders(token)
     });
   },
+  async deleteAccount(password: string): Promise<{ status: string; email: string }> {
+    // Requires the session token (auto-attached) plus the account password.
+    return request("/auth/account", {
+      method: "DELETE",
+      body: JSON.stringify({ password })
+    });
+  },
   async uploadDocument(file: File): Promise<DocumentAnalysis> {
     const form = new FormData();
     form.append("file", file);

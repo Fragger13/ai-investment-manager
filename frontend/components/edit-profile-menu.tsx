@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Pencil } from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SECTIONS } from "@/app/onboarding/_flow/types";
+import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 
 // Sections a user can jump straight into. "Welcome" and the celebrate screen
 // aren't editable data, so they're left out of the menu.
@@ -62,6 +63,18 @@ export function EditProfileMenu() {
               {section.label}
             </Link>
           ))}
+          <div className="my-1 h-px bg-border" aria-hidden />
+          <DeleteAccountDialog
+            trigger={
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-negative-foreground transition hover:bg-negative-soft focus:outline-none focus-visible:bg-negative-soft"
+              >
+                <Trash2 className="h-4 w-4" /> Delete account
+              </button>
+            }
+          />
         </div>
       ) : null}
     </div>

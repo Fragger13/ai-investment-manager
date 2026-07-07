@@ -63,3 +63,19 @@ export function suggestFinancialFreedomCorpus(p: {
   const corpus = monthlyLiving * 12 * 25;
   return Math.round(corpus / 100000) * 100000;
 }
+
+// The monthly income a financial-freedom / retirement goal should throw off:
+// enough to cover today's living costs (rent + everyday spends). Falls back to
+// ~60% of income when expenses aren't filled in yet, rounded to a clean ₹500.
+export function suggestDesiredMonthlyIncome(p: {
+  rent?: number;
+  monthlyExpenses?: number;
+  monthlySalary?: number;
+  otherIncome?: number;
+}): number {
+  const spend = Number(p.rent || 0) + Number(p.monthlyExpenses || 0);
+  const income = Number(p.monthlySalary || 0) + Number(p.otherIncome || 0);
+  const monthlyLiving = spend > 0 ? spend : Math.round(income * 0.6);
+  if (monthlyLiving <= 0) return 0;
+  return Math.round(monthlyLiving / 500) * 500;
+}

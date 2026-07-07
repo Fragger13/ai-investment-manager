@@ -3,6 +3,7 @@ import { ArrowRight, ChartPie, Lightbulb, Plus, Sprout, Target, TrendingUp } fro
 import { caveat, sans, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
 import { OurStoryButton } from "@/components/our-story-button";
 import { LandingAuthCta } from "@/components/landing-auth-cta";
+import { Disclaimer } from "@/components/disclaimer";
 
 const script: React.CSSProperties = { fontFamily: SCRIPT_FAMILY };
 
@@ -18,9 +19,32 @@ export default function LandingPage() {
         <QuoteBar />
         <SectionHeading />
         <Features />
-        <div className="h-12" />
+        <Footer />
       </div>
     </main>
+  );
+}
+
+/* ───────────────────────────── Footer ───────────────────────────── */
+
+function Footer() {
+  return (
+    <footer className="mt-16 border-t border-[#E5E7EB] pt-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <img src="/landing/logo.png" alt="AskPapa" className="h-10 w-auto" />
+        <div className="max-w-2xl">
+          <Disclaimer variant="full" />
+          <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6B7280]">
+            <Link href="/terms" className="font-semibold text-[#138A3C] hover:underline">Terms</Link>
+            <span aria-hidden>·</span>
+            <Link href="/privacy" className="font-semibold text-[#138A3C] hover:underline">Privacy</Link>
+            <span aria-hidden>·</span>
+            <a href="mailto:support@askpapa.in" className="font-semibold text-[#138A3C] hover:underline">Contact</a>
+          </p>
+          <p className="mt-2 text-xs text-[#9CA3AF]">© 2026 AskPapa. Built to help, not to sell.</p>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -55,7 +79,7 @@ function Hero() {
         </span>
 
         <h1 className="mt-6 text-[4rem] font-extrabold leading-[1.04] tracking-tight md:text-[4.75rem]">
-          Financial advice
+          Financial guidance
           <br />
           you can trust,
         </h1>
@@ -71,8 +95,7 @@ function Hero() {
         </div>
 
         <p className="mt-7 max-w-md text-base font-medium leading-7 text-[#1F2937]">
-          Share your financial details, plan your goals, and get personalized advice from your AI Coach — just like Papa would
-          give.
+          Share your financial details, plan your goals, and get a personalized money plan from your AI Coach, just like Papa would.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-6">
@@ -115,7 +138,7 @@ function Hero() {
           Curated for your goals &amp; risk
         </FloatingPill>
         <FloatingPill className="absolute -right-3 bottom-12 md:-right-6" Icon={Lightbulb} title="Better Decisions">
-          Simple advice, backed by data &amp; experience
+          Simple guidance, backed by data &amp; research
         </FloatingPill>
       </div>
     </section>
@@ -222,7 +245,7 @@ const features: { Icon: FeatureIcon; title: string; text: string; cta: string; h
   {
     Icon: Target,
     title: "Hit Your Goals",
-    text: "Plan for what matters – home, travel, education or early retirement.",
+    text: "Plan for what matters, like home, travel, education or early retirement.",
     cta: "Plan Goals",
     href: "/goals",
   },

@@ -10,7 +10,7 @@ import { CurrencyField, NumberField, SelectField, TextField } from "../_lib/fiel
 import { formatINR } from "@/lib/currency";
 import { ScreenWrap } from "./about";
 import { ScreenContext } from "../_flow/types";
-import { estimatedEmi, monthsUntil } from "../_lib/onboarding-math";
+import { estimatedEmi, monthsUntil, suggestDesiredMonthlyIncome } from "../_lib/onboarding-math";
 import { GoalEstimateHelper } from "./goal-estimate-helper";
 import { canEstimate, goalDateSuggestions } from "../_lib/goal-estimate-questions";
 
@@ -355,10 +355,29 @@ function GoalDialog({
 
           {isRetirementGoal ? (
             <div className="grid gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 sm:grid-cols-2">
-              <SelectField name={`goals.${index}.retirementInputType`} label="Set this by" placeholder="Pick one" options={["corpus", "monthly", "yearly"]} hint="How you'd rather describe the goal. Pick 'corpus' for a total savings target, or 'monthly' / 'yearly' for the income you want it to pay you after you stop working." />
+              <SelectField name={`goals.${index}.retirementInputType`} label="Set this by" placeholder="Pick one" options={["corpus", "monthly"]} hint="How you'd rather describe the goal. Pick 'corpus' for a total savings target, or 'monthly' for the income you want it to pay you after you stop working." />
               <NumberField name={`goals.${index}.withdrawalRate`} label="Withdrawal rate %" placeholder="Default 4" hint="How much of your nest egg you'll spend each year in retirement. 4% is the classic safe rule. Lower is more cautious, higher is riskier." />
-              <CurrencyField name={`goals.${index}.desiredMonthlyIncome`} label="Desired monthly income" placeholder="e.g., 1,00,000" hint="The monthly income you'd like your investments to pay you once you're financially free, in today's money." />
-              <CurrencyField name={`goals.${index}.desiredYearlyIncome`} label="Desired yearly income" placeholder="e.g., 12,00,000" hint="Same idea as monthly income, but per year. Fill in whichever is easier. They describe the same goal." />
+              <CurrencyField
+                name={`goals.${index}.desiredMonthlyIncome`}
+                label="Desired monthly income"
+                placeholder="e.g., 1,00,000"
+                hint="The monthly income you'd like your investments to pay you once you're financially free, in today's money."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const suggested = suggestDesiredMonthlyIncome(values);
+                      if (suggested > 0) {
+                        form.setValue(`goals.${index}.desiredMonthlyIncome`, suggested, { shouldValidate: true });
+                        form.setValue(`goals.${index}.retirementInputType`, "monthly", { shouldValidate: true });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[0.6875rem] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
+                  >
+                    <Sparkles className="h-3 w-3" /> Not sure?
+                  </button>
+                }
+              />
             </div>
           ) : null}
 

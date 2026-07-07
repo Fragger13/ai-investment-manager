@@ -1,10 +1,12 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from jose import JWTError, jwt
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import Base
 from app.core.data_encryption import (
     dek_to_claim,
     generate_dek,
@@ -20,6 +22,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.data_key_migration import migrate_user_rows_to_encrypted
 from app.schemas.auth import (
     AuthResponse,
+    DeleteAccountRequest,
     LoginRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
@@ -195,3 +198,48 @@ def password_reset_confirm(payload: PasswordResetConfirmRequest, db: Session = D
     except VerificationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return {"status": "password-updated", "email": user.email}
+
+
+def _user_from_auth_header(authorization: str | None, db: Session):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        decoded = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        return None
+    if decoded.get("type") != "access" or not decoded.get("sub"):
+        return None
+    return UserRepository(db).get_by_email(decoded["sub"])
+
+
+@router.delete("/account")
+def delete_account(
+    payload: DeleteAccountRequest,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Permanently erase the account and every row it owns. Requires a valid
+    session token AND the account password, so a leaked token alone cannot do
+    it. This is a real deletion, not a soft flag: the encrypted financial data
+    is gone for good."""
+    user = _user_from_auth_header(authorization, db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in again to delete your account")
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Wrong password")
+
+    uid, email = user.id, user.email
+    # Wipe every table that belongs to this user. Iterating the metadata means new
+    # user-scoped tables are covered automatically, no per-table list to maintain.
+    for table in reversed(Base.metadata.sorted_tables):
+        if "user_id" in table.columns:
+            db.execute(delete(table).where(table.c.user_id == uid))
+    for table_name in ("feedback", "password_resets", "pending_registrations"):
+        table = Base.metadata.tables.get(table_name)
+        if table is not None and "email" in table.columns:
+            db.execute(delete(table).where(table.c.email == email))
+    db.delete(user)
+    db.commit()
+    logger.info("[account] deleted account id=%s and all owned rows", uid)
+    return {"status": "account-deleted", "email": email}
