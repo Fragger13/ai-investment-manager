@@ -39,7 +39,7 @@ function Footer() {
             <span aria-hidden>·</span>
             <Link href="/privacy" className="font-semibold text-[#138A3C] hover:underline">Privacy</Link>
             <span aria-hidden>·</span>
-            <a href="mailto:noreply@askpapa.in" className="font-semibold text-[#138A3C] hover:underline">Contact</a>
+            <a href="mailto:contact@askpapa.in" className="font-semibold text-[#138A3C] hover:underline">Contact</a>
           </p>
           <p className="mt-2 text-xs text-[#9CA3AF]">© 2026 AskPapa. Built to help, not to sell.</p>
         </div>
