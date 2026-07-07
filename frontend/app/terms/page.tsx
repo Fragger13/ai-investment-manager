@@ -88,7 +88,7 @@ export default function TermsPage() {
 
       <h2>12. Contact</h2>
       <p>
-        Questions about these terms? Email us at <a href="mailto:support@askpapa.in">support@askpapa.in</a>. See
+        Questions about these terms? Email us at <a href="mailto:noreply@askpapa.in">noreply@askpapa.in</a>. See
         also our <Link href="/privacy">Privacy Policy</Link>.
       </p>
     </LegalPage>
