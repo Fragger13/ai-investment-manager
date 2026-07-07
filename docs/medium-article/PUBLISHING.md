@@ -3,9 +3,9 @@
 Everything you need is in this folder:
 
 - `askpapa-article.md` — the article text with image markers.
-- `images/` — 5 app screenshots, 4 architecture diagrams, hero art, and Papa.
-- `diagrams/*.mmd` — editable Mermaid sources for the diagrams. Re-render with:
-  `npx -y @mermaid-js/mermaid-cli -i diagrams/<name>.mmd -o images/diagram-<name>.png -b white -w 1600 --scale 2`
+- `images/` — 5 app screenshots, the single architecture diagram, hero art, and Papa.
+- `diagrams/architecture.mmd` — editable Mermaid source for the diagram. Re-render with:
+  `npx -y @mermaid-js/mermaid-cli -i diagrams/architecture.mmd -o images/diagram-architecture.png -b white -w 1700 --scale 2`
 
 ## Steps
 
@@ -16,25 +16,22 @@ Everything you need is in this folder:
    | # | File | Where it goes |
    |---|------|----------------|
    | 1 | `images/hero.png` | Directly under the subtitle (also the cover) |
-   | 2 | `images/papa-laugh.png` | "Meet Papa" section |
-   | 3 | `images/dashboard.jpg` | After the health score paragraph |
-   | 4 | `images/goals.jpg` | "Goals with a reality check" |
-   | 5 | `images/plan.jpg` | "A plan, not a lecture" |
-   | 6 | `images/discover.jpg` | "Discover, with reasons attached" |
-   | 7 | `images/portfolio.jpg` | After the Discover paragraph |
-   | 8 | `images/diagram-topology.png` | "The shape of the system" |
-   | 9 | `images/diagram-llm-pattern.png` | "The quant decides, the LLM explains" |
-   | 10 | `images/diagram-recommendation-pipeline.png` | "Life of a recommendation" |
-   | 11 | `images/diagram-encryption-flow.png` | "Privacy as architecture" |
+   | 2 | `images/papa-laugh.png` | End of "Why I built this" |
+   | 3 | `images/dashboard.jpg` | Top of "The look and feel" |
+   | 4 | `images/goals.jpg` | After "Every goal gets a reality check" |
+   | 5 | `images/plan.jpg` | After "Three actions a month" |
+   | 6 | `images/discover.jpg` | After "Reasons on every card" |
+   | 7 | `images/portfolio.jpg` | After "The whole picture in one place" |
+   | 8 | `images/diagram-architecture.png` | "How I built it", after the free tier list |
 
-4. Add captions to the screenshots (Medium shows them small and grey), e.g. "The dashboard: one screen, no jargon."
+4. Add captions to the screenshots (Medium shows them small and grey), e.g. "The dashboard: one screen, a verdict, and a plan."
 5. Title and subtitle are the first two lines of the article. Set the **cover image** to `hero.png` (or `dashboard.jpg` if you prefer a product shot in previews).
 
 ## Suggested metadata
 
-- **Tags** (Medium allows 5): `Personal Finance`, `Artificial Intelligence`, `Side Project`, `Software Architecture`, `India`
-- **Publications worth submitting to**: Level Up Coding, ILLUMINATION, Better Programming (if reopen), The Startup — any accepts increases reach substantially vs self publish.
-- **SEO title** (Settings → SEO): "How I Built AskPapa, an AI Money Mentor for India, on a $0 Stack"
+- **Tags** (Medium allows 5): `Personal Finance`, `Artificial Intelligence`, `Side Project`, `Gen Z`, `India`
+- **Publications worth submitting to**: Level Up Coding, ILLUMINATION, The Startup — any accepts increases reach substantially vs self publish.
+- **SEO title** (Settings → SEO): "How I Built AskPapa, an AI Money Mentor for Gen Z India, on a Free Tier Stack"
 
 ## Before you hit publish
 

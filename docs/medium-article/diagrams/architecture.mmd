@@ -1,0 +1,58 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Avenir, Helvetica, Arial, sans-serif",
+    "fontSize": "16px",
+    "primaryColor": "#FFFFFF",
+    "primaryBorderColor": "#138A3C",
+    "primaryTextColor": "#0F172A",
+    "lineColor": "#0E6B2E",
+    "clusterBkg": "#FAFAF7",
+    "clusterBorder": "#D8E4DC",
+    "edgeLabelBackground": "#FFFFFF"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 50, "rankSpacing": 56, "padding": 14 }
+}}%%
+flowchart TB
+    U["🧑‍💻 &nbsp;<b>The user</b><br/>phone or laptop"]
+    DOMAIN["💳 GoDaddy domain<br/><b>the only thing I paid for</b>"]
+
+    subgraph FE["🌐 &nbsp;Frontend · Vercel · free"]
+        NEXT["<b>Next.js app</b> · askpapa.in<br/>onboarding, dashboard, goals,<br/>plan, discover, Ask Papa chat"]
+    end
+
+    subgraph VM["🖥️ &nbsp;Backend · one AWS EC2 VM with 1 GB RAM · free for 6 months"]
+        direction LR
+        CADDY["Caddy<br/>auto HTTPS,<br/>free SSL"]
+        API["FastAPI<br/>single<br/>worker"]
+        ENGINE["🧮 <b>Deterministic engine</b><br/>goals, plans, portfolio math,<br/>recommendations with reasons<br/><i>the quant decides</i>"]
+        DB[("🔒 <b>SQLite</b><br/>financial data encrypted<br/>per user, unreadable<br/>even to me")]
+        CADDY --> API --> ENGINE --> DB
+    end
+
+    LLM["🗣️ <b>Ollama Cloud LLM</b> · free tier<br/>rewrites every answer<br/>in Papa's voice<br/><i>the LLM explains</i>"]
+
+    subgraph EXT["🤝 &nbsp;More free tiers"]
+        direction LR
+        MKT["📈 <b>Market data + news</b><br/>AMFI, Yahoo Finance,<br/>CoinGecko, RSS feeds"]
+        MAIL["✉️ <b>Resend</b><br/>OTP and<br/>reset emails"]
+    end
+
+    U ==>|HTTPS| NEXT
+    DOMAIN -. points to .-> NEXT
+    NEXT ==>|api.askpapa.in| CADDY
+    ENGINE -->|"prose only, never decisions"| LLM
+    API -->|"research refresh, in the background"| MKT
+    API --> MAIL
+
+    classDef user fill:#E9F4EC,stroke:#138A3C,stroke-width:2.5px;
+    classDef engine fill:#E9F4EC,stroke:#138A3C,stroke-width:2.5px;
+    classDef llm fill:#EFF6FF,stroke:#2563EB,stroke-width:2.5px;
+    classDef data fill:#FFF7ED,stroke:#D97706,stroke-width:2px;
+    classDef paid fill:#FEF3C7,stroke:#D97706,stroke-width:2px,stroke-dasharray:6 4;
+
+    class U user
+    class ENGINE engine
+    class LLM llm
+    class DB data
+    class DOMAIN paid
