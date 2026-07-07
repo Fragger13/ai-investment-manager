@@ -6,6 +6,7 @@ import { Bot, CircleDollarSign, Compass, Home, LifeBuoy, LogOut, NotebookTabs, P
 import { Button } from "@/components/ui/button";
 import { FeedbackPrompt } from "@/components/feedback-prompt";
 import { PageGuide } from "@/components/page-tour";
+import { Disclaimer } from "@/components/disclaimer";
 import { useAuthStore } from "@/store/auth-store";
 import { cn } from "@/lib/utils";
 
@@ -133,6 +134,21 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
 
       <main className="px-4 py-6 pb-28 lg:ml-64 lg:px-8 lg:py-8 lg:pb-8">
         <div className="mx-auto max-w-7xl">{children}</div>
+        {/* Baseline risk / not-advice disclaimer on every app surface. Chat and
+            Discover already carry their own contextual lines, so skip Chat where
+            the layout is a fixed-height column. */}
+        {pathname !== "/chat" ? (
+          <div className="mx-auto mt-10 max-w-7xl border-t border-border pt-5">
+            <Disclaimer />
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+              <Link href="/terms" className="hover:underline">Terms</Link>
+              <span aria-hidden>·</span>
+              <Link href="/privacy" className="hover:underline">Privacy</Link>
+              <span aria-hidden>·</span>
+              <a href="mailto:support@askpapa.in" className="hover:underline">Contact</a>
+            </p>
+          </div>
+        ) : null}
       </main>
 
       {/* Mobile bottom tab bar */}

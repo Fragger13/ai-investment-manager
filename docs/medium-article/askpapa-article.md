@@ -1,145 +1,102 @@
 # I Built an AI Money Mentor That Talks Like an Indian Dad
 
-*The story of AskPapa: why financial advice needed a personality transplant, what the product does, and how a 50,000 line codebase runs on a $0 monthly bill.*
+*Gen Z spends first and saves whatever survives the month. AskPapa exists to flip that, by making where and how much to invest a no brainer. Here is the why, the product, and the stack that cost me nothing but a domain name.*
 
 ![AskPapa hero illustration](images/hero.png)
 
-Every Indian household has a money person. The uncle with stock tips. The colleague who swears by one mutual fund. The friend who says just buy gold. What almost nobody has is someone who will sit down, look at your actual numbers, and explain what to do next in plain language, without selling you anything.
+## Why I built this: we spend first and save never
 
-I kept meeting people in their twenties and thirties who earn well and still feel a quiet anxiety about money. They are not lazy. They are stuck. Finance apps throw jargon at them, advisors have minimum ticket sizes, and the internet gives them fifty contradictory opinions. So they do nothing, and doing nothing quietly costs them years of compounding.
+Our parents had a simple rule: save first, spend what is left. Somewhere between UPI, food delivery, and one tap checkouts, my generation quietly inverted it. We spend first and save whatever survives the month. Often, nothing survives the month.
 
-AskPapa is my answer to that. It is a personal finance app built around one idea: what if the guidance felt like a dad who actually explains things? Not a chatbot with a finance skin. A mentor with opinions, warmth, and a little dry humour, backed by a real analytical engine.
+It is not carelessness. Ask around and you will hear the same two blockers on repeat.
 
-It is live at [askpapa.in](https://www.askpapa.in). This article covers the product first, then a technical deep dive for the builders.
+**We do not know exactly what to do.** The salary arrives, the intention is genuine, but "start investing" is not an instruction. Invest in what? How much? For which goal? Nobody teaches this in college, and the ads that promise to teach it are usually selling something.
 
----
+**And we are not going to research it.** Getting to a confident answer means comparing funds, decoding jargon, and reading fifty contradictory opinions on the internet. That is hours of effort for a decision you are scared of getting wrong. So the tab gets closed, and the money sits in a savings account slowly losing to inflation.
 
-## Part 1: The product
+The result is a generation that earns well and still carries a quiet anxiety about money.
 
-### Meet Papa
+AskPapa is my answer to that. It is a personal finance app with exactly one job: make where to invest and how much a no brainer. You tell it about your life once. It hands you a plan: this much here, this much there, here is why, and you can start with ₹500 if that is all this month allows. The research, the comparison, the second guessing, all of it happens inside the app so it does not have to happen inside your head.
 
-The entire app speaks in one voice. Papa is a mustachioed Indian father figure who shows up everywhere: he reacts while you fill onboarding forms, peeks from the edge of the screen with commentary, and delivers verdicts on your financial health with the exact energy of a dad reviewing your report card.
+The trust part is right there in the name. For most of us, the first financial lessons came from one person: Papa. Fixed deposits, gold, "money does not grow on trees", all of it. We trust him not because he has certifications, but because he explains things patiently and he is unmistakably on our side. So I did not build a chatbot with a finance skin. I built Papa: a mustachioed Indian dad who looks at your actual numbers, tells you what to do next in plain language, and judges your food delivery spending only a little.
 
 ![Papa laughing](images/papa-laugh.png)
 
-This is not decoration. The persona is a design constraint that forces every sentence in the app to pass a test: would a caring, slightly sarcastic father say this? That single rule killed every piece of jargon in the product. Nothing says "asset allocation drift detected." Papa says your investments are wandering and it is time for a word.
+He is live at [askpapa.in](https://www.askpapa.in).
 
-The tone lands because it is honest. When your financial health score is 62 out of 100, Papa's speech bubble reads: "Could be worse. Could also be much, much better. Your call."
+## The look and feel
 
-![The AskPapa dashboard](images/dashboard.jpg)
+The experience starts before you have typed a single number. Signing up is not a form, it is a short interview with Papa.
 
-### Onboarding that feels like a conversation
+![Onboarding: a note from Papa, not a form](images/onboarding.jpg)
 
-Signing up walks you through a friendly interview: who you are, what you earn, what you spend, what you own, what you dream about, and how you behave with money. Every question is in plain language. Every field that could confuse a beginner carries a hint. EPF is explained as the retirement money your employer sets aside, not assumed knowledge.
+Every screen of that interview carries Papa's voice and, crucially, a reason for each question: "I'm only asking because your money behaves differently from mine." Ten short sections, about five minutes, auto saved, pause anytime. Every word a beginner could stumble on is explained in plain language, so EPF becomes the retirement money your employer sets aside rather than assumed knowledge. Instead of typing your holdings you upload the statement your broker already gives you and Papa reads it. And wherever a question could freeze you, there is a "Not sure?" button: ask someone what their dream trip costs and they blank, so tap it and Papa asks what a real person would ask (where to, how many of you, how many days) and suggests a realistic figure. In early testing his guess for a user's Sri Lanka trip was ₹12,00,000, which is bonkers; grounding the estimate in per person per day math and letting the AI only nudge within a sane band brought it to ₹1,50,000. The privacy promise is stated right there on the welcome screen too: your money details are locked with your password before they are saved, unreadable even to the team behind AskPapa. More on both of those below.
 
-Two details I am particularly fond of:
+Then the product itself. Six screens, one personality, and not a single candlestick chart in sight.
 
-**The "Not sure?" buttons.** Ask someone what their wedding will cost and most people freeze. So next to the target amount, a small button lets Papa estimate it. He asks a couple of quick questions, the kind a real person would ask: which city, what scale, how many days the trip is, and then produces a realistic figure with a range and its reasoning. During testing, a user typed "Sri Lanka trip" as a custom goal and the early version suggested ₹12,00,000, which is bonkers for a week abroad. The fix taught me a lot about grounding AI estimates, and I cover it in the technical half. Today the same goal lands near ₹1,50,000, which is what the trip actually costs.
+![The whole product in one view: dashboard, goals, plan, portfolio, discover, and Ask Papa](images/collage-product.jpg)
 
-**Statement upload.** Instead of typing every holding, you upload the portfolio statement your broker or fund platform already gives you. The app parses it, shows you what it found, lets you correct anything, and merges multiple brokers into one portfolio with live valuations.
+**Dashboard.** How much you can invest this month, a financial health score, your goals, and the two or three things to do first. In the corner, Papa's blunt verdict on Aditi's 62 out of 100: "Could be worse. Could also be much, much better. Your call."
 
-### Goals with a reality check
+**Goals.** Each goal, where it stands, and exactly what it takes to get there. A goal that is off track does not just get a red badge, it gets three concrete fixes with their consequences: save more per month, extend the deadline, or accept more risk. You pick one and the plan updates. Agency, not guilt.
 
-Each goal gets its own card: target, progress, time left, and the monthly amount it actually needs. When a goal is off track, the app does not just show a red badge. It offers three concrete fixes with their consequences: save more per month, extend the deadline, or accept more risk. You pick one and the plan updates.
+**Plan.** Everything compressed into three actions a month, sized to the money you can actually spare, each with its reason and what happens if you start it. Tick one off and the progress bar moves. Nobody rebuilds their financial life in a weekend, but almost anyone can do three things a month. Momentum is the feature.
 
-![Goals with reality checks and fixes](images/goals.jpg)
+**Portfolio.** Net worth, where your money sits today, and what it becomes if you simply stay the course. Watching that projection line climb is its own kind of nudge.
 
-### A plan, not a lecture
+**Discover.** Specific instruments, each card explaining itself: why this fits you, its risk band, a realistic return range, and a starting amount, often ₹500 a month. A Papa's Pick sits on top and honest fine print at the bottom. People do not act because a score is high, they act when they understand why.
 
-The Plan page turns everything into three actions for the month, sized to the money you can actually spare. Each action says why it exists, which goal it serves, and what happens if you start it. Tick one off and it moves to completed. The idea is momentum: nobody rebuilds their financial life in a weekend, but almost anyone can do three things a month.
+**Ask Papa.** A chat that answers anything with your real numbers in mind and the last conversation remembered. Ask "Am I saving enough?" and you do not get a lecture, you get Papa's verdict, your actual income, commitments and surplus laid out, and a specific target to aim for.
 
-![Your money plan](images/plan.jpg)
+Running underneath all six is the same set of deliberate engagement choices. One personality on every screen, because Papa has thirteen moods and reacts as you go. The persona doubles as a writing constraint: every sentence must pass one test, would a caring, slightly sarcastic dad say this, and that single rule killed every piece of jargon in the product. First time users get walked in by a guided tour; returning users get pulled back by having exactly three clear things to do.
 
-### Discover, with reasons attached
+## How I built it: free tiers all the way down
 
-The Discover page recommends specific instruments, and every card explains itself: why this fits you, what risk band it sits in, what the realistic return range looks like, and what you could start with, often as low as ₹500 a month. There is a "Papa's Pick" at the top and honest fine print at the bottom reminding you that estimates are estimates.
+Here is my favourite part of the story. The total amount of money this app has cost me is the price of a domain name.
 
-![Discover recommendations](images/discover.jpg)
+- **GoDaddy** for the domain. The only bill.
+- **Vercel** hosts the Next.js frontend. Free.
+- **AWS EC2** runs the backend, one small VM with 1 GB of RAM. Free for the first six months.
+- **Ollama Cloud** serves a small open LLM. Free tier.
+- **Resend** sends the OTP and password reset emails. Free tier.
+- **Let's Encrypt** provides SSL on both domains, auto provisioned by Vercel and Caddy. Free.
 
-The portfolio view brings it together: net worth, holdings mix, projected wealth if you stay the course, and how much room you have to invest this month.
+The whole system fits in one picture:
 
-![Portfolio view](images/portfolio.jpg)
+![The complete AskPapa architecture: the quant decides, the LLM explains](images/diagram-architecture.png)
 
-And when you have a question that no dashboard answers, you ask Papa directly in chat. He knows your numbers, remembers the conversation, and answers like a person, not a search engine.
+Read it as three zones, left to right.
 
----
+**Zone 1, data ingestion and enrichment,** runs quietly in the background. Free data sources feed in: market data APIs (AMFI, Yahoo Finance, CoinGecko), news and regulator RSS (RBI, SEBI, NSE), and investor sentiment from Indian investing communities on Reddit, because that is where retail opinion actually lives. Everything ingested passes through content extraction and a financial NLP layer (entities, sentiment, contradiction detection), gets a source credibility score, and lands in an evidence and research store where every signal stays linked to where it came from and is reusable across users.
 
-## Part 2: For the builders
+**Zone 2, core intelligence,** is the multi agent recommendation pipeline, and this is where the quant decides. Seven stages take your profile plus that evidence and turn them into a plan: profile and goals, market regime, screening and alpha discovery, a category planner that gates what actually fits your life, portfolio construction, a fusion and consensus step where multiple agents must agree before an idea survives, and finally an explainability agent that attaches reasons, risks and confidence to every card.
 
-Here is the part I wish more product stories included. AskPapa is a Next.js frontend, a FastAPI backend, a SQLite database, and a small open LLM. About 50,000 lines of code: roughly 28,000 lines of Python across 295 files on the backend, and 21,000 lines of TypeScript on the frontend. It serves real users on infrastructure that costs nothing per month.
+**Zone 3, interface and delivery,** is what you touch. The Next.js frontend on Vercel talks to a single FastAPI worker behind Caddy on one small AWS EC2 box. Ask Papa chat builds context from your real numbers, goals and latest recommendations, drafts a complete deterministic answer, and only then hands it over to be voiced. Everything sensitive lands in an encrypted SQLite database, an adaptive memory layer watches for drift and triggers reassessments, Resend sends the OTP and reset emails, and the GoDaddy domain, the one thing I paid for, points at all of it.
 
-### The shape of the system
+The two thick green arrows in the diagram are the entire thesis: the explainability agent and the chat both send the language model prose only, never decisions.
 
-![Deployment topology](images/diagram-topology.png)
+Three ideas make this tiny footprint workable.
 
-The frontend lives on Vercel's free tier. The backend is one small virtual machine with 1 GB of RAM, running a single uvicorn worker behind Caddy, which handles HTTPS certificates automatically. The database is a SQLite file on that same machine, backed up nightly. The LLM is a small open model on Ollama Cloud's free tier. Email goes through Resend's free tier.
+**The quant decides, the LLM explains.** Every answer in AskPapa is computed first by ordinary, deterministic code: the goal math, the health score, the recommendation engine, the chat baseline. The LLM's only job is to take a complete, correct answer and rewrite it in Papa's voice. It never chooses instruments, never invents numbers, never decides anything. That is what the "prose only, never decisions" arrow in the diagram means, and it is why the Sri Lanka fix worked: the estimate is anchored by code, and the AI can only adjust it within a sane band. It is also why a small free model is enough, and why failure is invisible. If the model times out or hits a quota, users get the deterministic answer in slightly plainer language, never an error. During one provider outage lasting hours, no user noticed anything.
 
-People sometimes flinch at SQLite in production. For a single writer workload at this scale it is honestly great: zero operational overhead, trivial backups, and one less service to babysit at three in the morning. The 1 GB box works because of one deliberate constraint you will see next: the request path never waits on anything heavy.
+**Privacy as architecture, not policy.** I run this service and I decided early that I should not be able to read anyone's financial data. Every user gets their own encryption key, sealed under their password; it travels in their session token and unlocks their data only for the duration of each request. Open the production database and you will find ciphertext where the financial data should be. A separate recovery mechanism means a forgotten password does not destroy your data. This is a property of the system, not a promise in a policy page.
 
-### The core pattern: the quant decides, the LLM explains
+**Boring infrastructure, deliberately.** SQLite instead of a managed database: zero operational overhead and trivial backups, perfectly happy at this scale. A single worker because SQLite prefers one writer. A swap file because the box has 1 GB of RAM. Caching at every layer, slow work pushed to the background, and graceful degradation on every external dependency. Boring choices, deliberately made, compounding quietly. Which, now that I think about it, is exactly the investment philosophy the app teaches.
 
-This is the single most important architectural decision in the app, and I would repeat it in any AI product I build.
+## Key takeaways from the build
 
-Every answer in AskPapa is computed deterministically first. The recommendation engine, the goal math, the health score, the chat baseline: all of it is ordinary code with ordinary tests. The LLM's only job is to take a complete, correct answer and rewrite the prose in Papa's voice. It never chooses instruments, never invents numbers, never decides anything.
+**Start before you have a plan.** I opened my laptop to try vibe coding with no idea what to build. A month later it was a live product. Motion beats intention.
 
-![The deterministic core with LLM enhancement](images/diagram-llm-pattern.png)
+**Be your own first user.** I built AskPapa because my own money was a mess, so I always knew what to fix next. Solve your problem well and you have probably solved a stranger's too.
 
-The consequences are lovely:
+**One good character beats a hundred features.** People did not warm to a finance app, they warmed to a dad who explains. A personality people trust carries more than any feature list.
 
-- **Failure is invisible.** If the LLM times out, hits a quota, or returns nonsense, the user gets the deterministic answer. Slightly plainer language, same substance, no error screen. During one production incident the model provider was down for hours and no user noticed.
-- **Small models are enough.** Because the model only rewrites prose from structured context, a small open model does the job. There is no need for a frontier model when the hard thinking already happened in code.
-- **Costs stay near zero.** LLM calls are cached by prompt, batched, and mostly run in the background after the response is already served. The expensive path is the exception, not the rule.
+**Perfection is what shipped it.** I only meant to try something for a weekend. Refusing to leave it "good enough" is what turned a toy into a product.
 
-A model router picks a model per task with per task time budgets, so chat stays snappy while background explanation work gets more room. Post processing fixes the things small models reliably get wrong for an Indian audience, like digit grouping: ₹2,34,000, not ₹234,000.
-
-That Sri Lanka trip bug from Part 1? The estimator originally asked too few clarifying questions and let the model guess with too little context. The fix was pure engineering: ask for the cost drivers (destination, people, days, style of stay), compute a deterministic per person per day baseline in code, and let the model only adjust within a sane band of it. Grounding beats scale.
-
-### Life of a recommendation
-
-The recommendation engine is the deepest part of the backend: a pipeline of dozens of small, composable agents, each doing one deterministic job.
-
-![The recommendation pipeline](images/diagram-recommendation-pipeline.png)
-
-Conceptually it flows like this. A research layer continuously ingests market data, fund data, and news from public Indian sources, and scores the credibility of what it reads. A regime check asks what kind of market we are in. Screening drops unfit or low quality candidates. Then comes the step I care most about: personal category gates. Two users with the same risk score do not get the same list, because the engine reasons about their lives, not just their risk band. A tax saving fund makes no sense below the tax threshold. Small caps make no sense for someone three months from needing the money.
-
-Portfolio construction then does the allocation and sizing math with diversification constraints, a consensus pass requires multiple independent checks to agree before an idea survives, and an explanation layer attaches the evidence: why this, what could go wrong, how confident the system is, and which sources fed the view. That explanation object is what renders as the reasons on every card in the app.
-
-None of this needed machine learning in the trendy sense. It needed careful domain modelling, honest uncertainty handling, and the discipline to show your work.
-
-### Privacy as architecture, not policy
-
-I run this service, and I decided early that I should not be able to read anyone's financial data. Not as a promise in a privacy policy, but as a property of the system.
-
-![The encryption flow](images/diagram-encryption-flow.png)
-
-Every user gets a random data encryption key at signup. That key is stored only in wrapped form, sealed with AES-256-GCM under a key derived from the user's password. The raw key travels inside the user's signed session token, which lives on their device, and is presented back to the server on each request. A middleware exposes it to the ORM for that request only, and the ORM encrypts and decrypts financial fields transparently.
-
-The result: if you open the production database file, you see ciphertext where the financial data should be. The operator, me, cannot read it at rest. Identity fields like name and email stay readable on purpose, because support has to be possible.
-
-One wrinkle is worth sharing. Pure password wrapped encryption has a brutal edge case: forget your password, lose your data. That is correct cryptographic behaviour and terrible product behaviour. The compromise is a second wrap of the same key under a separate recovery key that lives only in server configuration and is used exclusively during the emailed password reset flow. Password resets keep your data. It is a deliberate trade of a little theoretical purity for a lot of user safety.
-
-### Running it for nothing
-
-The bill, itemised: Vercel free tier for the frontend. A free tier cloud VM for the backend. Ollama Cloud free tier for the model. Resend free tier for email. Let's Encrypt certificates on both domains, provisioned automatically. The only thing I actually paid for is the domain name.
-
-The engineering that makes free viable is unglamorous: a swap file because the box has 1 GB of RAM, a single worker because SQLite prefers one writer, caching at every layer, background processing for anything slow, and graceful degradation for every external dependency. Boring choices, deliberately made, compounding quietly. Which, now that I think about it, is also the entire investment philosophy the app teaches.
-
----
-
-## What building this taught me
-
-**Personality is a feature with an architecture.** Papa's voice needed a prompt discipline, a post processing layer, and a fallback plan. Charm that collapses when the model hiccups is not charm.
-
-**LLMs are a voice layer, not a brain.** The moment I stopped asking the model to think and started asking it to speak, quality went up, costs went down, and failures stopped mattering.
-
-**Trust is built in the explanation.** Users do not act on recommendations because a score is high. They act when the app says here is why, here is what could go wrong, and here is the evidence. The explanation layer took real effort and it is the part users mention most.
-
-**Constraints are a gift.** One small VM, a free model tier, and a zero budget forced an architecture that is simpler, faster, and more resilient than the one I would have built with money.
-
-There is plenty ahead: richer market intelligence, deeper document understanding, and the long tail of making every Papa sentence feel human. But the foundation held up to real users, real markets, and real production incidents, and it did so on pocket change.
+**Starting was the only real cost.** A domain name was the only thing I paid for. The tools are free and the models are free, so the rest was just showing up after work.
 
 If you want to see Papa in action, he is at [askpapa.in](https://www.askpapa.in), waiting to judge your emergency fund. Lovingly, of course.
 
 ---
 
-*If this was useful, a clap or a follow helps more people find it. I am happy to answer architecture questions in the responses.*
+*If this was useful, a clap or a follow helps more people find it. I am happy to answer build questions in the responses.*

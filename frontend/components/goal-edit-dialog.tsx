@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { OnboardingProfile, ProfileGoal } from "@/types";
 import { GoalEstimateHelper } from "@/app/onboarding/_screens/goal-estimate-helper";
 import { goalDateSuggestions } from "@/app/onboarding/_lib/goal-estimate-questions";
+import { suggestDesiredMonthlyIncome } from "@/app/onboarding/_lib/onboarding-math";
 
 const GOAL_TYPES = [
   "Retirement",
@@ -197,20 +198,35 @@ export function GoalEditDialog({
             <div className="rounded-xl bg-surface-soft p-4">
               <p className="text-sm font-semibold text-foreground">How would you like to plan this?</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {(["corpus", "monthly", "yearly"] as const).map((option) => (
+                {(["corpus", "monthly"] as const).map((option) => (
                   <button
                     key={option}
                     onClick={() => setGoal({ ...goal, retirementInputType: option })}
                     className={`rounded-full border px-4 py-1.5 text-xs font-medium transition ${goal.retirementInputType === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:bg-surface-hover"}`}
                   >
-                    {option === "corpus" ? "Lump-sum target" : option === "monthly" ? "Desired monthly income" : "Desired yearly income"}
+                    {option === "corpus" ? "Lump-sum target" : "Desired monthly income"}
                   </button>
                 ))}
               </div>
               {goal.retirementInputType === "monthly" ? (
-                <CurrencyField className="mt-3" label="Desired monthly income at retirement" value={goal.desiredMonthlyIncome} onChange={(value) => setGoal({ ...goal, desiredMonthlyIncome: value })} />
-              ) : goal.retirementInputType === "yearly" ? (
-                <CurrencyField className="mt-3" label="Desired yearly income at retirement" value={goal.desiredYearlyIncome} onChange={(value) => setGoal({ ...goal, desiredYearlyIncome: value })} />
+                <CurrencyField
+                  className="mt-3"
+                  label="Desired monthly income at retirement"
+                  value={goal.desiredMonthlyIncome}
+                  onChange={(value) => setGoal({ ...goal, desiredMonthlyIncome: value })}
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const suggested = suggestDesiredMonthlyIncome(profile || {});
+                        if (suggested > 0) setGoal({ ...goal, desiredMonthlyIncome: suggested, retirementInputType: "monthly" });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-accent px-2 py-0.5 text-[0.6875rem] font-semibold text-primary transition hover:border-primary"
+                    >
+                      <Sparkles className="h-3 w-3" /> Not sure?
+                    </button>
+                  }
+                />
               ) : null}
               <div className="mt-3">
                 <Label className="text-xs font-medium">Safe withdrawal rate (%)</Label>

@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { Calculator } from "lucide-react";
 import { ChoiceCard } from "../_components/choice-card";
 import { CurrencyField } from "../_lib/field-helpers";
 import { formatINR } from "@/lib/currency";
+import { monthlyCommitments } from "@/lib/profile";
 import { ScreenWrap } from "./about";
 import { ScreenContext } from "../_flow/types";
 
@@ -15,6 +18,21 @@ const SALARY_DAY_OPTIONS = [
 export function IncomeScreen({ form, values }: ScreenContext) {
   const inflow = Number(values.monthlySalary || 0) + Number(values.otherIncome || 0);
   const salaryDay = values.salaryDay || "";
+  const [autoNote, setAutoNote] = useState<string | null>(null);
+
+  // Fill "invest this month" with the same figure Papa uses for every later
+  // month: income minus rent, everyday spends and EMIs (monthlyCommitments).
+  function autoCalculateInvestable() {
+    const income = Number(values.monthlyCashInflow || 0) || Number(values.monthlySalary || 0) + Number(values.otherIncome || 0);
+    const commitments = monthlyCommitments(values);
+    const surplus = Math.max(income - commitments, 0);
+    form.setValue("investableThisMonth", surplus, { shouldValidate: true });
+    setAutoNote(
+      commitments > 0
+        ? `Income ${formatINR(income)} minus your rent, spends and EMIs ${formatINR(commitments)} = ${formatINR(surplus)}.`
+        : `Based on your income of ${formatINR(income)}. Add your spending and loans in the next steps and Papa will sharpen this.`,
+    );
+  }
   return (
     <ScreenWrap
       papa="Don't round up too much. Your bank account knows the truth."
@@ -35,14 +53,26 @@ export function IncomeScreen({ form, values }: ScreenContext) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <CurrencyField
-            name="investableThisMonth"
-            label="How much can you invest this month?"
-            placeholder="e.g., 30,000"
-            helper="Just for this month — later months auto-use income minus expenses."
-            optional
-            hint="Spare money you could put into investments right now, on top of your normal spending. A rough estimate is fine. From next month, Papa works it out as income minus expenses."
-          />
+          <div className="space-y-2">
+            <CurrencyField
+              name="investableThisMonth"
+              label="How much can you invest this month?"
+              placeholder="e.g., 30,000"
+              helper="Just for this month. Later months auto-use income minus expenses."
+              optional
+              hint="Spare money you could put into investments right now, on top of your normal spending. A rough estimate is fine. From next month, Papa works it out as income minus expenses."
+              action={
+                <button
+                  type="button"
+                  onClick={autoCalculateInvestable}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#138A3C]/40 bg-[#E9F4EC] px-2 py-0.5 text-[0.6875rem] font-semibold text-[#138A3C] transition hover:border-[#138A3C] hover:bg-[#dcefe1]"
+                >
+                  <Calculator className="h-3 w-3" /> Auto-calculate
+                </button>
+              }
+            />
+            {autoNote ? <p className="text-[0.8125rem] leading-5 text-[#138A3C]">{autoNote}</p> : null}
+          </div>
         </div>
 
         <div>

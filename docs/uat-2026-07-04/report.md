@@ -7,7 +7,7 @@ Full user-acceptance test with 5 mock users spanning very different financial li
 | Persona | Profile | Income /mo | True surplus /mo | Net worth | Goals |
 |---|---|---|---|---|---|
 | Aarav Joshi (student, 21, Pune) | Part-time + freelance, no loans, ₹5k crypto | ₹12,000 | ₹5,100 | ₹30,000 | Travel, Higher education |
-| Priya Nair (fresher SWE, 24, Bengaluru) | ₹18k rent, education loan EMI ₹8,667, index-fund SIP | ₹58,000 | ₹15,333 | ₹1.3L | Higher education, Travel |
+| Aditi Nair (fresher SWE, 24, Bengaluru) | ₹18k rent, education loan EMI ₹8,667, index-fund SIP | ₹58,000 | ₹15,333 | ₹1.3L | Higher education, Travel |
 | Rohit Malhotra (senior exec, 36, Gurugram) | Home + car loan EMIs ₹45k, ₹1.19Cr assets | ₹1,95,000 | ₹91,722 | ₹1.19Cr | Child education, Retirement, Debt |
 | Farhan Sheikh (business owner, 45, Mumbai) | Variable income, business loan, ₹3.25Cr assets | ₹4,00,000 | ₹2,64,667 | ₹3.25Cr | Business, Marriage, Retirement |
 | Meera Krishnan (professor, 53, Chennai) | No loans, conservative, ₹2.38Cr assets | ₹1,60,000 | ₹98,500 | ₹2.38Cr | Retirement, Marriage, Travel |
@@ -33,7 +33,7 @@ Full user-acceptance test with 5 mock users spanning very different financial li
 ## Defects found → fixed → re-verified
 
 ### P0 — Cross-user data leak on the dashboard
-A hydration race: on a cold load the dashboard fetched `latestProfile` **before** the persisted session loaded, got the **globally last-saved profile** (another user's), displayed it, and then **persisted it into the current user's session**. Screenshot evidence showed Priya's sidebar with Meera's entire finances.
+A hydration race: on a cold load the dashboard fetched `latestProfile` **before** the persisted session loaded, got the **globally last-saved profile** (another user's), displayed it, and then **persisted it into the current user's session**. Screenshot evidence showed Aditi's sidebar with Meera's entire finances.
 **Fix:** `hasHydrated` gate in the auth store (`onRehydrateStorage`) + dashboard effect waits for it; backend `/onboarding/latest` without a token now only returns guest profiles, never account-owned ones.
 
 ### P0 — Cross-user commitment leak in the portfolio

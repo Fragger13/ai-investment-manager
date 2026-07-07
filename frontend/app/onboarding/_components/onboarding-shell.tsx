@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SCRIPT_FAMILY, SCRIPT_GREEN, caveat, sans } from "@/lib/fonts";
 import { ProgressSegments } from "./progress-segments";
 import { CalculatorButton } from "./calculator";
+import { Disclaimer } from "@/components/disclaimer";
 
 type SaveState = "idle" | "saving" | "saved";
 
@@ -141,6 +142,8 @@ export function OnboardingShell({
             {submitting ? "Saving…" : nextLabel || (isLast ? "Open my dashboard" : "Continue")} <ArrowRight className="h-5 w-5" />
           </Button>
         </footer>
+
+        <Disclaimer className="mb-10 sm:mb-14" />
       </div>
     </main>
   );
