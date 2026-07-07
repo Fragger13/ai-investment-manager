@@ -72,7 +72,7 @@ export default function PrivacyPage() {
 
       <h2>10. Contact</h2>
       <p>
-        For any privacy question or data request, email <a href="mailto:noreply@askpapa.in">noreply@askpapa.in</a>.
+        For any privacy question or data request, email <a href="mailto:contact@askpapa.in">contact@askpapa.in</a>.
         See also our <Link href="/terms">Terms of Use</Link>.
       </p>
     </LegalPage>

@@ -145,7 +145,7 @@ export function AppShell({ children, sidebarExtra }: { children: React.ReactNode
               <span aria-hidden>·</span>
               <Link href="/privacy" className="hover:underline">Privacy</Link>
               <span aria-hidden>·</span>
-              <a href="mailto:noreply@askpapa.in" className="hover:underline">Contact</a>
+              <a href="mailto:contact@askpapa.in" className="hover:underline">Contact</a>
             </p>
           </div>
         ) : null}
