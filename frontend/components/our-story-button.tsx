@@ -9,7 +9,7 @@ import { BookOpen, ChevronDown, Play, X } from "lucide-react";
  * /AskPapa_final.mp4 in a centered overlay) or read the launch article on
  * Medium. Keeps the header to one button so it does not crowd the sign-in CTA.
  */
-const ARTICLE_URL =
+export const ARTICLE_URL =
   "https://medium.com/@ltanishq13/the-accidental-product-how-askpapa-came-to-life-94bda3483cf0?sharedUserId=ltanishq13";
 
 export function OurStoryButton() {
