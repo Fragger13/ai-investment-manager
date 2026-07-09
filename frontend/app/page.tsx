@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ChartPie, Lightbulb, Plus, Sprout, Target, TrendingUp } from "lucide-react";
 import { caveat, sans, SCRIPT_FAMILY, SCRIPT_GREEN } from "@/lib/fonts";
-import { OurStoryButton } from "@/components/our-story-button";
+import { OurStoryButton, ARTICLE_URL } from "@/components/our-story-button";
 import { LandingAuthCta } from "@/components/landing-auth-cta";
 import { Disclaimer } from "@/components/disclaimer";
 
@@ -38,6 +38,8 @@ function Footer() {
             <Link href="/terms" className="font-semibold text-[#138A3C] hover:underline">Terms</Link>
             <span aria-hidden>·</span>
             <Link href="/privacy" className="font-semibold text-[#138A3C] hover:underline">Privacy</Link>
+            <span aria-hidden>·</span>
+            <a href={ARTICLE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#138A3C] hover:underline">Our story</a>
             <span aria-hidden>·</span>
             <a href="mailto:contact@askpapa.in" className="font-semibold text-[#138A3C] hover:underline">Contact</a>
           </p>
