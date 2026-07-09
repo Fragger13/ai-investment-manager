@@ -7,9 +7,9 @@ import "./globals.css";
 
 const SITE_URL = "https://www.askpapa.in";
 const SITE_DESCRIPTION =
-  "AskPapa is your friendly AI money mentor for India. Build a clear financial plan, set goals, track your portfolio, and make confident money decisions, all explained in simple language.";
+  "AskPapa makes where to invest and how much a no brainer. Tell Papa about your life once and get a clear plan in plain language, starting from just ₹500 a month.";
 const SOCIAL_DESCRIPTION =
-  "Your friendly AI money mentor for India. A clear financial plan, goals, and portfolio tracking, all explained in simple language.";
+  "Where to invest and how much, made a no brainer. Tell Papa about your life once and get a clear money plan in plain language. Start from ₹500 a month.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
