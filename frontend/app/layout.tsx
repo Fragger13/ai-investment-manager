@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PapaTour } from "@/components/papa-tour";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
@@ -6,6 +7,11 @@ import { caveat, sans } from "@/lib/fonts";
 import "./globals.css";
 
 const SITE_URL = "https://www.askpapa.in";
+// GA4 measurement ID. This is a public, client-side identifier (it ships in the
+// page source), so it is safe to keep in the repo. Analytics only load in a
+// production build, so local `next dev` never pollutes the reporting.
+const GA_MEASUREMENT_ID = "G-FYEQLQZBDK";
+const ANALYTICS_ENABLED = process.env.NODE_ENV === "production";
 const SITE_DESCRIPTION =
   "AskPapa makes where to invest and how much a no brainer. Tell Papa about your life once and get a clear plan in plain language, starting from just ₹500 a month.";
 const SOCIAL_DESCRIPTION =
@@ -113,6 +119,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PapaTour />
         </ThemeProvider>
+        {ANALYTICS_ENABLED ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_MEASUREMENT_ID}');
+              `}
+            </Script>
+          </>
+        ) : null}
       </body>
     </html>
   );
