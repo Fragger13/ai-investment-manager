@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Account details:</strong> your name, email, and a securely hashed password.</li>
         <li><strong>Financial profile:</strong> the income, expenses, goals, and holdings you choose to enter.</li>
-        <li><strong>Usage:</strong> basic technical information needed to run and secure the service.</li>
+        <li><strong>Usage:</strong> basic technical and analytics information, such as which pages are visited and which features are used, needed to run, secure, and improve the service.</li>
       </ul>
       <p>You decide what to share. You can use most of the app with only the details you are comfortable giving.</p>
 
@@ -49,8 +49,9 @@ export default function PrivacyPage() {
       <h2>5. Service providers</h2>
       <p>
         A few trusted services help run AskPapa: hosting for the app and database, an email provider for
-        verification and reset emails, and a language model that rewrites already computed answers in Papa&apos;s
-        voice. Providers only ever receive what is needed to do their job.
+        verification and reset emails, a web analytics service that shows us how the app is used so we can improve
+        it, and a language model that rewrites already computed answers in Papa&apos;s voice. Providers only ever
+        receive what is needed to do their job, and your encrypted financial data is never shared with them.
       </p>
 
       <h2>6. Your rights</h2>
