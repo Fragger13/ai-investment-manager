@@ -45,6 +45,14 @@ export function LoansStep({ draft, update }: StepProps) {
 
   return (
     <View style={{ gap: spacing.md }}>
+      {draft.emiHint > 0 && loans.length === 0 ? (
+        <View style={styles.hintBanner}>
+          <Text style={{ fontSize: 16 }}>👀</Text>
+          <Text style={styles.hintText}>
+            Papa spotted an EMI of about {formatINR(draft.emiHint)} in your documents. Add it below so the math stays honest.
+          </Text>
+        </View>
+      ) : null}
       <PressableScale onPress={openAdd} style={[styles.bigChoice, draft.hasEmiLoans === true && styles.bigChoiceActive]}>
         <Text style={{ fontSize: 24 }}>💳</Text>
         <View style={{ flex: 1 }}>
@@ -151,6 +159,21 @@ export function LoansStep({ draft, update }: StepProps) {
 }
 
 const styles = StyleSheet.create({
+  hintBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  hintText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: "600",
+    color: colors.warningForeground,
+  },
   bigChoice: {
     flexDirection: "row",
     alignItems: "center",
