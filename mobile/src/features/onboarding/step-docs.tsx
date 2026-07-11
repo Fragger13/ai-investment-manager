@@ -74,10 +74,7 @@ export function DocumentsStep({ draft, update }: StepProps) {
         setState(key, { phase: "empty" });
       }
     } catch (e) {
-      const message =
-        e instanceof ApiError && e.status > 0
-          ? e.detail
-          : "Could not reach the server. Check your connection and try again.";
+      const message = e instanceof ApiError ? e.detail : "Something went wrong. Try again.";
       setState(key, { phase: "error", message });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
