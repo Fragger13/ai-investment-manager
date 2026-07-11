@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system/legacy";
+import { File, UploadTask, UploadType, type UploadResult } from "expo-file-system";
 import type {
   AuthResponse,
   ChatResponse,
@@ -110,26 +110,31 @@ export const api = {
       body: JSON.stringify(profile),
     });
   },
-  // Multipart upload via the native uploader (RN fetch + FormData file parts
-  // is unreliable on Android and surfaces as "network request failed").
+  // Multipart upload via the SDK 57 UploadTask (native networking). RN
+  // fetch+FormData file parts are unreliable on Android, and the legacy
+  // FileSystem.uploadAsync has no native module in current Expo Go.
   // doc_type tells the backend which profile fields this document may fill.
   async uploadDocument(
     file: { uri: string; name: string; mimeType: string },
     docType?: string
   ): Promise<DocumentAnalysis> {
     const headers: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-    let result: FileSystem.FileSystemUploadResult;
+    let result: UploadResult;
     try {
-      result = await FileSystem.uploadAsync(`${API_BASE}/documents/upload`, file.uri, {
+      const task = new UploadTask(new File(file.uri), `${API_BASE}/documents/upload`, {
         httpMethod: "POST",
-        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        uploadType: UploadType.MULTIPART,
         fieldName: "file",
         mimeType: file.mimeType,
         parameters: docType ? { doc_type: docType } : {},
         headers,
       });
-    } catch {
-      throw new ApiError(0, "Papa could not reach the server. Check your internet connection.");
+      result = await task.uploadAsync();
+    } catch (e) {
+      // Real reason matters: file unreadable vs network vs module issues all
+      // land here. Show it instead of blaming the connection.
+      const reason = e instanceof Error ? e.message : "unknown error";
+      throw new ApiError(0, `Upload failed on the phone: ${reason}`);
     }
     let body: Record<string, unknown> = {};
     try {
