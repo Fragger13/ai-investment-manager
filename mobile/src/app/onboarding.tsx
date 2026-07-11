@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, LogOut } from "lucide-react-native";
 import { Button, PressableScale } from "@/components/ui";
 import { colors, heroShadow, radius, spacing } from "@/constants/theme";
 import { api, ApiError } from "@/lib/api";
@@ -86,7 +86,7 @@ const STEP_META: Record<StepId, { title: string; sub?: string; papa: string }> =
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { token, hasHydrated, profile, loadProfile, markOnboarded } = useAuthStore();
+  const { token, hasHydrated, profile, loadProfile, markOnboarded, onboardingComplete, logout } = useAuthStore();
 
   const [draft, setDraft] = useState<OnboardingDraft>(blankDraft());
   const [stepIndex, setStepIndex] = useState(0);
@@ -97,7 +97,9 @@ export default function OnboardingScreen() {
   const hydratedDraft = useRef(false);
 
   // Resume a half-done onboarding: earlier partial saves land in the profile
-  // store, so pull whatever exists once and prefill the draft from it.
+  // store, so pull whatever exists once and prefill the draft from it. An
+  // already-onboarded user (edit mode from the You tab) starts on the review
+  // screen and jumps to whichever section they want to change.
   useEffect(() => {
     if (hydratedDraft.current || !token) return;
     hydratedDraft.current = true;
@@ -106,8 +108,11 @@ export default function OnboardingScreen() {
       if (existing && typeof existing === "object") {
         setDraft(draftFromProfile(existing as Record<string, unknown>));
       }
+      if (onboardingComplete) {
+        setStepIndex(STEP_ORDER.indexOf("review"));
+      }
     })();
-  }, [token, profile, loadProfile]);
+  }, [token, profile, loadProfile, onboardingComplete]);
 
   if (hasHydrated && !token) return <Redirect href="/login" />;
 
@@ -148,7 +153,15 @@ export default function OnboardingScreen() {
   function back() {
     setError(null);
     if (stepIndex === 0) {
-      router.back();
+      if (onboardingComplete) {
+        // Edit mode (came from the You tab): return to the app.
+        router.back();
+      } else {
+        // Onboarding is mandatory before the tabs, so the only way out from
+        // the first step is switching accounts.
+        logout();
+        router.replace("/login");
+      }
       return;
     }
     setStepIndex((i) => i - 1);
@@ -186,7 +199,11 @@ export default function OnboardingScreen() {
       {/* Header: back, progress */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <PressableScale onPress={back} style={styles.backBtn} haptic={false}>
-          <ArrowLeft color={colors.foreground} size={20} />
+          {stepIndex === 0 && !onboardingComplete ? (
+            <LogOut color={colors.mutedForeground} size={18} />
+          ) : (
+            <ArrowLeft color={colors.foreground} size={20} />
+          )}
         </PressableScale>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />

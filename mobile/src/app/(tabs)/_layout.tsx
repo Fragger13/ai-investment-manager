@@ -24,8 +24,12 @@ function IconPill({ focused, children }: { focused: boolean; children: React.Rea
 }
 
 export default function TabsLayout() {
-  const { token, hasHydrated } = useAuthStore();
+  const { token, hasHydrated, onboardingComplete } = useAuthStore();
   if (hasHydrated && !token) return <Redirect href="/login" />;
+  // A half-done onboarding leaves partial profile drafts on the server, so
+  // "a profile exists" is NOT the same as "onboarded". Gate the tabs on the
+  // real flag or users see a dashboard computed from an empty profile.
+  if (hasHydrated && token && !onboardingComplete) return <Redirect href="/onboarding" />;
 
   return (
     <Tabs
