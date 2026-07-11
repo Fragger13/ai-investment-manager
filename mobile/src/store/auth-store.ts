@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 import { api, setAuthToken } from "@/lib/api";
-import type { OnboardingProfile } from "@/lib/types";
+import type { AuthResponse, OnboardingProfile } from "@/lib/types";
 
 type User = {
   name: string;
@@ -24,6 +24,10 @@ type AuthState = {
   setHasHydrated: (value: boolean) => void;
   login: (email: string, password: string) => Promise<{ emailVerified: boolean; onboardingComplete: boolean }>;
   loadProfile: () => Promise<OnboardingProfile | null>;
+  // Adopt the session minted by /auth/verify-email (fresh registrations get
+  // tokens right there, no second login needed).
+  adoptSession: (auth: AuthResponse) => void;
+  markOnboarded: (profile: OnboardingProfile) => void;
   logout: () => void;
 };
 
@@ -68,6 +72,19 @@ export const useAuthStore = create<AuthState>()(
         const latest = await api.latestProfile(token).catch(() => ({ profile: null }));
         set({ profile: latest.profile });
         return latest.profile;
+      },
+      adoptSession: (auth) => {
+        setAuthToken(auth.access_token);
+        set({
+          token: auth.access_token,
+          user: { name: auth.name, email: auth.email },
+          onboardingComplete: auth.onboarding_complete,
+          emailVerified: auth.email_verified ?? true,
+          profile: null,
+        });
+      },
+      markOnboarded: (profile) => {
+        set({ onboardingComplete: true, profile });
       },
       logout: () => {
         setAuthToken(null);

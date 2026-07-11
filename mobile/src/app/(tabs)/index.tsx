@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Image,
-  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -36,6 +35,7 @@ function goalEmoji(name: string): string {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   // The hero header is deep green, so the status bar flips to light while this
   // screen is focused (other tabs sit on cream and need dark icons).
@@ -144,10 +144,10 @@ export default function HomeScreen() {
               <Card style={{ marginTop: spacing.lg }}>
                 <Heading size={18}>One step left</Heading>
                 <Body muted style={{ marginTop: 6 }}>
-                  Papa needs to meet you first. Finish your 5 minute onboarding on the web, then come back here.
+                  Papa needs to meet you first. Five minutes, and your whole money picture lights up.
                 </Body>
                 <View style={{ marginTop: spacing.lg }}>
-                  <Button title="Open askpapa.in" onPress={() => Linking.openURL("https://www.askpapa.in")} />
+                  <Button title="Start onboarding" onPress={() => router.push("/onboarding")} />
                 </View>
               </Card>
             </Animated.View>

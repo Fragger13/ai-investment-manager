@@ -64,6 +64,14 @@ function authHeaders(token?: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export type DocumentAnalysis = {
+  status: string;
+  summary: { extractionStatus: string; confidence: number; detectedIncome: number };
+  extractedFields: { field: string; label: string; value: number | string; confidence: number; status: string; explanation: string }[];
+  profilePatch: Record<string, number>;
+  aiFindings: string[];
+};
+
 export const api = {
   async login(email: string, password: string): Promise<AuthResponse> {
     return request("/auth/login", {
@@ -93,6 +101,38 @@ export const api = {
     return request("/onboarding/latest", {
       headers: authHeaders(token),
     });
+  },
+  async saveOnboarding(profile: Record<string, unknown>, options?: { partial?: boolean }): Promise<{ status: string; profileId: number }> {
+    const suffix = options?.partial ? "?partial=true" : "";
+    return request(`/onboarding${suffix}`, {
+      method: "POST",
+      body: JSON.stringify(profile),
+    });
+  },
+  // Multipart upload: statement/portfolio files go up as-is; the backend
+  // parses them, returns extracted fields, and keeps only ciphertext on disk.
+  async uploadDocument(file: { uri: string; name: string; mimeType: string }): Promise<DocumentAnalysis> {
+    const form = new FormData();
+    // React Native's fetch understands {uri, name, type} file descriptors.
+    form.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
+    const auth: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/documents/upload`, { method: "POST", headers: auth, body: form });
+    } catch {
+      throw new ApiError(0, "Papa could not reach the server. Check your internet connection.");
+    }
+    if (!response.ok) {
+      const text = await response.text();
+      let detail = text || `Upload failed: ${response.status}`;
+      try {
+        detail = JSON.parse(text).detail || detail;
+      } catch {
+        // keep raw text
+      }
+      throw new ApiError(response.status, detail);
+    }
+    return response.json() as Promise<DocumentAnalysis>;
   },
   async dashboard(profile: OnboardingProfile): Promise<DashboardData> {
     return request<DashboardData>("/intelligence/dashboard", {

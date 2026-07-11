@@ -41,7 +41,8 @@
         {
           "faceIDPermission": "AskPapa uses Face ID to unlock your financial data."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
