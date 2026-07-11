@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import * as LocalAuthentication from "expo-local-authentication";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ChevronRight, Compass, FileText, Fingerprint, LogOut, NotebookTabs, PieChart, ShieldCheck } from "lucide-react-native";
+import { ChevronRight, Compass, FileText, Fingerprint, LogOut, NotebookTabs, Pencil, PieChart, ShieldCheck } from "lucide-react-native";
 import { Body, Card, Heading, PressableScale, SectionLabel } from "@/components/ui";
 import { cardShadow, colors, radius, spacing } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth-store";
@@ -33,6 +34,7 @@ function LinkRow({
 
 export default function YouScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, profile, logout } = useAuthStore();
   const [biometrics, setBiometrics] = useState<"on" | "unavailable" | null>(null);
 
@@ -68,6 +70,19 @@ export default function YouScreen() {
             {user.email}
           </Body>
         ) : null}
+      </Animated.View>
+
+      {/* Profile */}
+      <Animated.View entering={FadeInDown.duration(400).delay(60)} style={{ gap: spacing.md }}>
+        <SectionLabel>Your details</SectionLabel>
+        <Card style={{ padding: spacing.sm, gap: 2 }}>
+          <LinkRow
+            icon={<Pencil color={colors.primary} size={20} />}
+            title="Edit your details"
+            subtitle="Income, spends, loans, goals, risk. Everything Papa knows."
+            onPress={() => router.push("/onboarding")}
+          />
+        </Card>
       </Animated.View>
 
       {/* More of AskPapa, on the web for now */}
