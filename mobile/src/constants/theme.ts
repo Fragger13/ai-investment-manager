@@ -12,9 +12,10 @@ export const colors = {
   surfaceHover: "hsl(220, 20%, 90%)",
   foreground: "hsl(222, 28%, 13%)", // soft ink
   textSecondary: "hsl(222, 20%, 30%)",
-  mutedForeground: "hsl(222, 20%, 30%)",
+  mutedForeground: "hsl(222, 14%, 46%)",
   card: "hsl(0, 0%, 100%)",
   primary: "hsl(157, 84%, 31%)", // money green
+  primaryDeep: "hsl(160, 86%, 19%)", // gradient end for hero surfaces
   primaryForeground: "hsl(0, 0%, 100%)",
   accent: "hsl(157, 60%, 92%)", // mint tint
   accentForeground: "hsl(158, 78%, 23%)",
@@ -53,11 +54,20 @@ export const spacing = {
   "2xl": 32,
 } as const;
 
-// Soft card shadow, close to the web `shadow-card`.
+// Soft, borderless card shadow. Cards sit on cream with depth, not borders.
 export const cardShadow = {
-  shadowColor: "hsl(222, 28%, 13%)",
-  shadowOpacity: 0.08,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 4 },
-  elevation: 2,
+  shadowColor: "hsl(160, 40%, 20%)",
+  shadowOpacity: 0.07,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 3,
+} as const;
+
+// Stronger lift for the hero header and floating elements.
+export const heroShadow = {
+  shadowColor: "hsl(160, 86%, 19%)",
+  shadowOpacity: 0.28,
+  shadowRadius: 20,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 8,
 } as const;
