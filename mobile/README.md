@@ -33,20 +33,24 @@ EXPO_PUBLIC_API_URL=http://<mac-ip>:8000/api/v1 npx expo start
   only, never persisted to disk.
 - **Biometric lock**: with a saved session, the app demands fingerprint/face
   on cold start (devices without biometrics fall through).
-- **Tabs**: Home, Goals, Plan, Portfolio, Papa — same five destinations and
-  lucide icons as the web bottom bar.
-- **Home**: greeting, investable-this-month hero card, health score,
-  "do this first" actions, goal progress bars, alerts, disclaimer —
-  live from `POST /intelligence/dashboard`, with pull-to-refresh.
-- **Papa**: working chat against `POST /chat` with metric cards and
-  suggestion chips.
-- Goals/Plan/Portfolio: honest "coming soon" placeholders that deep-link to
-  the web app.
+- **Tabs**: three real destinations — Home, Papa (his avatar is the tab
+  icon), You. No placeholder tabs; web-only features live as links under You.
+- **Home**: full-bleed green gradient hero with the investable-this-month
+  number, health score ring (SVG) overlapping the hero, "do this first"
+  actions, a horizontal goals carousel, Papa-noticed alerts — live from
+  `POST /intelligence/dashboard`, with pull-to-refresh.
+- **Papa**: messenger-style chat against `POST /chat` — avatar next to his
+  bubbles, animated typing dots, opener cards, metric cards, follow-up chips.
+- **You**: profile, web links (plan/portfolio/discover), app lock status,
+  privacy, log out.
 
 ## Design language
 
-`src/constants/theme.ts` mirrors `frontend/app/globals.css` verbatim
-(hsl strings). Light-only, matching the current product decision.
+Mobile-first, not a web port: borderless soft-shadow cards, press-scale +
+haptics on everything tappable (`PressableScale`), staggered entrance
+animations, no tab labels. The palette in `src/constants/theme.ts` stays
+true to the brand (`frontend/app/globals.css` greens and cream). Light-only,
+matching the current product decision.
 
 ## Not yet ported (per roadmap)
 
