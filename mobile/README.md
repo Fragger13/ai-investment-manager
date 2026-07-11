@@ -27,10 +27,20 @@ EXPO_PUBLIC_API_URL=http://<mac-ip>:8000/api/v1 npx expo start
 
 ## What is built so far (Phase 1 shell)
 
-- **Auth**: login against production, session in **expo-secure-store**
+- **Auth**: login, in-app **registration** and 6 digit **email verification**
+  (verify mints the session, no second login). Session in **expo-secure-store**
   (Android Keystore / iOS Keychain — the token carries the user's data key,
   so it never touches plain storage). The decrypted profile is held in memory
   only, never persisted to disk.
+- **Native onboarding**: 8 mobile-first steps (about, income, spending,
+  loans, risk, habits, goals, review) with chips, native date pickers, bottom
+  sheets and a celebrate screen. Option values match the web verbatim (the
+  engine keys off them); derived risk fields use the same mappings as the web.
+  Partial saves after every step so progress survives restarts.
+- **Document autofill**: on the income step, upload a bank statement
+  (PDF/CSV/XLSX) to `POST /documents/upload`; extracted figures show for
+  review and only apply on tap. The backend parser is column-aware for
+  CSV/XLSX (ignores the running balance column, strips date tokens).
 - **Biometric lock**: with a saved session, the app demands fingerprint/face
   on cold start (devices without biometrics fall through).
 - **Tabs**: three real destinations — Home, Papa (his avatar is the tab
@@ -54,10 +64,10 @@ matching the current product decision.
 
 ## Not yet ported (per roadmap)
 
-- Registration + email verification (login-only for now; register links out
-  to the web).
-- Document-first onboarding, expense tracker (SMS on-device parsing),
-  deep links to demat apps, push notifications.
+- Flagship-grade document parsers (salary slip, CIBIL report, credit card
+  statement, CAMS/KFintech CAS) — the current extractor is a keyword MVP.
+- Expense tracker (SMS on-device parsing), deep links to demat apps,
+  push notifications, goals/plan/portfolio native screens.
 
 ## Store readiness notes
 

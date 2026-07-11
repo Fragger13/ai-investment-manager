@@ -14,7 +14,12 @@ from app.schemas.document import DocumentAnalyzeRequest
 SUPPORTED_TYPES = {"pdf", "csv", "xlsx", "xls"}
 
 
+_DATE_TOKEN = re.compile(r"\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b")
+
+
 def _money_values(text: str) -> list[int]:
+    # Dates like 01/06/2026 would otherwise contribute "2026" as an amount.
+    text = _DATE_TOKEN.sub(" ", text)
     values = []
     for match in re.findall(r"(?:rs\.?|inr|₹)?\s*([0-9][0-9,]{2,}(?:\.\d+)?)", text, flags=re.IGNORECASE):
         try:
@@ -35,13 +40,69 @@ def _extract_pdf_text(path: Path) -> str:
 
 
 def _extract_csv_text(path: Path) -> str:
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        rows = list(csv.reader(handle))
+    rows = _csv_rows(path)
+    structured = _structured_statement_text(rows)
+    if structured is not None:
+        return structured
     return "\n".join(" ".join(cell for cell in row if cell) for row in rows[:2000])
 
 
+def _csv_rows(path: Path) -> list[list[str]]:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.reader(handle))[:2000]
+
+
+# Column headers that mark transaction amounts vs. the running balance.
+_AMOUNT_HEADERS = ("debit", "withdrawal", "credit", "deposit", "amount", "dr", "cr")
+_BALANCE_HEADERS = ("balance", "closing")
+
+
+def _structured_statement_text(rows: list[list[str]]) -> str | None:
+    """Bank exports carry a running-balance column that is almost always the
+    largest number on the row — naive per-line "take the biggest value"
+    extraction reads the balance instead of the transaction. When a header row
+    identifies amount columns, rebuild each row as description + amount only,
+    so downstream keyword inference sees the right figures."""
+    header_index = None
+    header: list[str] = []
+    for index, row in enumerate(rows[:10]):
+        lowered = [cell.strip().lower() for cell in row]
+        if any(any(h == cell or h in cell for h in _AMOUNT_HEADERS) for cell in lowered):
+            header_index = index
+            header = lowered
+            break
+    if header_index is None:
+        return None
+    amount_columns = [
+        i for i, cell in enumerate(header)
+        if any(h == cell or h in cell for h in _AMOUNT_HEADERS) and not any(b in cell for b in _BALANCE_HEADERS)
+    ]
+    balance_columns = {i for i, cell in enumerate(header) if any(b in cell for b in _BALANCE_HEADERS)}
+    if not amount_columns:
+        return None
+    lines: list[str] = []
+    for row in rows[header_index + 1 :]:
+        if not any(cell.strip() for cell in row):
+            continue
+        description = " ".join(
+            cell for i, cell in enumerate(row) if i not in amount_columns and i not in balance_columns and cell.strip()
+        )
+        amounts = [row[i].strip() for i in amount_columns if i < len(row) and row[i].strip()]
+        if amounts:
+            lines.append(f"{description} {' '.join(amounts)}")
+    return "\n".join(lines) if lines else None
+
+
 def _extract_xlsx_text(path: Path) -> str:
-    values: list[str] = []
+    rows = _xlsx_rows(path)
+    structured = _structured_statement_text(rows)
+    if structured is not None:
+        return structured
+    return "\n".join(" ".join(cell for cell in row if cell) for row in rows)
+
+
+def _xlsx_rows(path: Path) -> list[list[str]]:
+    rows: list[list[str]] = []
     with zipfile.ZipFile(path) as workbook:
         shared_strings: list[str] = []
         if "xl/sharedStrings.xml" in workbook.namelist():
@@ -53,19 +114,26 @@ def _extract_xlsx_text(path: Path) -> str:
             if not name.startswith("xl/worksheets/sheet") or not name.endswith(".xml"):
                 continue
             root = ElementTree.fromstring(workbook.read(name))
-            for cell in root.iter():
-                if not cell.tag.endswith("}c"):
+            for row_node in root.iter():
+                if not row_node.tag.endswith("}row"):
                     continue
-                cell_type = cell.attrib.get("t")
-                value_node = next((child for child in cell if child.tag.endswith("}v")), None)
-                if value_node is None or value_node.text is None:
-                    continue
-                if cell_type == "s":
-                    index = int(value_node.text)
-                    values.append(shared_strings[index] if index < len(shared_strings) else "")
-                else:
-                    values.append(value_node.text)
-    return "\n".join(values)
+                row: list[str] = []
+                for cell in row_node:
+                    if not cell.tag.endswith("}c"):
+                        continue
+                    cell_type = cell.attrib.get("t")
+                    value_node = next((child for child in cell if child.tag.endswith("}v")), None)
+                    if value_node is None or value_node.text is None:
+                        row.append("")
+                        continue
+                    if cell_type == "s":
+                        index = int(value_node.text)
+                        row.append(shared_strings[index] if index < len(shared_strings) else "")
+                    else:
+                        row.append(value_node.text)
+                if row:
+                    rows.append(row)
+    return rows[:2000]
 
 
 def extract_text(path: Path, file_type: str) -> str:
