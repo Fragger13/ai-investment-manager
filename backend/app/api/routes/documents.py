@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -33,6 +33,10 @@ def analyze(payload: DocumentAnalyzeRequest) -> dict:
 @router.post("/upload", response_model=DocumentAnalysisResponse)
 async def upload_document(
     file: UploadFile = File(...),
+    # Which document the user says this is (salary_slip, bank_statement,
+    # credit_card, loan_statement, portfolio). Restricts which profile fields
+    # the extraction may fill, so a salary slip can't overwrite expenses.
+    doc_type: str | None = Form(default=None),
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -67,7 +71,7 @@ async def upload_document(
     db.refresh(record)
 
     try:
-        analysis = analyze_saved_file(path, file.filename or safe_name, inferred_type, record.id)
+        analysis = analyze_saved_file(path, file.filename or safe_name, inferred_type, record.id, doc_type=doc_type)
         record.extraction_status = analysis["status"]
         record.parsed_data = dumps(analysis)
         db.commit()

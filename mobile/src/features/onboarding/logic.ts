@@ -68,6 +68,9 @@ export type OnboardingDraft = {
   goldValue: number;
   cashBalance: number;
   subscriptions: number;
+  // Detected EMI figure from uploaded documents. Not sent to the backend —
+  // loans need real names and dates, so this only nudges the loans step.
+  emiHint: number;
 };
 
 export function blankDraft(): OnboardingDraft {
@@ -100,6 +103,7 @@ export function blankDraft(): OnboardingDraft {
     goldValue: 0,
     cashBalance: 0,
     subscriptions: 0,
+    emiHint: 0,
   };
 }
 
@@ -305,12 +309,14 @@ export function parseINRInput(text: string): number {
 
 // ------------------------------------------------------------ validation
 
-export type StepId = "about" | "income" | "spending" | "loans" | "risk" | "habits" | "goals" | "review";
+export type StepId = "documents" | "about" | "income" | "spending" | "loans" | "risk" | "habits" | "goals" | "review";
 
-export const STEP_ORDER: StepId[] = ["about", "income", "spending", "loans", "risk", "habits", "goals", "review"];
+export const STEP_ORDER: StepId[] = ["documents", "about", "income", "spending", "loans", "risk", "habits", "goals", "review"];
 
 export function validateStep(step: StepId, draft: OnboardingDraft): string | null {
   switch (step) {
+    case "documents":
+      return null; // fully optional — typing everything by hand is fine
     case "about": {
       if (!draft.name.trim()) return "Tell Papa your name.";
       if (!draft.dateOfBirth) return "Pick your date of birth.";

@@ -29,12 +29,18 @@ import {
   type StepId,
 } from "@/features/onboarding/logic";
 import { AboutStep, IncomeStep, SpendingStep } from "@/features/onboarding/step-basics";
+import { DocumentsStep } from "@/features/onboarding/step-docs";
 import { LoansStep } from "@/features/onboarding/step-loans";
 import { HabitsStep, RiskStep } from "@/features/onboarding/step-mind";
 import { GoalsStep } from "@/features/onboarding/step-goals";
 import { ReviewStep } from "@/features/onboarding/step-review";
 
 const STEP_META: Record<StepId, { title: string; sub?: string; papa: string }> = {
+  documents: {
+    title: "Skip the typing",
+    sub: "Upload what you have, one by one. Papa fills the form and you just check it.",
+    papa: "Hand me the paperwork, beta. I read fast and I never gossip.",
+  },
   about: {
     title: "About you",
     sub: "Whatever you share here shapes everything Papa suggests.",
@@ -211,6 +217,7 @@ export default function OnboardingScreen() {
         </Animated.View>
 
         <Animated.View key={`body-${step}`} entering={FadeInDown.duration(300)}>
+          {step === "documents" ? <DocumentsStep draft={draft} update={update} /> : null}
           {step === "about" ? <AboutStep draft={draft} update={update} /> : null}
           {step === "income" ? <IncomeStep draft={draft} update={update} /> : null}
           {step === "spending" ? <SpendingStep draft={draft} update={update} /> : null}

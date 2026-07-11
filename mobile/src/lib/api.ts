@@ -1,3 +1,4 @@
+import * as FileSystem from "expo-file-system/legacy";
 import type {
   AuthResponse,
   ChatResponse,
@@ -109,30 +110,37 @@ export const api = {
       body: JSON.stringify(profile),
     });
   },
-  // Multipart upload: statement/portfolio files go up as-is; the backend
-  // parses them, returns extracted fields, and keeps only ciphertext on disk.
-  async uploadDocument(file: { uri: string; name: string; mimeType: string }): Promise<DocumentAnalysis> {
-    const form = new FormData();
-    // React Native's fetch understands {uri, name, type} file descriptors.
-    form.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
-    const auth: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-    let response: Response;
+  // Multipart upload via the native uploader (RN fetch + FormData file parts
+  // is unreliable on Android and surfaces as "network request failed").
+  // doc_type tells the backend which profile fields this document may fill.
+  async uploadDocument(
+    file: { uri: string; name: string; mimeType: string },
+    docType?: string
+  ): Promise<DocumentAnalysis> {
+    const headers: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    let result: FileSystem.FileSystemUploadResult;
     try {
-      response = await fetch(`${API_BASE}/documents/upload`, { method: "POST", headers: auth, body: form });
+      result = await FileSystem.uploadAsync(`${API_BASE}/documents/upload`, file.uri, {
+        httpMethod: "POST",
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: "file",
+        mimeType: file.mimeType,
+        parameters: docType ? { doc_type: docType } : {},
+        headers,
+      });
     } catch {
       throw new ApiError(0, "Papa could not reach the server. Check your internet connection.");
     }
-    if (!response.ok) {
-      const text = await response.text();
-      let detail = text || `Upload failed: ${response.status}`;
-      try {
-        detail = JSON.parse(text).detail || detail;
-      } catch {
-        // keep raw text
-      }
-      throw new ApiError(response.status, detail);
+    let body: Record<string, unknown> = {};
+    try {
+      body = JSON.parse(result.body);
+    } catch {
+      // non-JSON error body; fall through to status check
     }
-    return response.json() as Promise<DocumentAnalysis>;
+    if (result.status < 200 || result.status >= 300) {
+      throw new ApiError(result.status, String(body.detail || `Upload failed: ${result.status}`));
+    }
+    return body as unknown as DocumentAnalysis;
   },
   async dashboard(profile: OnboardingProfile): Promise<DashboardData> {
     return request<DashboardData>("/intelligence/dashboard", {

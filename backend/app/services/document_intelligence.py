@@ -153,6 +153,7 @@ def infer_financials(text: str) -> dict:
     categories: dict[str, int] = defaultdict(int)
     profile_patch: dict[str, int] = {}
     salary_values: list[int] = []
+    net_salary_values: list[int] = []
     expense_values: list[int] = []
     investment_values: list[int] = []
     emi_values: list[int] = []
@@ -164,8 +165,12 @@ def infer_financials(text: str) -> dict:
         if not line_values:
             continue
         amount = max(line_values)
-        if any(token in line_lower for token in ["salary", "payroll", "wages", "income", "credit salary"]):
+        if any(token in line_lower for token in ["salary", "payroll", "wages", "income", "credit salary", "net pay", "take home", "in hand"]):
             salary_values.append(amount)
+            # Salary slips list basic/HRA/gross AND the take-home figure; the
+            # take-home line is the one that means "monthly salary" here.
+            if any(token in line_lower for token in ["net pay", "net salary", "take home", "in hand"]):
+                net_salary_values.append(amount)
             categories["Salary credits"] += amount
         elif any(token in line_lower for token in ["sip", "mutual", "nse", "bse", "broker", "zerodha", "groww", "investment"]):
             investment_values.append(amount)
@@ -180,7 +185,9 @@ def infer_financials(text: str) -> dict:
             expense_values.append(amount)
             categories["Expenses"] += amount
 
-    if salary_values:
+    if net_salary_values:
+        profile_patch["monthlySalary"] = round(sum(net_salary_values[-3:]) / min(len(net_salary_values), 3))
+    elif salary_values:
         profile_patch["monthlySalary"] = round(sum(salary_values[-3:]) / min(len(salary_values), 3))
     elif values:
         profile_patch["monthlySalary"] = max(values) if max(values) < 1000000 else 0
@@ -218,6 +225,25 @@ def _field(label: str, field: str, value: int | str, confidence: int, explanatio
         "status": "Ready to use" if confidence >= 75 else "Needs your review",
         "explanation": explanation,
     }
+
+
+# Fields each named document is allowed to fill. None means no restriction
+# (backward compatible with callers that send no doc_type).
+DOC_TYPE_FIELDS: dict[str, set[str]] = {
+    "salary_slip": {"monthlySalary", "monthlyCashInflow"},
+    "credit_card": {"monthlyExpenses", "subscriptions", "emi"},
+    "loan_statement": {"emi"},
+    "portfolio": {"mutualFundsValue"},
+}
+
+
+def _restrict_to_doc_type(analysis: dict, doc_type: str | None) -> dict:
+    allowed = DOC_TYPE_FIELDS.get(doc_type or "")
+    if allowed is None:
+        return analysis
+    analysis["profilePatch"] = {key: value for key, value in analysis["profilePatch"].items() if key in allowed}
+    analysis["extractedFields"] = [field for field in analysis["extractedFields"] if field["field"] in allowed]
+    return analysis
 
 
 def response_from_text(file_name: str, file_type: str, text: str, document_id: int | None = None) -> dict:
@@ -280,9 +306,9 @@ def analyze_document(payload: DocumentAnalyzeRequest) -> dict:
     return response_from_text(payload.file_name, payload.file_type, "")
 
 
-def analyze_saved_file(path: Path, file_name: str, file_type: str, document_id: int | None = None) -> dict:
+def analyze_saved_file(path: Path, file_name: str, file_type: str, document_id: int | None = None, doc_type: str | None = None) -> dict:
     text = extract_text(path, file_type)
-    return response_from_text(file_name, file_type, text, document_id)
+    return _restrict_to_doc_type(response_from_text(file_name, file_type, text, document_id), doc_type)
 
 
 def dumps(data: dict) -> str:
