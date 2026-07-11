@@ -2,10 +2,10 @@ import { useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
-import { Check, FileUp, ShieldCheck } from "lucide-react-native";
+import { Check, ChevronDown, ChevronUp, FileUp, ShieldCheck } from "lucide-react-native";
 import { Body, PressableScale } from "@/components/ui";
 import { cardShadow, colors, radius, spacing } from "@/constants/theme";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type DocumentAnalysis } from "@/lib/api";
 import { formatINR } from "@/lib/format";
 import type { OnboardingDraft } from "./logic";
 
@@ -24,10 +24,17 @@ const DOCUMENTS: { key: DocKey; emoji: string; title: string; fills: string }[] 
   { key: "portfolio", emoji: "📈", title: "Portfolio or CAS statement", fills: "Mutual funds and investments" },
 ];
 
+type DocDetails = {
+  periodLabel?: string;
+  totalMonthlySpend?: number;
+  emis?: { name: string; amount: number }[];
+  fieldNotes: { label: string; value: number; note: string }[];
+};
+
 type DocState =
   | { phase: "idle" }
   | { phase: "uploading" }
-  | { phase: "done"; summary: string }
+  | { phase: "done"; summary: string; details: DocDetails }
   | { phase: "empty" }
   | { phase: "error"; message: string };
 
@@ -44,6 +51,7 @@ export function DocumentsStep({ draft, update }: StepProps) {
     loan_statement: { phase: "idle" },
     portfolio: { phase: "idle" },
   });
+  const [expandedDoc, setExpandedDoc] = useState<DocKey | null>(null);
 
   const setState = (key: DocKey, state: DocState) => setStates((prev) => ({ ...prev, [key]: state }));
 
@@ -66,9 +74,18 @@ export function DocumentsStep({ draft, update }: StepProps) {
         { uri: asset.uri, name: asset.name || "document.pdf", mimeType: asset.mimeType || "application/pdf" },
         key
       );
-      const summary = applyPatch(key, analysis.profilePatch || {});
+      const summary = applyPatch(key, analysis.profilePatch || {}, analysis);
       if (summary) {
-        setState(key, { phase: "done", summary });
+        const statement = analysis.statement;
+        const details: DocDetails = {
+          periodLabel: statement?.periodLabel || undefined,
+          totalMonthlySpend: statement?.totalMonthlySpend || undefined,
+          emis: statement?.emiBreakdown?.map((item) => ({ name: item.name, amount: item.amount })),
+          fieldNotes: (analysis.extractedFields || [])
+            .filter((f) => Number(f.value) > 0)
+            .map((f) => ({ label: f.label, value: Number(f.value), note: f.explanation })),
+        };
+        setState(key, { phase: "done", summary, details });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         setState(key, { phase: "empty" });
@@ -81,10 +98,12 @@ export function DocumentsStep({ draft, update }: StepProps) {
   }
 
   /** Apply extracted values into the draft; returns a human summary of what got filled. */
-  function applyPatch(key: DocKey, patch: Record<string, number>): string | null {
+  function applyPatch(key: DocKey, patch: Record<string, number>, analysis?: DocumentAnalysis): string | null {
     const filled: string[] = [];
     const next: Partial<OnboardingDraft> = {};
 
+    // Salary priority: the salary slip is authoritative. A statement's salary
+    // guess only lands when no slip has filled the field.
     if (patch.monthlySalary && (key === "salary_slip" || !draft.monthlySalary)) {
       next.monthlySalary = patch.monthlySalary;
       filled.push(`salary ${formatINR(patch.monthlySalary)}`);
@@ -107,7 +126,11 @@ export function DocumentsStep({ draft, update }: StepProps) {
     }
     if (patch.emi) {
       next.emiHint = Math.max(patch.emi, draft.emiHint);
-      filled.push(`EMI spotted ${formatINR(patch.emi)}`);
+      filled.push(`EMIs ${formatINR(patch.emi)}/mo`);
+    }
+    const breakdown = analysis?.statement?.emiBreakdown;
+    if (breakdown?.length) {
+      next.emiBreakdown = breakdown.map((item) => ({ name: item.name, amount: item.amount }));
     }
 
     if (filled.length === 0) return null;
@@ -120,37 +143,54 @@ export function DocumentsStep({ draft, update }: StepProps) {
       {DOCUMENTS.map((doc) => {
         const state = states[doc.key];
         const done = state.phase === "done";
+        const expanded = expandedDoc === doc.key && done;
         return (
-          <PressableScale
-            key={doc.key}
-            onPress={() => (state.phase === "uploading" ? undefined : pickAndUpload(doc.key))}
-            style={[styles.card, done && styles.cardDone]}
-          >
-            <Text style={{ fontSize: 26 }}>{doc.emoji}</Text>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.title}>{doc.title}</Text>
-              {state.phase === "done" ? (
-                <Text style={styles.doneText}>{state.summary}</Text>
-              ) : state.phase === "empty" ? (
-                <Text style={styles.emptyText}>Papa could not read numbers from that file. Try another, or type it later.</Text>
-              ) : state.phase === "error" ? (
-                <Text style={styles.errorText}>{state.message}</Text>
+          <View key={doc.key}>
+            <PressableScale
+              onPress={() => (state.phase === "uploading" ? undefined : pickAndUpload(doc.key))}
+              style={[styles.card, done && styles.cardDone, done && styles.cardExpanded]}
+            >
+              <Text style={{ fontSize: 26 }}>{doc.emoji}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.title}>{doc.title}</Text>
+                {state.phase === "done" ? (
+                  <Text style={styles.doneText}>{state.summary}</Text>
+                ) : state.phase === "empty" ? (
+                  <Text style={styles.emptyText}>Papa could not read numbers from that file. Try another, or type it later.</Text>
+                ) : state.phase === "error" ? (
+                  <Text style={styles.errorText}>{state.message}</Text>
+                ) : (
+                  <Text style={styles.fills}>{doc.fills}</Text>
+                )}
+              </View>
+              {state.phase === "uploading" ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : done ? (
+                <View style={styles.doneBadge}>
+                  <Check color={colors.primaryForeground} size={14} strokeWidth={3} />
+                </View>
               ) : (
-                <Text style={styles.fills}>{doc.fills}</Text>
+                <View style={styles.uploadBadge}>
+                  <FileUp color={colors.primary} size={16} />
+                </View>
               )}
-            </View>
-            {state.phase === "uploading" ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : done ? (
-              <View style={styles.doneBadge}>
-                <Check color={colors.primaryForeground} size={14} strokeWidth={3} />
-              </View>
-            ) : (
-              <View style={styles.uploadBadge}>
-                <FileUp color={colors.primary} size={16} />
-              </View>
-            )}
-          </PressableScale>
+            </PressableScale>
+            {done ? (
+              <PressableScale
+                haptic={false}
+                onPress={() => setExpandedDoc(expanded ? null : doc.key)}
+                style={styles.detailToggle}
+              >
+                <Text style={styles.detailToggleText}>{expanded ? "Hide what Papa read" : "See what Papa read"}</Text>
+                {expanded ? (
+                  <ChevronUp color={colors.accentForeground} size={14} />
+                ) : (
+                  <ChevronDown color={colors.accentForeground} size={14} />
+                )}
+              </PressableScale>
+            ) : null}
+            {expanded && state.phase === "done" ? <DocDetailPanel details={state.details} /> : null}
+          </View>
         );
       })}
 
@@ -163,6 +203,45 @@ export function DocumentsStep({ draft, update }: StepProps) {
       <Body muted size={12.5}>
         No documents handy? Just continue and type things in. Every field stays editable either way.
       </Body>
+    </View>
+  );
+}
+
+function DocDetailPanel({ details }: { details: DocDetails }) {
+  return (
+    <View style={styles.detailPanel}>
+      {details.periodLabel ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Statement covers</Text>
+          <Text style={styles.detailValue}>{details.periodLabel}</Text>
+        </View>
+      ) : null}
+      {details.totalMonthlySpend ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Average monthly spend (everything)</Text>
+          <Text style={styles.detailValue}>{formatINR(details.totalMonthlySpend)}</Text>
+        </View>
+      ) : null}
+      {details.emis?.length ? (
+        <View style={{ gap: 4 }}>
+          <Text style={styles.detailLabel}>EMIs, once per month each</Text>
+          {details.emis.map((emi, i) => (
+            <View key={i} style={styles.detailRow}>
+              <Text style={styles.detailEmiName}>{emi.name}</Text>
+              <Text style={styles.detailValue}>{formatINR(emi.amount)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {details.fieldNotes.map((note, i) => (
+        <View key={i} style={{ gap: 1 }}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>{note.label}</Text>
+            <Text style={styles.detailValue}>{formatINR(note.value)}</Text>
+          </View>
+          <Text style={styles.detailNote}>{note.note}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -183,6 +262,61 @@ const styles = StyleSheet.create({
   cardDone: {
     backgroundColor: colors.accent,
     borderColor: colors.primary,
+  },
+  cardExpanded: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  detailToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 8,
+    backgroundColor: colors.accent,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    marginTop: -2,
+  },
+  detailToggleText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.accentForeground,
+  },
+  detailPanel: {
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.sm,
+    ...cardShadow,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  detailLabel: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  detailEmiName: {
+    fontSize: 13,
+    color: colors.foreground,
+    flexShrink: 1,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.foreground,
+  },
+  detailNote: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.mutedForeground,
   },
   title: {
     fontSize: 15,

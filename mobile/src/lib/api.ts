@@ -65,12 +65,24 @@ function authHeaders(token?: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export type EmiBreakdownItem = { name: string; amount: number; occurrences: number };
+
+export type StatementInsights = {
+  periodStart: string;
+  periodEnd: string;
+  periodDays: number;
+  periodLabel: string;
+  totalMonthlySpend: number;
+  emiBreakdown: EmiBreakdownItem[];
+};
+
 export type DocumentAnalysis = {
   status: string;
   summary: { extractionStatus: string; confidence: number; detectedIncome: number };
   extractedFields: { field: string; label: string; value: number | string; confidence: number; status: string; explanation: string }[];
   profilePatch: Record<string, number>;
   aiFindings: string[];
+  statement?: StatementInsights | null;
 };
 
 export const api = {

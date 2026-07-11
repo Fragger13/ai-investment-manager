@@ -25,6 +25,24 @@ export function LoansStep({ draft, update }: StepProps) {
     setEditIndex(null);
     setSheetOpen(true);
   };
+  // One tap turns a detected EMI into a real loan entry: name and monthly
+  // amount arrive prefilled, the user only adds the dates.
+  const openFromDetected = (name: string, amount: number) => {
+    const lower = name.toLowerCase();
+    const productType = /housing|home|lic|hdfc ltd/.test(lower)
+      ? "Home"
+      : /auto|vehicle|car|bike|two wheeler/.test(lower)
+        ? "Vehicle"
+        : /card/.test(lower)
+          ? "Credit Card EMI"
+          : "Other";
+    setLoanDraft({ ...emptyLoan(), name, productType, monthlyEmiAmount: amount });
+    setEditIndex(null);
+    setSheetOpen(true);
+  };
+  const detectedUnadded = draft.emiBreakdown.filter(
+    (item) => !loans.some((loan) => loan.monthlyEmiAmount === item.amount || loan.name.toLowerCase() === item.name.toLowerCase())
+  );
   const openEdit = (index: number) => {
     setLoanDraft({ ...emptyLoan(), ...loans[index] });
     setEditIndex(index);
@@ -45,12 +63,30 @@ export function LoansStep({ draft, update }: StepProps) {
 
   return (
     <View style={{ gap: spacing.md }}>
-      {draft.emiHint > 0 && loans.length === 0 ? (
+      {detectedUnadded.length > 0 ? (
         <View style={styles.hintBanner}>
-          <Text style={{ fontSize: 16 }}>👀</Text>
-          <Text style={styles.hintText}>
-            Papa spotted an EMI of about {formatINR(draft.emiHint)} in your documents. Add it below so the math stays honest.
-          </Text>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Text style={{ fontSize: 16 }}>👀</Text>
+            <Text style={styles.hintText}>
+              Papa spotted {detectedUnadded.length === 1 ? "this EMI" : "these EMIs"} in your documents. Tap one to add it, then just fill the dates.
+            </Text>
+          </View>
+          {detectedUnadded.map((item, i) => (
+            <PressableScale key={i} onPress={() => openFromDetected(item.name, item.amount)} style={styles.detectedRow}>
+              <Text style={styles.detectedName}>{item.name}</Text>
+              <Text style={styles.detectedAmount}>{formatINR(item.amount)}/mo</Text>
+              <Plus color={colors.primary} size={15} />
+            </PressableScale>
+          ))}
+        </View>
+      ) : draft.emiHint > 0 && loans.length === 0 ? (
+        <View style={styles.hintBanner}>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Text style={{ fontSize: 16 }}>👀</Text>
+            <Text style={styles.hintText}>
+              Papa spotted an EMI of about {formatINR(draft.emiHint)} in your documents. Add it below so the math stays honest.
+            </Text>
+          </View>
         </View>
       ) : null}
       <PressableScale onPress={openAdd} style={[styles.bigChoice, draft.hasEmiLoans === true && styles.bigChoiceActive]}>
@@ -160,12 +196,30 @@ export function LoansStep({ draft, update }: StepProps) {
 
 const styles = StyleSheet.create({
   hintBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     gap: spacing.sm,
     backgroundColor: colors.warningSoft,
     borderRadius: radius.lg,
     padding: spacing.md,
+  },
+  detectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  detectedName: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: colors.foreground,
+  },
+  detectedAmount: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.primary,
   },
   hintText: {
     flex: 1,
