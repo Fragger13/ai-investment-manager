@@ -28,6 +28,14 @@ def generate_chat_answer(message: str, context: dict[str, Any], fallback_answer:
     return _complete_text("chat", prompt, fallback_answer)
 
 
+def extract_document_fields(prompt: str) -> dict[str, Any] | None:
+    """Structured extraction from an uploaded financial document. Returns the
+    parsed JSON object, or None when the model is unavailable/unparseable —
+    callers always have a deterministic extraction to fall back on."""
+    result = _complete_json("document_extraction", prompt, None)
+    return result if isinstance(result, dict) else None
+
+
 def refine_goal_estimate(
     goal_type: str,
     answers: dict[str, Any],
@@ -332,6 +340,10 @@ def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
 def _timeout_for_task(task: LLMTask) -> int:
     if task == "chat":
         return min(30, max(5, int(settings.llm_timeout_chat_seconds or 25)))
+    if task == "document_extraction":
+        # In the upload request path behind a spinner; long documents need a
+        # little more room than chat, but never hang the upload.
+        return min(25, max(5, int(settings.llm_timeout_chat_seconds or 20)))
     if task in {"goal_estimate", "goal_clarify"}:
         # In the onboarding request path — keep it snappy and fall back fast.
         return min(15, max(5, int(settings.llm_timeout_chat_seconds or 12)))

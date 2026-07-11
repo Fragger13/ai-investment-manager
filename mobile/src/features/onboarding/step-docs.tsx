@@ -89,6 +89,10 @@ export function DocumentsStep({ draft, update }: StepProps) {
       next.monthlySalary = patch.monthlySalary;
       filled.push(`salary ${formatINR(patch.monthlySalary)}`);
     }
+    if (patch.rent && !draft.rent) {
+      next.rent = patch.rent;
+      filled.push(`rent ${formatINR(patch.rent)}`);
+    }
     if (patch.monthlyExpenses && !draft.monthlyExpenses) {
       next.monthlyExpenses = patch.monthlyExpenses;
       filled.push(`spends ${formatINR(patch.monthlyExpenses)}`);
