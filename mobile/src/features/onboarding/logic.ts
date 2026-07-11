@@ -71,6 +71,9 @@ export type OnboardingDraft = {
   // Detected EMI figure from uploaded documents. Not sent to the backend —
   // loans need real names and dates, so this only nudges the loans step.
   emiHint: number;
+  // Named EMI split from statement analysis; loans step offers these as
+  // one-tap prefills for real loan entries.
+  emiBreakdown: { name: string; amount: number }[];
 };
 
 export function blankDraft(): OnboardingDraft {
@@ -104,6 +107,7 @@ export function blankDraft(): OnboardingDraft {
     cashBalance: 0,
     subscriptions: 0,
     emiHint: 0,
+    emiBreakdown: [],
   };
 }
 

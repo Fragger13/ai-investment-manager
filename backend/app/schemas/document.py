@@ -37,6 +37,21 @@ class ExtractedCategory(BaseModel):
     value: int
 
 
+class EmiBreakdownItem(BaseModel):
+    name: str
+    amount: int
+    occurrences: int = 1
+
+
+class StatementInsights(BaseModel):
+    periodStart: str = ""
+    periodEnd: str = ""
+    periodDays: int = 0
+    periodLabel: str = ""  # "12 days" | "about 3 months"
+    totalMonthlySpend: int = 0  # all debits, normalised to one month
+    emiBreakdown: list[EmiBreakdownItem] = []
+
+
 class DocumentAnalysisResponse(BaseModel):
     id: int | None = None
     fileName: str = ""
@@ -48,3 +63,4 @@ class DocumentAnalysisResponse(BaseModel):
     extractedFields: list[ExtractedField] = []
     profilePatch: dict[str, Any] = {}
     aiFindings: list[str]
+    statement: StatementInsights | None = None

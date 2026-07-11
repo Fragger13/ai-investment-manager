@@ -126,11 +126,11 @@ _BALANCE_HEADERS = ("balance", "closing")
 _DATE_FORMATS = ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%d-%m-%Y", "%d-%b-%Y", "%d %b %Y", "%d-%b-%y")
 
 
-def _parse_month(cell: str) -> str:
+def _parse_date(cell: str) -> str:
     token = (cell or "").strip()[:12]
     for fmt in _DATE_FORMATS:
         try:
-            return datetime.strptime(token, fmt).strftime("%Y-%m")
+            return datetime.strptime(token, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
     return ""
@@ -148,8 +148,10 @@ def _parse_amount_cell(cell: str) -> int:
 
 
 def _parse_transactions(rows: list[list[str]]) -> list[dict] | None:
-    """Bank exports with explicit debit/credit columns become real transaction
-    records; the running balance column is dropped entirely."""
+    """Bank exports become real transaction records; the running balance
+    column is dropped entirely. Handles both layouts: separate
+    debit/withdrawal + credit/deposit columns, and a single amount column
+    with a Dr/Cr type column (Kotak-style)."""
     header_index = None
     header: list[str] = []
     for index, row in enumerate(rows[:10]):
@@ -160,36 +162,56 @@ def _parse_transactions(rows: list[list[str]]) -> list[dict] | None:
             break
     if header_index is None:
         return None
-    debit_cols = [i for i, c in enumerate(header) if ("debit" in c or "withdrawal" in c or c == "dr") and not any(b in c for b in _BALANCE_HEADERS)]
-    credit_cols = [i for i, c in enumerate(header) if ("credit" in c or "deposit" in c or c == "cr") and not any(b in c for b in _BALANCE_HEADERS)]
+    debit_cols = [i for i, c in enumerate(header) if ("debit" in c or "withdrawal" in c or c == "dr") and "amount" not in c and not any(b in c for b in _BALANCE_HEADERS)]
+    credit_cols = [i for i, c in enumerate(header) if ("credit" in c or "deposit" in c or c == "cr") and "amount" not in c and not any(b in c for b in _BALANCE_HEADERS)]
+    amount_only_cols = [i for i, c in enumerate(header) if "amount" in c and not any(b in c for b in _BALANCE_HEADERS)]
+    # "Debit Amount"/"Credit Amount" style headers land in amount_only unless reclaimed:
+    for i in list(amount_only_cols):
+        if "debit" in header[i] or "withdrawal" in header[i]:
+            debit_cols.append(i)
+            amount_only_cols.remove(i)
+        elif "credit" in header[i] or "deposit" in header[i]:
+            credit_cols.append(i)
+            amount_only_cols.remove(i)
+    type_cols = [i for i, c in enumerate(header) if c in {"dr/cr", "dr / cr", "type", "cr/dr", "transaction type", "txn type"}]
     balance_cols = {i for i, c in enumerate(header) if any(b in c for b in _BALANCE_HEADERS)}
     date_cols = [i for i, c in enumerate(header) if "date" in c]
-    if not debit_cols or not credit_cols:
+
+    two_column = bool(debit_cols and credit_cols)
+    amount_typed = bool(amount_only_cols and type_cols)
+    if not two_column and not amount_typed:
         return None
-    amount_cols = set(debit_cols) | set(credit_cols)
+    amount_cols = set(debit_cols) | set(credit_cols) | set(amount_only_cols)
+
     txns: list[dict] = []
     for row in rows[header_index + 1 :]:
         if not any(cell.strip() for cell in row):
             continue
-        debit = max((_parse_amount_cell(row[i]) for i in debit_cols if i < len(row)), default=0)
-        credit = max((_parse_amount_cell(row[i]) for i in credit_cols if i < len(row)), default=0)
+        if two_column:
+            debit = max((_parse_amount_cell(row[i]) for i in debit_cols if i < len(row)), default=0)
+            credit = max((_parse_amount_cell(row[i]) for i in credit_cols if i < len(row)), default=0)
+        else:
+            amount = max((_parse_amount_cell(row[i]) for i in amount_only_cols if i < len(row)), default=0)
+            marker = " ".join(row[i].strip().lower() for i in type_cols if i < len(row))
+            is_credit = "cr" in marker and "dr" not in marker.replace("cr", "")
+            debit, credit = (0, amount) if is_credit else (amount, 0)
         if debit == 0 and credit == 0:
             continue
-        month = ""
+        date = ""
         for i in date_cols:
             if i < len(row):
-                month = _parse_month(row[i])
-                if month:
+                date = _parse_date(row[i])
+                if date:
                     break
-        if not month:
+        if not date:
             for cell in row:
-                month = _parse_month(cell)
-                if month:
+                date = _parse_date(cell)
+                if date:
                     break
         description = " ".join(
-            cell.strip() for i, cell in enumerate(row) if i not in amount_cols and i not in balance_cols and cell.strip()
+            cell.strip() for i, cell in enumerate(row) if i not in amount_cols and i not in balance_cols and i not in set(type_cols) and cell.strip()
         )
-        txns.append({"raw": description, "desc": description.lower(), "debit": debit, "credit": credit, "month": month})
+        txns.append({"raw": description, "desc": description.lower(), "debit": debit, "credit": credit, "date": date, "month": date[:7] if date else ""})
     return txns if len(txns) >= 3 else None
 
 
@@ -243,30 +265,58 @@ def _field(value: int, confidence: int, explanation: str) -> dict:
     return {"value": int(value), "confidence": confidence, "explanation": explanation}
 
 
-def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]]:
+def _statement_period(txns: list[dict]) -> tuple[str, str, int, float, str]:
+    """(start, end, days, month_factor, label). month_factor normalises totals
+    to a single month: a 12 day statement has factor ~0.4, a quarter ~3."""
+    dates = sorted(t["date"] for t in txns if t.get("date"))
+    if not dates:
+        return "", "", 0, 1.0, "unknown period"
+    start, end = dates[0], dates[-1]
+    days = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days + 1
+    factor = max(days / 30.44, 0.25)
+    if days < 25:
+        label = f"{days} days"
+    else:
+        approx_months = max(1, round(days / 30.44))
+        label = f"about {approx_months} month{'s' if approx_months > 1 else ''}"
+    return start, end, days, factor, label
+
+
+def _emi_display_name(raw: str) -> str:
+    """'ACH D- BAJAJFIN LTD 40912' → 'Bajajfin Ltd'."""
+    cleaned = re.sub(r"(?i)\b(ach|nach|ecs|adhoc|d|dr|debit|emi|mandate|si|tp)\b", " ", raw)
+    cleaned = re.sub(r"[^A-Za-z ]", " ", cleaned)
+    words = [w for w in cleaned.split() if len(w) > 1]
+    return " ".join(w.capitalize() for w in words[:4]) or "EMI"
+
+
+def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict], dict]:
     fields: dict[str, dict] = {}
     categories: dict[str, int] = defaultdict(int)
 
-    months = len({t["month"] for t in txns if t["month"]}) or 1
+    start, end, days, month_factor, period_label = _statement_period(txns)
+    # Recurrence needs at least ~6 weeks of data to mean anything.
+    recurrence_possible = days >= 45
 
     # Salary: prefer recurring credits that say so; then any recurring monthly
-    # credit; a lone NEFT/IMPS credit is only a weak hint.
+    # credit; a lone NEFT/IMPS credit is only a weak hint. The value is the
+    # MEDIAN of one group — a 3 month statement counts salary once, never 3x.
     credit_groups = _group(txns, "credit")
     salary_pick = None
     for group in credit_groups:
         if _has_kw(group, _SALARY_KW) and _is_recurring(group, min_amount=8000):
-            salary_pick = (group, 92, "Recurring monthly credit that names salary.")
+            salary_pick = (group, 92, "Recurring monthly credit that names salary, counted once.")
             break
     if not salary_pick:
         kw_singles = [g for g in credit_groups if _has_kw(g, _SALARY_KW)]
         if kw_singles:
             best = max(kw_singles, key=lambda g: statistics.median(g["amounts"]))
             salary_pick = (best, 80, "Credit line that names salary.")
-    if not salary_pick:
+    if not salary_pick and recurrence_possible:
         recurring = [g for g in credit_groups if _is_recurring(g, min_amount=10000)]
         if recurring:
             best = max(recurring, key=lambda g: statistics.median(g["amounts"]))
-            salary_pick = (best, 78, "Largest credit that repeats monthly with a similar amount, which is how salaries look.")
+            salary_pick = (best, 78, "Largest credit that repeats monthly with a similar amount, which is how salaries look. Counted once per month.")
     if not salary_pick:
         transfers = [g for g in credit_groups if _has_kw(g, _TRANSFER_KW) and statistics.median(g["amounts"]) >= 15000]
         if transfers:
@@ -278,9 +328,11 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
         fields["monthlySalary"] = _field(value, confidence, why)
         categories["Salary credits"] += sum(group["amounts"])
 
-    # Debits: classify each recurring/named group.
+    # Debits: classify each recurring/named group. Per-month figures use the
+    # group MEDIAN (one occurrence), so multi-month statements never double count.
     emi_total = 0
     emi_recurring = False
+    emi_breakdown: list[dict] = []
     subs_total = 0
     rent_value = 0
     classified_sum = 0
@@ -303,23 +355,34 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
         elif _has_kw(group, _EMI_KW):
             emi_total += median
             emi_recurring = emi_recurring or len(group["amounts"]) >= 2
+            emi_breakdown.append({"name": _emi_display_name(group["raw"]), "amount": median, "occurrences": len(group["amounts"])})
             categories["EMI / loan payments"] += total
             classified_sum += total
 
+    emi_breakdown.sort(key=lambda item: -item["amount"])
     if emi_total:
-        fields["emi"] = _field(emi_total, 88 if emi_recurring else 72, "Recurring loan or EMI debits, added up per month.")
+        plural = "instalments" if len(emi_breakdown) > 1 else "instalment"
+        fields["emi"] = _field(emi_total, 88 if emi_recurring else 72, f"{len(emi_breakdown)} monthly {plural}, each counted once: " + ", ".join(f"{i['name']} ₹{i['amount']:,}" for i in emi_breakdown[:4]))
     if subs_total:
         fields["subscriptions"] = _field(subs_total, 80, "Recurring subscription merchants.")
     if rent_value:
         fields["rent"] = _field(rent_value, 85, "Recurring debit that names rent.")
 
     total_debits = sum(t["debit"] for t in txns)
-    other_spend = max(0, round((total_debits - classified_sum) / months))
+    other_spend = max(0, round((total_debits - classified_sum) / month_factor))
     if other_spend:
-        fields["monthlyExpenses"] = _field(other_spend, 62, "Everything else that left the account, averaged per month. Excludes rent, EMIs, investments and subscriptions.")
+        fields["monthlyExpenses"] = _field(other_spend, 62, f"Everything else that left the account over {period_label}, normalised to one month. Excludes rent, EMIs, investments and subscriptions.")
         categories["Expenses"] += total_debits - classified_sum
 
-    return fields, [{"name": k, "value": v} for k, v in categories.items()]
+    statement_insights = {
+        "periodStart": start,
+        "periodEnd": end,
+        "periodDays": days,
+        "periodLabel": period_label,
+        "totalMonthlySpend": round(total_debits / month_factor),
+        "emiBreakdown": emi_breakdown,
+    }
+    return fields, [{"name": k, "value": v} for k, v in categories.items()], statement_insights
 
 
 def infer_financials(text: str) -> dict:
@@ -476,8 +539,9 @@ def response_from_text(
 
     # Deterministic layer: transaction patterns when the file has real
     # structure, keyword lines otherwise.
+    statement_insights: dict | None = None
     if transactions:
-        det_fields, categories = _analyze_transactions(transactions)
+        det_fields, categories, statement_insights = _analyze_transactions(transactions)
         llm_text = _transactions_text(transactions)
     else:
         det_fields, categories = _fields_from_text_inference(text)
@@ -547,6 +611,7 @@ def response_from_text(
             "Please review extracted values before saving them to your profile.",
             "Fields marked 'Needs your review' were inferred from weak signals or disagreeing sources.",
         ],
+        "statement": statement_insights,
     }
     return _restrict_to_doc_type(analysis, doc_type)
 
