@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
-import { Check, ChevronDown, ChevronUp, FileUp, KeyRound, ShieldCheck } from "lucide-react-native";
+import * as IntentLauncher from "expo-intent-launcher";
+import { Check, ExternalLink, FileUp, KeyRound, ShieldCheck, Smartphone } from "lucide-react-native";
 import { Body, PressableScale } from "@/components/ui";
 import { cardShadow, colors, radius, spacing } from "@/constants/theme";
 import { api, ApiError, type DocumentAnalysis } from "@/lib/api";
-import { formatINR } from "@/lib/format";
+import { Sheet } from "./fields";
 import type { OnboardingDraft } from "./logic";
 
 type StepProps = {
@@ -24,19 +25,28 @@ const DOCUMENTS: { key: DocKey; emoji: string; title: string; fills: string }[] 
   { key: "portfolio", emoji: "📈", title: "Portfolio or CAS statement", fills: "Mutual funds and investments" },
 ];
 
-type PickedFile = { uri: string; name: string; mimeType: string };
+// Launchable Android apps where statements live. Opening one is a shortcut,
+// not an integration: the user downloads the PDF there and uploads it here.
+const BANK_APPS: { name: string; pkg: string }[] = [
+  { name: "HDFC Bank", pkg: "com.snapwork.hdfc" },
+  { name: "SBI YONO", pkg: "com.sbi.lotusintouch" },
+  { name: "ICICI iMobile", pkg: "com.csam.icici.bank.imobile" },
+  { name: "Axis Mobile", pkg: "com.axis.mobile" },
+  { name: "Kotak Mobile Banking", pkg: "com.msf.kbank.mobile" },
+  { name: "IDFC FIRST Bank", pkg: "com.idfcfirstbank.optimus" },
+  { name: "PNB ONE", pkg: "com.Version1" },
+  { name: "bob World", pkg: "com.bankofbaroda.mconnect" },
+  { name: "IndusMobile", pkg: "com.fss.indus" },
+  { name: "FedMobile", pkg: "com.fedmobile" },
+];
+const CRED_APP = { name: "CRED", pkg: "com.dreamplug.androidapp" };
 
-type DocDetails = {
-  periodLabel?: string;
-  totalMonthlySpend?: number;
-  emis?: { name: string; amount: number }[];
-  fieldNotes: { label: string; value: number; note: string }[];
-};
+type PickedFile = { uri: string; name: string; mimeType: string };
 
 type DocState =
   | { phase: "idle" }
   | { phase: "uploading" }
-  | { phase: "done"; summary: string; details: DocDetails }
+  | { phase: "done" }
   | { phase: "empty" }
   | { phase: "error"; message: string }
   // The PDF is locked; keep the picked file so the retry with a password
@@ -45,8 +55,9 @@ type DocState =
 
 /**
  * Documents-first onboarding: upload whatever paperwork exists, one document
- * at a time, and the later steps arrive prefilled for review. Every value can
- * still be edited by hand — documents fill fields, they never lock them.
+ * at a time, and the later steps arrive prefilled for review. The card only
+ * confirms the read; the numbers themselves show up in their own sections,
+ * where the user can check and edit them.
  */
 export function DocumentsStep({ draft, update }: StepProps) {
   const [states, setStates] = useState<Record<DocKey, DocState>>({
@@ -54,8 +65,9 @@ export function DocumentsStep({ draft, update }: StepProps) {
     credit_card: { phase: "idle" },
     portfolio: { phase: "idle" },
   });
-  const [expandedDoc, setExpandedDoc] = useState<DocKey | null>(null);
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
+  const [bankSheetFor, setBankSheetFor] = useState<DocKey | null>(null);
+  const [openFailed, setOpenFailed] = useState<string | null>(null);
 
   const setState = (key: DocKey, state: DocState) => setStates((prev) => ({ ...prev, [key]: state }));
 
@@ -83,18 +95,8 @@ export function DocumentsStep({ draft, update }: StepProps) {
     setState(key, { phase: "uploading" });
     try {
       const analysis = await api.uploadDocument(file, key, password);
-      const summary = applyPatch(key, analysis.profilePatch || {}, analysis);
-      if (summary) {
-        const statement = analysis.statement;
-        const details: DocDetails = {
-          periodLabel: statement?.periodLabel || undefined,
-          totalMonthlySpend: statement?.totalMonthlySpend || undefined,
-          emis: statement?.emiBreakdown?.map((item) => ({ name: item.name, amount: item.amount })),
-          fieldNotes: (analysis.extractedFields || [])
-            .filter((f) => Number(f.value) > 0)
-            .map((f) => ({ label: f.label, value: Number(f.value), note: f.explanation })),
-        };
-        setState(key, { phase: "done", summary, details });
+      if (applyPatch(analysis.profilePatch || {}, analysis)) {
+        setState(key, { phase: "done" });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         setState(key, { phase: "empty" });
@@ -117,45 +119,34 @@ export function DocumentsStep({ draft, update }: StepProps) {
     }
   }
 
-  /** Apply extracted values into the draft; returns a human summary of what got filled. */
-  function applyPatch(key: DocKey, patch: Record<string, number>, analysis?: DocumentAnalysis): string | null {
-    const filled: string[] = [];
+  /** Apply extracted values into the draft; returns whether anything filled. */
+  function applyPatch(patch: Record<string, number>, analysis?: DocumentAnalysis): boolean {
     const next: Partial<OnboardingDraft> = {};
 
-    // Salary comes from the bank statement; a later upload never overwrites
-    // a value that is already filled.
-    if (patch.monthlySalary && !draft.monthlySalary) {
-      next.monthlySalary = patch.monthlySalary;
-      filled.push(`salary ${formatINR(patch.monthlySalary)}`);
-    }
-    if (patch.rent && !draft.rent) {
-      next.rent = patch.rent;
-      filled.push(`rent ${formatINR(patch.rent)}`);
-    }
-    if (patch.monthlyExpenses && !draft.monthlyExpenses) {
-      next.monthlyExpenses = patch.monthlyExpenses;
-      filled.push(`spends ${formatINR(patch.monthlyExpenses)}`);
-    }
-    if (patch.subscriptions) {
-      next.subscriptions = patch.subscriptions;
-      filled.push(`subscriptions ${formatINR(patch.subscriptions)}`);
-    }
-    if (patch.mutualFundsValue && !draft.mutualFundsValue) {
-      next.mutualFundsValue = patch.mutualFundsValue;
-      filled.push(`investments ${formatINR(patch.mutualFundsValue)}`);
-    }
-    if (patch.emi) {
-      next.emiHint = Math.max(patch.emi, draft.emiHint);
-      filled.push(`EMIs ${formatINR(patch.emi)}/mo`);
-    }
+    // A later upload never overwrites a value that is already filled.
+    if (patch.monthlySalary && !draft.monthlySalary) next.monthlySalary = patch.monthlySalary;
+    if (patch.rent && !draft.rent) next.rent = patch.rent;
+    if (patch.monthlyExpenses && !draft.monthlyExpenses) next.monthlyExpenses = patch.monthlyExpenses;
+    if (patch.subscriptions) next.subscriptions = patch.subscriptions;
+    if (patch.mutualFundsValue && !draft.mutualFundsValue) next.mutualFundsValue = patch.mutualFundsValue;
+    if (patch.emi) next.emiHint = Math.max(patch.emi, draft.emiHint);
     const breakdown = analysis?.statement?.emiBreakdown;
     if (breakdown?.length) {
       next.emiBreakdown = breakdown.map((item) => ({ name: item.name, amount: item.amount }));
     }
 
-    if (filled.length === 0) return null;
+    if (Object.keys(next).length === 0) return false;
     update(next);
-    return filled.join(" · ");
+    return true;
+  }
+
+  async function openApp(name: string, pkg: string) {
+    setOpenFailed(null);
+    try {
+      await IntentLauncher.openApplication(pkg);
+    } catch {
+      setOpenFailed(name);
+    }
   }
 
   return (
@@ -163,18 +154,21 @@ export function DocumentsStep({ draft, update }: StepProps) {
       {DOCUMENTS.map((doc) => {
         const state = states[doc.key];
         const done = state.phase === "done";
-        const expanded = expandedDoc === doc.key && done;
+        const showBankLink =
+          Platform.OS === "android" &&
+          (doc.key === "bank_statement" || doc.key === "credit_card") &&
+          state.phase === "idle";
         return (
           <View key={doc.key}>
             <PressableScale
               onPress={() => (state.phase === "uploading" ? undefined : pickAndUpload(doc.key))}
-              style={[styles.card, done && styles.cardDone, done && styles.cardExpanded]}
+              style={[styles.card, done && styles.cardDone]}
             >
               <Text style={{ fontSize: 26 }}>{doc.emoji}</Text>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.title}>{doc.title}</Text>
                 {state.phase === "done" ? (
-                  <Text style={styles.doneText}>{state.summary}</Text>
+                  <Text style={styles.doneText}>Read it. These details will arrive prefilled in the next steps.</Text>
                 ) : state.phase === "empty" ? (
                   <Text style={styles.emptyText}>Papa could not read numbers from that file. Try another, or type it later.</Text>
                 ) : state.phase === "error" ? (
@@ -197,21 +191,14 @@ export function DocumentsStep({ draft, update }: StepProps) {
                 </View>
               )}
             </PressableScale>
-            {done ? (
-              <PressableScale
-                haptic={false}
-                onPress={() => setExpandedDoc(expanded ? null : doc.key)}
-                style={styles.detailToggle}
-              >
-                <Text style={styles.detailToggleText}>{expanded ? "Hide what Papa read" : "See what Papa read"}</Text>
-                {expanded ? (
-                  <ChevronUp color={colors.accentForeground} size={14} />
-                ) : (
-                  <ChevronDown color={colors.accentForeground} size={14} />
-                )}
+            {showBankLink ? (
+              <PressableScale haptic={false} onPress={() => setBankSheetFor(doc.key)} style={styles.bankLink}>
+                <Smartphone color={colors.primary} size={14} />
+                <Text style={styles.bankLinkText}>
+                  {doc.key === "credit_card" ? "No PDF handy? Open your bank or CRED app" : "No PDF handy? Open your bank app"}
+                </Text>
               </PressableScale>
             ) : null}
-            {expanded && state.phase === "done" ? <DocDetailPanel details={state.details} /> : null}
             {state.phase === "password" ? (
               <View style={styles.passwordPanel}>
                 <TextInput
@@ -252,45 +239,28 @@ export function DocumentsStep({ draft, update }: StepProps) {
       <Body muted size={12.5}>
         No documents handy? Just continue and type things in. Every field stays editable either way.
       </Body>
-    </View>
-  );
-}
 
-function DocDetailPanel({ details }: { details: DocDetails }) {
-  return (
-    <View style={styles.detailPanel}>
-      {details.periodLabel ? (
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Statement covers</Text>
-          <Text style={styles.detailValue}>{details.periodLabel}</Text>
-        </View>
-      ) : null}
-      {details.totalMonthlySpend ? (
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Average monthly spend (everything)</Text>
-          <Text style={styles.detailValue}>{formatINR(details.totalMonthlySpend)}</Text>
-        </View>
-      ) : null}
-      {details.emis?.length ? (
-        <View style={{ gap: 4 }}>
-          <Text style={styles.detailLabel}>EMIs, once per month each</Text>
-          {details.emis.map((emi, i) => (
-            <View key={i} style={styles.detailRow}>
-              <Text style={styles.detailEmiName}>{emi.name}</Text>
-              <Text style={styles.detailValue}>{formatINR(emi.amount)}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {details.fieldNotes.map((note, i) => (
-        <View key={i} style={{ gap: 1 }}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>{note.label}</Text>
-            <Text style={styles.detailValue}>{formatINR(note.value)}</Text>
-          </View>
-          <Text style={styles.detailNote}>{note.note}</Text>
-        </View>
-      ))}
+      <Sheet
+        visible={bankSheetFor !== null}
+        title="Get your statement"
+        onClose={() => {
+          setBankSheetFor(null);
+          setOpenFailed(null);
+        }}
+      >
+        <Body muted size={12.5}>
+          Open your app and download the statement PDF, it usually lives under Accounts or Statements. Then come back here and upload it.
+        </Body>
+        {openFailed ? (
+          <Text style={styles.bankFail}>Papa could not open {openFailed}. Open it from your home screen instead.</Text>
+        ) : null}
+        {(bankSheetFor === "credit_card" ? [CRED_APP, ...BANK_APPS] : BANK_APPS).map((app) => (
+          <PressableScale key={app.pkg} onPress={() => openApp(app.name, app.pkg)} style={styles.bankRow}>
+            <Text style={styles.bankName}>{app.name}</Text>
+            <ExternalLink color={colors.primary} size={15} />
+          </PressableScale>
+        ))}
+      </Sheet>
     </View>
   );
 }
@@ -311,61 +281,6 @@ const styles = StyleSheet.create({
   cardDone: {
     backgroundColor: colors.accent,
     borderColor: colors.primary,
-  },
-  cardExpanded: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  detailToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 8,
-    backgroundColor: colors.accent,
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
-    marginTop: -2,
-  },
-  detailToggleText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.accentForeground,
-  },
-  detailPanel: {
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    ...cardShadow,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  detailLabel: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: colors.textSecondary,
-    flexShrink: 1,
-  },
-  detailEmiName: {
-    fontSize: 13,
-    color: colors.foreground,
-    flexShrink: 1,
-  },
-  detailValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: colors.foreground,
-  },
-  detailNote: {
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.mutedForeground,
   },
   title: {
     fontSize: 15,
@@ -412,6 +327,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
+  },
+  bankLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+  },
+  bankLinkText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  bankRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
+  },
+  bankName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.foreground,
+  },
+  bankFail: {
+    fontSize: 12.5,
+    color: colors.warningForeground,
   },
   passwordPanel: {
     flexDirection: "row",
