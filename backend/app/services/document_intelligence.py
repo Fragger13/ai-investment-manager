@@ -434,10 +434,19 @@ def _field(value: int, confidence: int, explanation: str) -> dict:
     return {"value": int(value), "confidence": confidence, "explanation": explanation}
 
 
+def _is_iso_date(value: str) -> bool:
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
 def _statement_period(txns: list[dict]) -> tuple[str, str, int, float, str]:
     """(start, end, days, month_factor, label). month_factor normalises totals
-    to a single month: a 12 day statement has factor ~0.4, a quarter ~3."""
-    dates = sorted(t["date"] for t in txns if t.get("date"))
+    to a single month: a 12 day statement has factor ~0.4, a quarter ~3.
+    Only real dates count — a malformed one must never crash the analysis."""
+    dates = sorted(t["date"] for t in txns if t.get("date") and _is_iso_date(t["date"]))
     if not dates:
         return "", "", 0, 1.0, "unknown period"
     start, end = dates[0], dates[-1]
