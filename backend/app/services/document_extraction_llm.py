@@ -11,6 +11,7 @@ same "never an outage" contract as chat.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
 from app.services.llm.model_router import extract_document_fields, structure_document_transactions
@@ -164,8 +165,12 @@ def llm_structure_transactions(text: str, document_values: set[int]) -> list[dic
         kind = str(row.get("k") or "").strip().lower()
         if kind not in {"dr", "cr"}:
             continue
+        # Shape alone is not enough: the model has produced '2026-28-06',
+        # which looks ISO but is not a date. Parse it or drop it.
         date = str(row.get("d") or "").strip()[:10]
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        try:
+            date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except ValueError:
             date = ""
         desc = " ".join(str(row.get("t") or "").split())[:120]
         txns.append(
