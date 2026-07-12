@@ -14,13 +14,13 @@ type StepProps = {
   update: (patch: Partial<OnboardingDraft>) => void;
 };
 
-type DocKey = "salary_slip" | "bank_statement" | "credit_card" | "loan_statement" | "portfolio";
+// Kept deliberately minimal: the bank statement already carries salary and
+// EMIs, so no separate salary slip or loan statement uploads.
+type DocKey = "bank_statement" | "credit_card" | "portfolio";
 
 const DOCUMENTS: { key: DocKey; emoji: string; title: string; fills: string }[] = [
-  { key: "salary_slip", emoji: "💼", title: "Salary slip", fills: "Your in hand salary" },
   { key: "bank_statement", emoji: "🏦", title: "Bank account statement", fills: "Salary, spends and EMIs" },
   { key: "credit_card", emoji: "💳", title: "Credit card statement", fills: "Card spends and card EMIs" },
-  { key: "loan_statement", emoji: "📄", title: "Loan or CIBIL statement", fills: "Your EMIs" },
   { key: "portfolio", emoji: "📈", title: "Portfolio or CAS statement", fills: "Mutual funds and investments" },
 ];
 
@@ -50,10 +50,8 @@ type DocState =
  */
 export function DocumentsStep({ draft, update }: StepProps) {
   const [states, setStates] = useState<Record<DocKey, DocState>>({
-    salary_slip: { phase: "idle" },
     bank_statement: { phase: "idle" },
     credit_card: { phase: "idle" },
-    loan_statement: { phase: "idle" },
     portfolio: { phase: "idle" },
   });
   const [expandedDoc, setExpandedDoc] = useState<DocKey | null>(null);
@@ -124,9 +122,9 @@ export function DocumentsStep({ draft, update }: StepProps) {
     const filled: string[] = [];
     const next: Partial<OnboardingDraft> = {};
 
-    // Salary priority: the salary slip is authoritative. A statement's salary
-    // guess only lands when no slip has filled the field.
-    if (patch.monthlySalary && (key === "salary_slip" || !draft.monthlySalary)) {
+    // Salary comes from the bank statement; a later upload never overwrites
+    // a value that is already filled.
+    if (patch.monthlySalary && !draft.monthlySalary) {
       next.monthlySalary = patch.monthlySalary;
       filled.push(`salary ${formatINR(patch.monthlySalary)}`);
     }

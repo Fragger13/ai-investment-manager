@@ -20,7 +20,7 @@ import re
 import statistics
 import zipfile
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -363,13 +363,35 @@ def _parse_pdf_transactions(text: str) -> list[dict] | None:
 
 # --------------------------------------------------- deterministic analysis
 
-_SALARY_KW = ("salary", "sal cr", "payroll", "stipend", "wages")
+def _kw_regex(keywords: tuple[str, ...]) -> re.Pattern:
+    """Compile keywords into a word-boundary pattern. Plain substring
+    matching classified 'shreEMIthai' and 'remittance' as EMIs; boundaries
+    make 'emi' mean the word, not three letters inside a UPI handle."""
+    parts = []
+    for kw in keywords:
+        escaped = re.escape(kw).replace(r"\ ", r"\s+")
+        if kw[0].isalnum():
+            escaped = r"\b" + escaped
+        if kw[-1].isalnum():
+            escaped += r"\b"
+        parts.append(escaped)
+    return re.compile("|".join(parts))
+
+
+_SALARY_KW = _kw_regex(("salary", "sal cr", "payroll", "stipend", "wages"))
 # Credits that look recurring but are never salary.
-_SALARY_EXCLUDE_KW = ("reversal", "rvsl", "refund", "interest", "cashback", "redemption", "maturity", "dividend", "rev-")
-_TRANSFER_KW = ("neft", "imps", "rtgs", "ach", "trf", "transfer")
-_INVEST_KW = ("sip", "mutual fund", "mf ", "zerodha", "groww", "kuvera", "etmoney", "indmoney", "smallcase", "nps", "ppf", "elss", "indian clearing", "icclearing", "bse limited")
-_RENT_KW = ("rent", "landlord")
-_EMI_KW = ("emi", "nach", "ecs", "ach d", "achdr", "loan", "bajaj fin", "hdfc ltd", "lic housing", "repayment", "instalment", "installment")
+_SALARY_EXCLUDE_KW = _kw_regex(("reversal", "rvsl", "refund", "interest", "cashback", "redemption", "maturity", "dividend", "rev-"))
+_TRANSFER_KW = _kw_regex(("neft", "imps", "rtgs", "ach", "trf", "transfer"))
+_INVEST_KW = _kw_regex(("sip", "mutual fund", "mf", "zerodha", "groww", "kuvera", "etmoney", "indmoney", "smallcase", "nps", "ppf", "elss", "indian clearing", "icclearing", "bse limited"))
+_RENT_KW = _kw_regex(("rent", "landlord"))
+_EMI_KW = _kw_regex(("emi", "nach", "ecs", "ach d", "achd", "achdr", "loan", "bajaj fin", "hdfc ltd", "lic housing", "repayment", "instalment", "installment"))
+# Words that make an EMI claim strong on their own (vs mandate plumbing like
+# NACH/ECS/ACH-D, which any subscription e-mandate also carries).
+_EMI_STRONG_KW = _kw_regex(("emi", "loan", "instalment", "installment", "repayment"))
+# Lender names for UPI debits: a UPI payment is spending unless it recurs AND
+# goes to a lender (UPI autopay EMIs name Bajaj Finance and friends).
+_LENDER_KW = _kw_regex(("finance", "financial", "finserv", "fincorp", "bajaj fin", "hdfc ltd", "lic housing", "housing fin"))
+_UPI_KW = _kw_regex(("upi",))
 
 _MONTH_TOKENS = {
     "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
@@ -391,14 +413,16 @@ def _group(txns: list[dict], side: str) -> list[dict]:
         if amount <= 0:
             continue
         key = _norm_group_key(t["desc"])
-        bucket = groups.setdefault(key, {"key": key, "raw": t["raw"], "amounts": []})
+        bucket = groups.setdefault(key, {"key": key, "raw": t["raw"], "amounts": [], "last_date": ""})
         bucket["amounts"].append(amount)
+        if t.get("date") and t["date"] > bucket["last_date"]:
+            bucket["last_date"] = t["date"]
     return list(groups.values())
 
 
-def _has_kw(group: dict, keywords: tuple[str, ...]) -> bool:
+def _has_kw(group: dict, pattern: re.Pattern) -> bool:
     haystack = f"{group['key']} {group['raw'].lower()}"
-    return any(kw in haystack for kw in keywords)
+    return bool(pattern.search(haystack))
 
 
 def _is_recurring(group: dict, min_amount: int = 1000, spread: float = 1.35) -> bool:
@@ -427,12 +451,22 @@ def _statement_period(txns: list[dict]) -> tuple[str, str, int, float, str]:
     return start, end, days, factor, label
 
 
+_GENERIC_NAME_TOKENS = {"chq", "upi", "pos", "neft", "imps", "ref", "no"}
+
+
 def _emi_display_name(raw: str) -> str:
-    """'ACH D- BAJAJFIN LTD 40912' → 'Bajajfin Ltd'."""
+    """'ACH D- BAJAJFIN LTD 40912' → 'Bajajfin Ltd'. When stripping leaves
+    nothing meaningful ('EMI 466375280 CHQ S...' → 'Chq'), fall back to the
+    loan account number so the user can recognise which loan it is."""
     cleaned = re.sub(r"(?i)\b(ach|nach|ecs|adhoc|d|dr|debit|emi|mandate|si|tp)\b", " ", raw)
     cleaned = re.sub(r"[^A-Za-z ]", " ", cleaned)
-    words = [w for w in cleaned.split() if len(w) > 1]
-    return " ".join(w.capitalize() for w in words[:4]) or "EMI"
+    words = [w for w in cleaned.split() if len(w) > 1 and w.lower() not in _GENERIC_NAME_TOKENS]
+    if words:
+        return " ".join(w.capitalize() for w in words[:4])
+    account = re.search(r"\d{6,}", raw)
+    if account:
+        return f"EMI account ending {account.group(0)[-4:]}"
+    return "EMI"
 
 
 def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict], dict]:
@@ -462,7 +496,7 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
         recurring = [g for g in credit_groups if _is_recurring(g, min_amount=10000)]
         # Employers pay by NEFT/IMPS/ACH; a recurring UPI credit is more
         # likely a person, so bank-channel groups win when both exist.
-        non_upi = [g for g in recurring if "upi" not in g["key"] and "upi" not in g["raw"].lower()]
+        non_upi = [g for g in recurring if not _has_kw(g, _UPI_KW)]
         if non_upi:
             best = max(non_upi, key=lambda g: statistics.median(g["amounts"]))
             salary_pick = (best, 78, "Largest credit that repeats monthly with a similar amount, which is how salaries look. Counted once per month.")
@@ -482,6 +516,28 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
 
     # Debits: classify each recurring/named group. Per-month figures use the
     # group MEDIAN (one occurrence), so multi-month statements never double count.
+    # An EMI recurs monthly, so in a statement longer than a month it must
+    # show up in the FINAL month — anything older is a closed loan, and a
+    # single NACH/ECS/ACH debit is some e-mandate, not an EMI.
+    multi_month = days >= 45
+    recent_cutoff = ""
+    if multi_month and end:
+        recent_cutoff = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=35)).strftime("%Y-%m-%d")
+
+    def _is_emi(group: dict) -> bool:
+        if _has_kw(group, _UPI_KW):
+            # UPI debits are spending ('shreEMIthai' sweets, hospitals) unless
+            # they recur AND go to a lender (UPI autopay EMIs name the NBFC).
+            if len(group["amounts"]) < 2 or not _has_kw(group, _LENDER_KW):
+                return False
+        elif not _has_kw(group, _EMI_KW):
+            return False
+        elif multi_month and len(group["amounts"]) == 1 and not _has_kw(group, _EMI_STRONG_KW):
+            return False
+        if recent_cutoff and group["last_date"] and group["last_date"] < recent_cutoff:
+            return False
+        return True
+
     emi_total = 0
     emi_recurring = False
     emi_breakdown: list[dict] = []
@@ -499,7 +555,7 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
                 rent_value = median
             categories["Rent"] += total
             classified_sum += total
-        elif _has_kw(group, _EMI_KW):
+        elif _is_emi(group):
             emi_total += median
             emi_recurring = emi_recurring or len(group["amounts"]) >= 2
             emi_breakdown.append({"name": _emi_display_name(group["raw"]), "amount": median, "occurrences": len(group["amounts"])})
@@ -561,13 +617,13 @@ def infer_financials(text: str) -> dict:
         elif any(token in line_lower for token in ["sip", "mutual", "nse", "bse", "broker", "zerodha", "groww", "investment"]):
             investment_values.append(amount)
             categories["Investments"] += amount
-        elif any(token in line_lower for token in ["emi", "loan", "mortgage"]):
+        elif re.search(r"\b(emi|loan|mortgage)\b", line_lower):
             emi_values.append(amount)
             categories["EMI / loan payments"] += amount
         elif any(token in line_lower for token in ["netflix", "spotify", "prime", "subscription", "saas"]):
             subscription_values.append(amount)
             categories["Subscriptions"] += amount
-        elif any(token in line_lower for token in ["rent", "grocery", "swiggy", "zomato", "uber", "debit", "upi", "card"]):
+        elif re.search(r"\brent\b", line_lower) or any(token in line_lower for token in ["grocery", "swiggy", "zomato", "uber", "debit", "upi", "card"]):
             expense_values.append(amount)
             categories["Expenses"] += amount
 
@@ -602,6 +658,12 @@ def infer_financials(text: str) -> dict:
     }
 
 
+# The keyword floor sums labelled lines without knowing the statement period,
+# so on a dense document it can produce absurd monthly figures. Nothing above
+# these ever reaches a profile from that path (the value is conf<=65 anyway).
+_PLAUSIBLE_MONTHLY_CEILING = 1_000_000
+
+
 def _fields_from_text_inference(text: str) -> tuple[dict[str, dict], list[dict]]:
     inferred = infer_financials(text)
     patch = inferred["profilePatch"]
@@ -614,8 +676,12 @@ def _fields_from_text_inference(text: str) -> tuple[dict[str, dict], list[dict]]
         "mutualFundsValue": (55, "Detected from investment-like lines."),
     }
     for key, (confidence, why) in mapping.items():
-        if patch.get(key):
-            fields[key] = _field(patch[key], confidence, why)
+        value = patch.get(key)
+        if not value:
+            continue
+        if key != "mutualFundsValue" and value > _PLAUSIBLE_MONTHLY_CEILING:
+            continue
+        fields[key] = _field(value, confidence, why)
     return fields, inferred["categories"]
 
 
