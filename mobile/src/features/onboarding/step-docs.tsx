@@ -95,7 +95,12 @@ export function DocumentsStep({ draft, update }: StepProps) {
     setState(key, { phase: "uploading" });
     try {
       const analysis = await api.uploadDocument(file, key, password);
-      if (applyPatch(analysis.profilePatch || {}, analysis)) {
+      // "Read it" means Papa extracted figures from the file — even when a
+      // previous upload already filled those fields, the read succeeded.
+      const read =
+        Object.keys(analysis.profilePatch || {}).length > 0 || (analysis.extractedFields || []).length > 0;
+      applyPatch(analysis.profilePatch || {}, analysis);
+      if (read) {
         setState(key, { phase: "done" });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
@@ -119,8 +124,8 @@ export function DocumentsStep({ draft, update }: StepProps) {
     }
   }
 
-  /** Apply extracted values into the draft; returns whether anything filled. */
-  function applyPatch(patch: Record<string, number>, analysis?: DocumentAnalysis): boolean {
+  /** Apply extracted values into the draft for the later steps to prefill. */
+  function applyPatch(patch: Record<string, number>, analysis?: DocumentAnalysis) {
     const next: Partial<OnboardingDraft> = {};
 
     // A later upload never overwrites a value that is already filled.
@@ -135,9 +140,20 @@ export function DocumentsStep({ draft, update }: StepProps) {
       next.emiBreakdown = breakdown.map((item) => ({ name: item.name, amount: item.amount }));
     }
 
-    if (Object.keys(next).length === 0) return false;
-    update(next);
-    return true;
+    if (Object.keys(next).length > 0) update(next);
+  }
+
+  // Android has no "banking apps" filter, but an implicit launcher intent
+  // makes the system show its own app picker — the same chooser it shows
+  // when opening a PDF. The curated sheet stays as the fallback.
+  async function openBankApps(key: DocKey) {
+    try {
+      await IntentLauncher.startActivityAsync("android.intent.action.MAIN", {
+        category: "android.intent.category.LAUNCHER",
+      });
+    } catch {
+      setBankSheetFor(key);
+    }
   }
 
   async function openApp(name: string, pkg: string) {
@@ -192,7 +208,7 @@ export function DocumentsStep({ draft, update }: StepProps) {
               )}
             </PressableScale>
             {showBankLink ? (
-              <PressableScale haptic={false} onPress={() => setBankSheetFor(doc.key)} style={styles.bankLink}>
+              <PressableScale haptic={false} onPress={() => openBankApps(doc.key)} style={styles.bankLink}>
                 <Smartphone color={colors.primary} size={14} />
                 <Text style={styles.bankLinkText}>
                   {doc.key === "credit_card" ? "No PDF handy? Open your bank or CRED app" : "No PDF handy? Open your bank app"}

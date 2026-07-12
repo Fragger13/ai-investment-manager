@@ -133,7 +133,8 @@ def build_structuring_prompt(text: str) -> str:
         '- "k" is "dr" when money left the account, "cr" when money came in.\n'
         '- "d" is the transaction date as YYYY-MM-DD.\n'
         '- "t" is a short description copied from the row.\n'
-        "- At most 60 entries. If there are more rows, keep every credit and the largest and recurring debits.\n"
+        "- At most 60 entries. If there are more rows, keep every credit, every row that mentions EMI, loan, "
+        "instalment or a lender (however small the amount), and then the largest and recurring debits.\n"
         "Reply with ONLY this JSON, no other text:\n"
         '{"transactions": [{"d": "2026-01-31", "t": "", "a": 0, "k": "dr"}]}\n'
         f"Document:\n{body}"
