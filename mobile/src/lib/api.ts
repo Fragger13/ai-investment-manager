@@ -126,9 +126,12 @@ export const api = {
   // fetch+FormData file parts are unreliable on Android, and the legacy
   // FileSystem.uploadAsync has no native module in current Expo Go.
   // doc_type tells the backend which profile fields this document may fill.
+  // pdfPassword unlocks bank PDFs; a locked PDF without it comes back as a
+  // 422 with detail "pdf_password_required".
   async uploadDocument(
     file: { uri: string; name: string; mimeType: string },
-    docType?: string
+    docType?: string,
+    pdfPassword?: string
   ): Promise<DocumentAnalysis> {
     const headers: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
     let result: UploadResult;
@@ -138,7 +141,10 @@ export const api = {
         uploadType: UploadType.MULTIPART,
         fieldName: "file",
         mimeType: file.mimeType,
-        parameters: docType ? { doc_type: docType } : {},
+        parameters: {
+          ...(docType ? { doc_type: docType } : {}),
+          ...(pdfPassword ? { pdf_password: pdfPassword } : {}),
+        },
         headers,
       });
       result = await task.uploadAsync();

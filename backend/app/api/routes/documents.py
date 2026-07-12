@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.core.security import user_from_bearer
 from app.models.uploaded_document import UploadedDocument
 from app.schemas.document import DocumentAnalysisResponse, DocumentAnalyzeRequest
-from app.services.document_intelligence import analyze_document, analyze_saved_file, dumps
+from app.services.document_intelligence import PdfPasswordRequired, analyze_document, analyze_saved_file, dumps
 
 router = APIRouter()
 
@@ -37,6 +37,9 @@ async def upload_document(
     # credit_card, loan_statement, portfolio). Restricts which profile fields
     # the extraction may fill, so a salary slip can't overwrite expenses.
     doc_type: str | None = Form(default=None),
+    # Banks send statement PDFs encrypted; the user supplies the password
+    # (used in memory for this one analysis, never stored).
+    pdf_password: str | None = Form(default=None),
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -71,11 +74,19 @@ async def upload_document(
     db.refresh(record)
 
     try:
-        analysis = analyze_saved_file(path, file.filename or safe_name, inferred_type, record.id, doc_type=doc_type)
+        analysis = analyze_saved_file(
+            path, file.filename or safe_name, inferred_type, record.id, doc_type=doc_type, pdf_password=pdf_password
+        )
         record.extraction_status = analysis["status"]
         record.parsed_data = dumps(analysis)
         db.commit()
         return analysis
+    except PdfPasswordRequired:
+        # Machine-readable: the client shows a password prompt and retries.
+        record.extraction_status = "password_required"
+        record.parsed_data = json.dumps({"error": "pdf_password_required"})
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="pdf_password_required")
     except Exception as exc:
         record.extraction_status = "failed"
         record.parsed_data = json.dumps({"error": str(exc)})

@@ -14,6 +14,7 @@ LLMTask = Literal[
     "goal_estimate",
     "goal_clarify",
     "document_extraction",
+    "document_structure",
 ]
 
 

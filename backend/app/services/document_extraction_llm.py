@@ -10,9 +10,10 @@ same "never an outage" contract as chat.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from app.services.llm.model_router import extract_document_fields
+from app.services.llm.model_router import extract_document_fields, structure_document_transactions
 
 # Field key → (patch key, must the value literally appear in the document?)
 # monthlyExpenses is a judgement call (sums/averages), so it is exempt from
@@ -34,8 +35,12 @@ _DOC_GUIDANCE: dict[str, str] = {
     "bank_statement": (
         "This is a bank account statement. Salary is usually a recurring credit that arrives once a month "
         "with a similar amount, often via NEFT/IMPS/RTGS/ACH and often naming an employer — but a NEFT credit "
-        "alone is not proof; prefer recurring monthly credits. EMIs are recurring debits of identical amounts, "
-        "often marked EMI/NACH/ECS/ACH-D or naming a lender. Transaction amounts, never the running balance column."
+        "alone is not proof; prefer recurring monthly credits. Reversals, refunds, interest and redemptions are "
+        "never salary. EMIs are recurring debits of identical amounts, often marked EMI/NACH/ECS/ACH-D or naming "
+        "a lender; monthlyEmi is the TOTAL of all distinct instalments, each lender counted once per month "
+        "(two EMIs of 15500 and 4499 mean monthlyEmi 19999). Do not report monthlySubscriptions for a bank "
+        "statement; count subscriptions inside monthlyExpenses instead. Transaction amounts, never the running "
+        "balance column."
     ),
     "credit_card": (
         "This is a credit card statement. monthlyExpenses is the total monthly spend on the card; "
@@ -71,9 +76,9 @@ def build_extraction_prompt(text: str, doc_type: str | None) -> str:
     )
 
 
-def _cap_text(text: str, max_lines: int = 160, max_chars: int = 6500) -> str:
-    # Keep the lines that can carry figures; drop the rest to stay inside a
-    # small model's useful context.
+def _cap_text(text: str, max_lines: int = 220, max_chars: int = 9000) -> str:
+    # Keep the lines that can carry figures; drop the rest to stay inside the
+    # model's useful context.
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     with_digits = [line for line in lines if any(ch.isdigit() for ch in line)]
     picked = (with_digits or lines)[:max_lines]
@@ -111,3 +116,62 @@ def llm_extract(text: str, doc_type: str | None, document_values: set[int]) -> d
 def _value_in_document(value: int, document_values: set[int]) -> bool:
     # ±1 absorbs rounding of paise; nothing looser, or hallucinations slip in.
     return value in document_values or (value - 1) in document_values or (value + 1) in document_values
+
+
+# ------------------------------------------------- table structuring fallback
+
+def build_structuring_prompt(text: str) -> str:
+    body = _cap_text(text, max_lines=180, max_chars=9000)
+    return (
+        "You convert an Indian bank or card statement into a transaction list. Amounts are INR.\n"
+        "Rules:\n"
+        "- One entry per transaction row. Skip headers, totals and opening/closing balance rows.\n"
+        '- "a" is the transaction amount exactly as printed, NEVER the running balance.\n'
+        '- "k" is "dr" when money left the account, "cr" when money came in.\n'
+        '- "d" is the transaction date as YYYY-MM-DD.\n'
+        '- "t" is a short description copied from the row.\n'
+        "- At most 60 entries. If there are more rows, keep every credit and the largest and recurring debits.\n"
+        "Reply with ONLY this JSON, no other text:\n"
+        '{"transactions": [{"d": "2026-01-31", "t": "", "a": 0, "k": "dr"}]}\n'
+        f"Document:\n{body}"
+    )
+
+
+def llm_structure_transactions(text: str, document_values: set[int]) -> list[dict] | None:
+    """For statement PDFs the deterministic line parser can't read: the model
+    rebuilds the transaction table, and only rows whose amount literally
+    appears in the document survive. Returns transactions in the same shape
+    as the CSV parser, or None so callers fall back to text inference."""
+    if len(text.strip()) < 40 or not document_values:
+        return None
+    rows = structure_document_transactions(build_structuring_prompt(text))
+    if not rows:
+        return None
+    txns: list[dict] = []
+    for row in rows[:80]:
+        if not isinstance(row, dict):
+            continue
+        try:
+            amount = int(float(row.get("a") or 0))
+        except (TypeError, ValueError):
+            continue
+        if amount <= 0 or not _value_in_document(amount, document_values):
+            continue
+        kind = str(row.get("k") or "").strip().lower()
+        if kind not in {"dr", "cr"}:
+            continue
+        date = str(row.get("d") or "").strip()[:10]
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            date = ""
+        desc = " ".join(str(row.get("t") or "").split())[:120]
+        txns.append(
+            {
+                "raw": desc,
+                "desc": desc.lower(),
+                "debit": amount if kind == "dr" else 0,
+                "credit": amount if kind == "cr" else 0,
+                "date": date,
+                "month": date[:7] if date else "",
+            }
+        )
+    return txns if len(txns) >= 3 else None

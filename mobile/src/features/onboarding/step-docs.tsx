@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
-import { Check, ChevronDown, ChevronUp, FileUp, ShieldCheck } from "lucide-react-native";
+import { Check, ChevronDown, ChevronUp, FileUp, KeyRound, ShieldCheck } from "lucide-react-native";
 import { Body, PressableScale } from "@/components/ui";
 import { cardShadow, colors, radius, spacing } from "@/constants/theme";
 import { api, ApiError, type DocumentAnalysis } from "@/lib/api";
@@ -18,11 +18,13 @@ type DocKey = "salary_slip" | "bank_statement" | "credit_card" | "loan_statement
 
 const DOCUMENTS: { key: DocKey; emoji: string; title: string; fills: string }[] = [
   { key: "salary_slip", emoji: "💼", title: "Salary slip", fills: "Your in hand salary" },
-  { key: "bank_statement", emoji: "🏦", title: "Bank account statement", fills: "Salary, spends, EMIs, subscriptions" },
+  { key: "bank_statement", emoji: "🏦", title: "Bank account statement", fills: "Salary, spends and EMIs" },
   { key: "credit_card", emoji: "💳", title: "Credit card statement", fills: "Card spends and card EMIs" },
   { key: "loan_statement", emoji: "📄", title: "Loan or CIBIL statement", fills: "Your EMIs" },
   { key: "portfolio", emoji: "📈", title: "Portfolio or CAS statement", fills: "Mutual funds and investments" },
 ];
+
+type PickedFile = { uri: string; name: string; mimeType: string };
 
 type DocDetails = {
   periodLabel?: string;
@@ -36,7 +38,10 @@ type DocState =
   | { phase: "uploading" }
   | { phase: "done"; summary: string; details: DocDetails }
   | { phase: "empty" }
-  | { phase: "error"; message: string };
+  | { phase: "error"; message: string }
+  // The PDF is locked; keep the picked file so the retry with a password
+  // doesn't make the user pick it again.
+  | { phase: "password"; file: PickedFile; message: string };
 
 /**
  * Documents-first onboarding: upload whatever paperwork exists, one document
@@ -52,6 +57,7 @@ export function DocumentsStep({ draft, update }: StepProps) {
     portfolio: { phase: "idle" },
   });
   const [expandedDoc, setExpandedDoc] = useState<DocKey | null>(null);
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
 
   const setState = (key: DocKey, state: DocState) => setStates((prev) => ({ ...prev, [key]: state }));
 
@@ -68,12 +74,17 @@ export function DocumentsStep({ draft, update }: StepProps) {
     });
     if (picked.canceled || !picked.assets?.length) return;
     const asset = picked.assets[0];
+    await upload(key, {
+      uri: asset.uri,
+      name: asset.name || "document.pdf",
+      mimeType: asset.mimeType || "application/pdf",
+    });
+  }
+
+  async function upload(key: DocKey, file: PickedFile, password?: string) {
     setState(key, { phase: "uploading" });
     try {
-      const analysis = await api.uploadDocument(
-        { uri: asset.uri, name: asset.name || "document.pdf", mimeType: asset.mimeType || "application/pdf" },
-        key
-      );
+      const analysis = await api.uploadDocument(file, key, password);
       const summary = applyPatch(key, analysis.profilePatch || {}, analysis);
       if (summary) {
         const statement = analysis.statement;
@@ -91,6 +102,17 @@ export function DocumentsStep({ draft, update }: StepProps) {
         setState(key, { phase: "empty" });
       }
     } catch (e) {
+      if (e instanceof ApiError && e.status === 422 && e.detail.includes("pdf_password_required")) {
+        setState(key, {
+          phase: "password",
+          file,
+          message: password
+            ? "That password did not open the file. Check it and try again."
+            : "This PDF is locked. Enter the password from your bank, it is usually in the statement email.",
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
       const message = e instanceof ApiError ? e.detail : "Something went wrong. Try again.";
       setState(key, { phase: "error", message });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -159,6 +181,8 @@ export function DocumentsStep({ draft, update }: StepProps) {
                   <Text style={styles.emptyText}>Papa could not read numbers from that file. Try another, or type it later.</Text>
                 ) : state.phase === "error" ? (
                   <Text style={styles.errorText}>{state.message}</Text>
+                ) : state.phase === "password" ? (
+                  <Text style={styles.emptyText}>{state.message}</Text>
                 ) : (
                   <Text style={styles.fills}>{doc.fills}</Text>
                 )}
@@ -190,6 +214,33 @@ export function DocumentsStep({ draft, update }: StepProps) {
               </PressableScale>
             ) : null}
             {expanded && state.phase === "done" ? <DocDetailPanel details={state.details} /> : null}
+            {state.phase === "password" ? (
+              <View style={styles.passwordPanel}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordDrafts[doc.key] || ""}
+                  onChangeText={(text) => setPasswordDrafts((prev) => ({ ...prev, [doc.key]: text }))}
+                  placeholder="PDF password"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onSubmitEditing={() => {
+                    const pw = (passwordDrafts[doc.key] || "").trim();
+                    if (pw) upload(doc.key, state.file, pw);
+                  }}
+                />
+                <PressableScale
+                  onPress={() => {
+                    const pw = (passwordDrafts[doc.key] || "").trim();
+                    if (pw) upload(doc.key, state.file, pw);
+                  }}
+                  style={styles.passwordBtn}
+                >
+                  <KeyRound color={colors.primaryForeground} size={15} />
+                  <Text style={styles.passwordBtnText}>Unlock</Text>
+                </PressableScale>
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -363,5 +414,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
+  },
+  passwordPanel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    ...cardShadow,
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.foreground,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  passwordBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  passwordBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.primaryForeground,
   },
 });
