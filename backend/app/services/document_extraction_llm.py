@@ -38,13 +38,16 @@ _DOC_GUIDANCE: dict[str, str] = {
         "alone is not proof; prefer recurring monthly credits. Reversals, refunds, interest and redemptions are "
         "never salary. EMIs are recurring debits of identical amounts, often marked EMI/NACH/ECS/ACH-D or naming "
         "a lender; monthlyEmi is the TOTAL of all distinct instalments, each lender counted once per month "
-        "(two EMIs of 15500 and 4499 mean monthlyEmi 19999). Do not report monthlySubscriptions for a bank "
-        "statement; count subscriptions inside monthlyExpenses instead. Transaction amounts, never the running "
-        "balance column."
+        "(two EMIs of 15500 and 4499 mean monthlyEmi 19999). UPI payments to shops, restaurants or hospitals "
+        "are ordinary spending, never EMIs, even when the UPI handle happens to contain the letters 'emi'. "
+        "In a multi month statement only count EMIs still active in the most recent month. Do not report "
+        "monthlySubscriptions for a bank statement; count subscriptions inside monthlyExpenses instead. "
+        "Transaction amounts, never the running balance column."
     ),
     "credit_card": (
         "This is a credit card statement. monthlyExpenses is the total monthly spend on the card; "
-        "monthlyEmi is any card EMI instalment; monthlySubscriptions covers recurring merchants like "
+        "monthlyEmi is only a genuine card EMI instalment (narrations like 'EMI 03/12'); ordinary merchant "
+        "purchases, however large, are never EMIs. monthlySubscriptions covers recurring merchants like "
         "Netflix, Spotify, Prime."
     ),
     "loan_statement": "This is a loan or CIBIL statement. Report the monthly EMI instalment amount.",
