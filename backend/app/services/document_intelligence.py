@@ -25,7 +25,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from app.schemas.document import DocumentAnalyzeRequest
-from app.services.document_extraction_llm import llm_extract
+from app.services.document_extraction_llm import llm_extract, llm_structure_transactions
 
 
 SUPPORTED_TYPES = {"pdf", "csv", "xlsx", "xls"}
@@ -49,17 +49,38 @@ def _money_values(text: str) -> list[int]:
 
 # ------------------------------------------------------------ text extraction
 
-def _extract_pdf_text(path: Path) -> str:
-    # Real extraction first; the legacy latin-1 fragment scrape stays as the
-    # floor for odd or image-based PDFs (until OCR lands).
-    try:
-        from pypdf import PdfReader
+class PdfPasswordRequired(Exception):
+    """The PDF is encrypted and needs the user's password (banks usually
+    print it in the statement email: PAN, DOB combos and so on)."""
 
-        reader = PdfReader(str(path))
-        pages = [page.extract_text() or "" for page in reader.pages[:40]]
+
+def _open_pdf(path: Path, password: str | None):
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(path))
+    if reader.is_encrypted:
+        if not password or not reader.decrypt(password):
+            raise PdfPasswordRequired()
+    return reader
+
+
+def _extract_pdf_text(path: Path, password: str | None = None) -> str:
+    # Layout mode preserves the column structure of statement tables, which
+    # the line parser depends on. The legacy latin-1 fragment scrape stays as
+    # the floor for odd PDFs (until OCR lands).
+    try:
+        reader = _open_pdf(path, password)
+        pages = []
+        for page in reader.pages[:40]:
+            try:
+                pages.append(page.extract_text(extraction_mode="layout") or "")
+            except Exception:
+                pages.append(page.extract_text() or "")
         text = "\n".join(pages).strip()
         if len(text) > 40:
             return text
+    except PdfPasswordRequired:
+        raise
     except Exception:
         pass
     raw = path.read_bytes()
@@ -108,14 +129,14 @@ def _xlsx_rows(path: Path) -> list[list[str]]:
     return rows[:2000]
 
 
-def extract_text(path: Path, file_type: str) -> str:
+def extract_text(path: Path, file_type: str, pdf_password: str | None = None) -> str:
     normalized = file_type.lower().lstrip(".")
     if normalized == "csv":
         return "\n".join(" ".join(cell for cell in row if cell) for row in _csv_rows(path))
     if normalized in {"xlsx", "xls"}:
         return "\n".join(" ".join(cell for cell in row if cell) for row in _xlsx_rows(path))
     if normalized == "pdf":
-        return _extract_pdf_text(path)
+        return _extract_pdf_text(path, pdf_password)
     return ""
 
 
@@ -224,18 +245,142 @@ def _transactions_text(txns: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# PDF statement rows start with a date; amounts carry paise (two decimals),
+# which reference numbers and dates never do — that one shape separates money
+# from noise on a PDF line.
+_PDF_DATE = re.compile(r"^\s{0,8}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}[- ]?[A-Za-z]{3}[- ]?\d{2,4}|\d{4}-\d{2}-\d{2})\b")
+_PDF_MONEY = re.compile(r"(\d{1,3}(?:,\d{2,3})*\.\d{2})(?:\s*\(?(cr|dr)\.?\)?(?=[\s,]|$))?", re.IGNORECASE)
+_OPENING_KW = ("opening balance", "b/f", "brought forward", "bal b/f", "balance forward")
+
+
+def _parse_date_any(token: str) -> str:
+    normalized = re.sub(r"[/. ]", "-", token.strip())
+    for fmt in ("%d-%m-%Y", "%d-%m-%y", "%d-%b-%Y", "%d-%b-%y", "%Y-%m-%d", "%d%b%Y", "%d%b%y"):
+        try:
+            return datetime.strptime(normalized, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
+
+
+def _parse_pdf_transactions(text: str) -> list[dict] | None:
+    """Bank PDF text (layout mode) becomes transactions the same shape as the
+    CSV parser's. The last money token on a row is the running balance, and
+    the transaction amount is whichever earlier token explains the change in
+    balance from the previous row — so debit vs credit is proven by the money
+    actually moving, not guessed from words. Cr/Dr suffixes are the fallback
+    when a row's delta doesn't reconcile."""
+    entries: list[dict] = []
+    last_entry: dict | None = None
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        tokens = [
+            (float(m.group(1).replace(",", "")), (m.group(2) or "").lower())
+            for m in _PDF_MONEY.finditer(line)
+        ]
+        date_match = _PDF_DATE.match(line)
+        lowered = line.lower()
+        if not date_match:
+            if tokens and any(kw in lowered for kw in _OPENING_KW):
+                entries.append({"date": "", "tokens": tokens, "raw": "", "balance_only": True})
+                last_entry = None
+            elif last_entry is not None and not tokens and re.search(r"[a-z]{3}", lowered) and len(last_entry["raw"]) < 140:
+                # Wrapped narration: banks continue the description on the
+                # next line without a date or amounts.
+                last_entry["raw"] = f"{last_entry['raw']} {' '.join(line.split())}".strip()
+            continue
+        if not tokens:
+            continue
+        desc = _PDF_MONEY.sub(" ", line[date_match.end():])
+        entry = {
+            "date": _parse_date_any(date_match.group(1)),
+            "tokens": tokens,
+            "raw": " ".join(desc.split())[:140],
+            "balance_only": any(kw in lowered for kw in _OPENING_KW),
+        }
+        entries.append(entry)
+        last_entry = entry
+
+    dated = [e["date"] for e in entries if e["date"]]
+    if len(dated) < 3:
+        return None
+    descending = sum(1 for a, b in zip(dated, dated[1:]) if a > b)
+    ascending = sum(1 for a, b in zip(dated, dated[1:]) if a < b)
+    if descending > ascending:
+        # Newest-first statements: reverse into chronological order so the
+        # running-balance delta explains each row's own amount.
+        entries.reverse()
+
+    txns: list[dict] = []
+    prev_balance: float | None = None
+    for entry in entries:
+        tokens = entry["tokens"]
+        if entry["balance_only"]:
+            prev_balance = tokens[-1][0]
+            continue
+        balance: float | None = tokens[-1][0]
+        candidates = [(v, s) for v, s in tokens[:-1] if v > 0]
+        amount = 0.0
+        direction = ""
+        if prev_balance is not None and candidates:
+            delta = balance - prev_balance
+            for value, _suffix in candidates:
+                if abs(abs(delta) - value) <= 1.0 and abs(delta) > 0:
+                    amount = value
+                    direction = "credit" if delta > 0 else "debit"
+                    break
+        if not direction and candidates:
+            value, suffix = candidates[-1]
+            if suffix in {"cr", "dr"}:
+                amount = value
+                direction = "credit" if suffix == "cr" else "debit"
+        if not direction and len(tokens) == 1:
+            # No balance column on this row: a lone amount with a Cr/Dr
+            # marker is still a usable transaction.
+            value, suffix = tokens[0]
+            if suffix in {"cr", "dr"}:
+                amount = value
+                direction = "credit" if suffix == "cr" else "debit"
+                balance = None
+        if balance is not None:
+            prev_balance = balance
+        if not direction or not (1 <= amount <= 100000000):
+            continue
+        rounded = int(round(amount))
+        txns.append(
+            {
+                "raw": entry["raw"],
+                "desc": entry["raw"].lower(),
+                "debit": rounded if direction == "debit" else 0,
+                "credit": rounded if direction == "credit" else 0,
+                "date": entry["date"],
+                "month": entry["date"][:7] if entry["date"] else "",
+            }
+        )
+    return txns if len(txns) >= 3 else None
+
+
 # --------------------------------------------------- deterministic analysis
 
 _SALARY_KW = ("salary", "sal cr", "payroll", "stipend", "wages")
+# Credits that look recurring but are never salary.
+_SALARY_EXCLUDE_KW = ("reversal", "rvsl", "refund", "interest", "cashback", "redemption", "maturity", "dividend", "rev-")
 _TRANSFER_KW = ("neft", "imps", "rtgs", "ach", "trf", "transfer")
 _INVEST_KW = ("sip", "mutual fund", "mf ", "zerodha", "groww", "kuvera", "etmoney", "indmoney", "smallcase", "nps", "ppf", "elss", "indian clearing", "icclearing", "bse limited")
-_SUBS_KW = ("netflix", "spotify", "prime", "hotstar", "youtube", "google one", "apple.com", "jiocinema", "sonyliv", "subscription")
 _RENT_KW = ("rent", "landlord")
 _EMI_KW = ("emi", "nach", "ecs", "ach d", "achdr", "loan", "bajaj fin", "hdfc ltd", "lic housing", "repayment", "instalment", "installment")
 
+_MONTH_TOKENS = {
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+    "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december",
+}
+
 
 def _norm_group_key(desc: str) -> str:
-    tokens = re.sub(r"[^a-z ]", " ", desc).split()
+    # Month names would split "SALARY MAY" and "SALARY JUN" into different
+    # groups, hiding the recurrence that is the whole signal.
+    tokens = [t for t in re.sub(r"[^a-z ]", " ", desc).split() if t not in _MONTH_TOKENS]
     return " ".join(tokens[:4]) or desc[:24]
 
 
@@ -301,7 +446,8 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
     # Salary: prefer recurring credits that say so; then any recurring monthly
     # credit; a lone NEFT/IMPS credit is only a weak hint. The value is the
     # MEDIAN of one group — a 3 month statement counts salary once, never 3x.
-    credit_groups = _group(txns, "credit")
+    # Reversals, refunds, interest and redemption credits are never salary.
+    credit_groups = [g for g in _group(txns, "credit") if not _has_kw(g, _SALARY_EXCLUDE_KW)]
     salary_pick = None
     for group in credit_groups:
         if _has_kw(group, _SALARY_KW) and _is_recurring(group, min_amount=8000):
@@ -314,9 +460,15 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
             salary_pick = (best, 80, "Credit line that names salary.")
     if not salary_pick and recurrence_possible:
         recurring = [g for g in credit_groups if _is_recurring(g, min_amount=10000)]
-        if recurring:
-            best = max(recurring, key=lambda g: statistics.median(g["amounts"]))
+        # Employers pay by NEFT/IMPS/ACH; a recurring UPI credit is more
+        # likely a person, so bank-channel groups win when both exist.
+        non_upi = [g for g in recurring if "upi" not in g["key"] and "upi" not in g["raw"].lower()]
+        if non_upi:
+            best = max(non_upi, key=lambda g: statistics.median(g["amounts"]))
             salary_pick = (best, 78, "Largest credit that repeats monthly with a similar amount, which is how salaries look. Counted once per month.")
+        elif recurring:
+            best = max(recurring, key=lambda g: statistics.median(g["amounts"]))
+            salary_pick = (best, 60, "Recurring UPI credit of a similar amount each month. Could be salary or a personal transfer, please check.")
     if not salary_pick:
         transfers = [g for g in credit_groups if _has_kw(g, _TRANSFER_KW) and statistics.median(g["amounts"]) >= 15000]
         if transfers:
@@ -333,7 +485,6 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
     emi_total = 0
     emi_recurring = False
     emi_breakdown: list[dict] = []
-    subs_total = 0
     rent_value = 0
     classified_sum = 0
     debit_groups = _group(txns, "debit")
@@ -342,10 +493,6 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
         total = sum(group["amounts"])
         if _has_kw(group, _INVEST_KW):
             categories["Investments"] += total
-            classified_sum += total
-        elif _has_kw(group, _SUBS_KW):
-            subs_total += median
-            categories["Subscriptions"] += total
             classified_sum += total
         elif _has_kw(group, _RENT_KW):
             if median > rent_value:
@@ -363,15 +510,15 @@ def _analyze_transactions(txns: list[dict]) -> tuple[dict[str, dict], list[dict]
     if emi_total:
         plural = "instalments" if len(emi_breakdown) > 1 else "instalment"
         fields["emi"] = _field(emi_total, 88 if emi_recurring else 72, f"{len(emi_breakdown)} monthly {plural}, each counted once: " + ", ".join(f"{i['name']} ₹{i['amount']:,}" for i in emi_breakdown[:4]))
-    if subs_total:
-        fields["subscriptions"] = _field(subs_total, 80, "Recurring subscription merchants.")
     if rent_value:
         fields["rent"] = _field(rent_value, 85, "Recurring debit that names rent.")
 
+    # Subscriptions are deliberately NOT a separate field here: they are just
+    # spending, so they stay inside the monthly expenses figure.
     total_debits = sum(t["debit"] for t in txns)
     other_spend = max(0, round((total_debits - classified_sum) / month_factor))
     if other_spend:
-        fields["monthlyExpenses"] = _field(other_spend, 62, f"Everything else that left the account over {period_label}, normalised to one month. Excludes rent, EMIs, investments and subscriptions.")
+        fields["monthlyExpenses"] = _field(other_spend, 62, f"Everything that left the account over {period_label} apart from rent, EMIs and investments, normalised to one month. Subscriptions and everyday spends are included here.")
         categories["Expenses"] += total_debits - classified_sum
 
     statement_insights = {
@@ -487,7 +634,9 @@ _FIELD_LABELS = {
 # (backward compatible with callers that send no doc_type).
 DOC_TYPE_FIELDS: dict[str, set[str]] = {
     "salary_slip": {"monthlySalary", "monthlyCashInflow"},
-    "bank_statement": {"monthlySalary", "monthlyCashInflow", "monthlyExpenses", "emi", "subscriptions", "rent"},
+    # Subscriptions from a bank statement are folded into monthlyExpenses,
+    # never reported separately.
+    "bank_statement": {"monthlySalary", "monthlyCashInflow", "monthlyExpenses", "emi", "rent"},
     "credit_card": {"monthlyExpenses", "subscriptions", "emi"},
     "loan_statement": {"emi"},
     "portfolio": {"mutualFundsValue"},
@@ -503,11 +652,16 @@ def _restrict_to_doc_type(analysis: dict, doc_type: str | None) -> dict:
     return analysis
 
 
-def _merge_field(det: dict | None, llm: dict | None) -> dict | None:
+def _merge_field(det: dict | None, llm: dict | None, det_structural: bool = False) -> dict | None:
     if det and llm:
         det_v, llm_v = det["value"], llm["value"]
         if abs(det_v - llm_v) <= 0.1 * max(det_v, llm_v):
             return _field(llm_v, 92, det["explanation"])
+        if det_structural and det["confidence"] >= 78:
+            # The pattern result is proven by real transaction structure
+            # (recurrence, ledger sums); one disagreeing model read doesn't
+            # outrank that evidence.
+            return _field(det_v, det["confidence"], det["explanation"])
         return _field(det_v, 55, f"Pattern analysis says {det_v:,}, the reading model says {llm_v:,}. Please check which is right.")
     if llm:
         return _field(llm["value"], 75, f"Read from the document: {llm['evidence'][:90]}" if llm.get("evidence") else "Read from the document.")
@@ -521,6 +675,7 @@ def response_from_text(
     document_id: int | None = None,
     doc_type: str | None = None,
     transactions: list[dict] | None = None,
+    llm_layer: bool = True,
 ) -> dict:
     normalized = file_type.lower().lstrip(".")
     if normalized not in SUPPORTED_TYPES:
@@ -548,17 +703,19 @@ def response_from_text(
         llm_text = text
 
     # Language-model layer, validated against numbers present in the document.
+    # Skipped when the transactions themselves came from an LLM structuring
+    # pass: a second reading of the same model adds latency, not information.
     document_values = set(_money_values(text))
     if transactions:
         for t in transactions:
             document_values.add(t["debit"])
             document_values.add(t["credit"])
     document_values.discard(0)
-    llm_fields = llm_extract(llm_text, doc_type, document_values)
+    llm_fields = llm_extract(llm_text, doc_type, document_values) if llm_layer else {}
 
     merged: dict[str, dict] = {}
     for key in _FIELD_LABELS:
-        result = _merge_field(det_fields.get(key), llm_fields.get(key))
+        result = _merge_field(det_fields.get(key), llm_fields.get(key), det_structural=bool(transactions))
         if result and result["value"] > 0:
             merged[key] = result
 
@@ -620,15 +777,32 @@ def analyze_document(payload: DocumentAnalyzeRequest) -> dict:
     return response_from_text(payload.file_name, payload.file_type, "")
 
 
-def analyze_saved_file(path: Path, file_name: str, file_type: str, document_id: int | None = None, doc_type: str | None = None) -> dict:
+def analyze_saved_file(
+    path: Path,
+    file_name: str,
+    file_type: str,
+    document_id: int | None = None,
+    doc_type: str | None = None,
+    pdf_password: str | None = None,
+) -> dict:
     normalized = file_type.lower().lstrip(".")
     transactions: list[dict] | None = None
+    llm_layer = True
     if normalized == "csv":
         transactions = _parse_transactions(_csv_rows(path))
     elif normalized in {"xlsx", "xls"}:
         transactions = _parse_transactions(_xlsx_rows(path))
-    text = extract_text(path, file_type)
-    return response_from_text(file_name, file_type, text, document_id, doc_type=doc_type, transactions=transactions)
+    text = extract_text(path, file_type, pdf_password)
+    if normalized == "pdf" and transactions is None:
+        transactions = _parse_pdf_transactions(text)
+        if transactions is None and doc_type in {None, "bank_statement", "credit_card"}:
+            # Last resort for layouts the line parser can't read: the LLM
+            # structures the rows, every amount validated against the text.
+            transactions = llm_structure_transactions(text, set(_money_values(text)))
+            llm_layer = transactions is None
+    return response_from_text(
+        file_name, file_type, text, document_id, doc_type=doc_type, transactions=transactions, llm_layer=llm_layer
+    )
 
 
 def dumps(data: dict) -> str:

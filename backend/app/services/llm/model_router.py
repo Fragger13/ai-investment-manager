@@ -36,6 +36,16 @@ def extract_document_fields(prompt: str) -> dict[str, Any] | None:
     return result if isinstance(result, dict) else None
 
 
+def structure_document_transactions(prompt: str) -> list[Any] | None:
+    """Table structuring for statement PDFs the deterministic parser can't
+    read. Returns the raw transactions array (callers validate every row), or
+    None when the model is unavailable/unparseable."""
+    result = _complete_json("document_structure", prompt, None)
+    if isinstance(result, dict):
+        result = result.get("transactions")
+    return result if isinstance(result, list) else None
+
+
 def refine_goal_estimate(
     goal_type: str,
     answers: dict[str, Any],
@@ -241,7 +251,10 @@ def _call_with_metadata(task: LLMTask, prompt: str, expect_json: bool, fallback:
                     model=model,
                     expect_json=expect_json,
                     timeout_seconds=_timeout_for_task(task),
-                    metadata={"num_predict": _num_predict_for_task(task, expect_json)},
+                    metadata={
+                        "num_predict": _num_predict_for_task(task, expect_json),
+                        "num_ctx": _num_ctx_for_task(task),
+                    },
                 )
             )
             record_llm_event({"task": task, "provider": response.provider, "model": model, "ok": response.ok, "fallback": False, "elapsedMs": response.elapsed_ms})
@@ -334,7 +347,21 @@ def _num_predict_for_task(task: LLMTask, expect_json: bool) -> int:
         # One clarifying question with a few options — a tight cap keeps the
         # onboarding round-trip fast.
         return 140
+    if task == "document_structure":
+        # A whole transaction table as JSON; ~60 rows of {d,t,a,k}.
+        return 1600
     return 520 if expect_json else 180
+
+
+def _num_ctx_for_task(task: LLMTask) -> int:
+    # Document tasks carry up to ~9K chars of statement text in the prompt;
+    # the 2048 default would silently truncate it from the front, losing the
+    # instructions. Everything else keeps the small, fast window.
+    if task == "document_structure":
+        return 6144
+    if task == "document_extraction":
+        return 4096
+    return 2048
 
 
 def _timeout_for_task(task: LLMTask) -> int:
@@ -344,6 +371,10 @@ def _timeout_for_task(task: LLMTask) -> int:
         # In the upload request path behind a spinner; long documents need a
         # little more room than chat, but never hang the upload.
         return min(25, max(5, int(settings.llm_timeout_chat_seconds or 20)))
+    if task == "document_structure":
+        # Also behind the upload spinner, but only fires when the
+        # deterministic PDF parser failed, and it generates a lot more JSON.
+        return min(45, max(10, int(settings.llm_timeout_chat_seconds or 20) + 20))
     if task in {"goal_estimate", "goal_clarify"}:
         # In the onboarding request path — keep it snappy and fall back fast.
         return min(15, max(5, int(settings.llm_timeout_chat_seconds or 12)))
